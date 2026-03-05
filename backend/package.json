@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "build": "npx prisma generate"
+    "postinstall": "npx prisma generate",
+    "build": "echo 'Build step complete'"
   },
   "keywords": [],
   "author": "",
