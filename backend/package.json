@@ -17,10 +17,10 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "prisma": "^6.4.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14",
-    "prisma": "^6.4.1"
+    "nodemon": "^3.1.14"
   }
 }
