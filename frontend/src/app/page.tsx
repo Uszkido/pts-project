@@ -1,11 +1,40 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
     const [imei, setImei] = useState('');
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [systemStatus, setSystemStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+    // System Health Check
+    useEffect(() => {
+        const checkSystemHealth = async () => {
+            try {
+                // Use the environment variable, or fallback to localhost for local development
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                // we want to hit /health, which is at the root of the backend server (not under /api/v1/)
+                // So if NEXT_PUBLIC_API_URL is "https://pts-backend-40w4.onrender.com/api/v1", we need the root.
+                // A safer way is to construct the base URL from the API URL.
+                const baseUrl = apiUrl.replace('/api/v1', '');
+
+                const res = await fetch(`${baseUrl}/health`);
+                if (res.ok) {
+                    setSystemStatus('online');
+                } else {
+                    setSystemStatus('offline');
+                }
+            } catch (err) {
+                setSystemStatus('offline');
+            }
+        };
+
+        checkSystemHealth();
+        // Ping every 30 seconds
+        const interval = setInterval(checkSystemHealth, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,7 +47,8 @@ export default function Home() {
         setResult(null);
 
         try {
-            const res = await fetch(`http://localhost:5000/api/v1/devices/verify/${imei}`);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/devices/verify/${imei}`);
             const data = await res.json();
 
             if (!res.ok) {
@@ -51,10 +81,23 @@ export default function Home() {
 
             <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-20 sm:pt-32">
                 <div className="text-center space-y-8">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                        National Database Active
+                    {/* Dynamic System Status Badge */}
+                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-sm font-medium transition-colors duration-500
+                        ${systemStatus === 'checking' ? 'bg-slate-500/10 border-slate-500/20 text-slate-400' :
+                            systemStatus === 'online' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                'bg-red-500/10 border-red-500/20 text-red-400'}`}
+                    >
+                        {systemStatus === 'checking' && (
+                            <svg className="animate-spin w-3 h-3 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        )}
+                        {systemStatus === 'online' && <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>}
+                        {systemStatus === 'offline' && <span className="w-2 h-2 rounded-full bg-red-500"></span>}
+
+                        {systemStatus === 'checking' ? 'Checking Link...' :
+                            systemStatus === 'online' ? 'Live Database Connected' :
+                                'Database Offline'}
                     </div>
+
                     <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-slate-200 to-slate-500">
                         Verify Device <br className="hidden sm:block" />Integrity.
                     </h1>
@@ -169,11 +212,11 @@ export default function Home() {
                     <div className="text-white w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl">
                         <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                             {/* Inner V */}
-                            <path d="M50 78L26 48L37 38L50 56L63 38L74 48L50 78Z" fill="white"/>
+                            <path d="M50 78L26 48L37 38L50 56L63 38L74 48L50 78Z" fill="white" />
                             {/* Left Outer Angle */}
-                            <path d="M22 30H42L35 38H30.5L16 54C16 54 12 48 16 38C17 35 19 30 22 30Z" fill="white"/>
+                            <path d="M22 30H42L35 38H30.5L16 54C16 54 12 48 16 38C17 35 19 30 22 30Z" fill="white" />
                             {/* Right Outer Angle */}
-                            <path d="M78 30H58L65 38H69.5L84 54C84 54 88 48 84 38C83 35 81 30 78 30Z" fill="white"/>
+                            <path d="M78 30H58L65 38H69.5L84 54C84 54 88 48 84 38C83 35 81 30 78 30Z" fill="white" />
                         </svg>
                     </div>
                     <div className="text-center">
