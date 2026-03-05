@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  role        String   @default("VENDOR") // ADMIN, VENDOR, CONSUMER, POLICE, INSURANCE, TELECOM
+  companyName String?
+  vendorTier  Int      @default(3) // 1: Verified, 2: Certified, 3: Informal, 4: Watchlist
+  devices     Device[]
+  certificates Certificate[]
+  sales        OwnershipTransfer[] @relation("Sales")
+  purchases    OwnershipTransfer[] @relation("Purchases")
+  trustScore   VendorTrustScore?
+  incidentsReported IncidentReport[]
+  vendorAlertsSubmitted VendorSuspiciousAlert[] @relation("VendorAlerts")
+  actionsPerformed TransactionHistory[] @relation("ActionsPerformed")
+  proofsOfSaleAsVendor ProofOfSale[] @relation("VendorSales")
+  proofsOfSaleAsBuyer  ProofOfSale[] @relation("BuyerPurchases")
+  createdAt   DateTime @default(now())
+}
+
+model Device {
+  id               String   @id @default(uuid())
+  imei             String   @unique
+  serialNumber     String?
+  brand            String
+  model            String
+  status           String   @default("CLEAN") // CLEAN, STOLEN, LOST, INVESTIGATING, VENDOR_HELD, ARCHIVED, RECOVERED
+  riskScore        Int      @default(100)
+  registeredOwnerId String
+  registeredOwner  User     @relation(fields: [registeredOwnerId], references: [id])
+  certificates     Certificate[]
+  transfersAsDevice OwnershipTransfer[]
+  incidents        IncidentReport[]
+  vendorAlerts     VendorSuspiciousAlert[]
+  history          TransactionHistory[]
+  proofsOfSale     ProofOfSale[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model VendorTrustScore {
+  id          String   @id @default(uuid())
+  vendorId    String   @unique
+  vendor      User     @relation(fields: [vendorId], references: [id])
+  score       Int      @default(100)
+  completedSales Int   @default(0)
+  flaggedDevices Int   @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model TelecomSyncLog {
+  id          String   @id @default(uuid())
+  telecomName String
+  syncedAt    DateTime @default(now())
+  recordsSent Int
+}
+
+model IncidentReport {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  type        String   // LOST, STOLEN, SNATCHED, FRAUD
+  incidentDate DateTime?
+  location    String?
+  description String?
+  policeReportNo String?
+  status      String   @default("OPEN") // OPEN, REVIEWING, RESOLVED
+  createdAt   DateTime @default(now())
+}
+
+model VendorSuspiciousAlert {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  vendorId    String
+  vendor      User     @relation("VendorAlerts", fields: [vendorId], references: [id])
+  sellerEmail String?
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model Certificate {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+  issueDate   DateTime @default(now())
+  qrHash      String   @unique
+  isActive    Boolean  @default(true)
+}
+
+model OwnershipTransfer {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  sellerId    String
+  seller      User     @relation("Sales", fields: [sellerId], references: [id])
+  buyerId     String
+  buyer       User     @relation("Purchases", fields: [buyerId], references: [id])
+  status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  transferDate DateTime @default(now())
+}
+
+model TransactionHistory {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  actorId     String?
+  actor       User?    @relation("ActionsPerformed", fields: [actorId], references: [id])
+  type        String   // REGISTRATION, TRANSFER, STATUS_CHANGE, CERT_ISSUANCE, SALE, RECOVERY
+  description String
+  metadata    String?  // JSON string
+  createdAt   DateTime @default(now())
+}
+
+model ProofOfSale {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  vendorId    String
+  vendor      User     @relation("VendorSales", fields: [vendorId], references: [id])
+  buyerId     String?
+  buyer       User?    @relation("BuyerPurchases", fields: [buyerId], references: [id])
+  transactionRef String?
+  signedByVendor Boolean @default(false)
+  signedByBuyer  Boolean @default(false)
+  createdAt   DateTime @default(now())
+}

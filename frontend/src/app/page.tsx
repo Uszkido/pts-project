@@ -1,0 +1,190 @@
+'use client';
+import { useState } from 'react';
+
+export default function Home() {
+    const [imei, setImei] = useState('');
+    const [result, setResult] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleVerify = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (imei.length < 15) {
+            setError('Please enter a valid 15-digit IMEI.');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        setResult(null);
+
+        try {
+            const res = await fetch(`http://localhost:5000/api/v1/devices/verify/${imei}`);
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.message || 'Error communicating with server');
+            }
+            setResult(data.device);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+            {/* Navbar */}
+            <nav className="border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-blue-500/20 tracking-tighter">PTS</div>
+                        <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Registry</span>
+                    </div>
+                    <div className="flex gap-4">
+                        <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
+                        <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Consumer Login</a>
+                        <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full shadow-md shadow-blue-500/20">Vendor Portal</a>
+                    </div>
+                </div>
+            </nav>
+
+            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-20 sm:pt-32">
+                <div className="text-center space-y-8">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium">
+                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                        National Database Active
+                    </div>
+                    <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-slate-200 to-slate-500">
+                        Verify Device <br className="hidden sm:block" />Integrity.
+                    </h1>
+                    <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
+                        The decentralized digital authority for phone ownership. Check if a device is clean or reported stolen before completing your purchase.
+                    </p>
+                </div>
+
+                <div className="mt-16 max-w-2xl mx-auto">
+                    <form onSubmit={handleVerify} className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                        <div className="relative bg-slate-900 border border-slate-800 rounded-2xl p-2 sm:p-3 flex flex-col sm:flex-row items-center gap-2 shadow-2xl">
+                            <div className="flex-1 w-full relative">
+                                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                <input
+                                    type="text"
+                                    value={imei}
+                                    onChange={(e) => setImei(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                                    placeholder="Enter 15-digit IMEI number"
+                                    className="w-full bg-transparent border-none text-white placeholder-slate-500 pl-14 pr-4 py-4 focus:outline-none focus:ring-0 text-xl font-mono tracking-wider"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading || imei.length < 15}
+                                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Scanning...' : 'Run Verification'}
+                            </button>
+                        </div>
+                    </form>
+                    {error && <p className="mt-6 text-red-400 text-center font-medium bg-red-500/10 py-3 rounded-xl border border-red-500/20">{error}</p>}
+                </div>
+
+                {/* Results Card */}
+                {result && (
+                    <div className="mt-16 max-w-2xl mx-auto transition-all duration-500 ease-out translate-y-0 opacity-100">
+                        <div className={`p-[1px] rounded-3xl bg-gradient-to-b ${result.status === 'CLEAN' ? 'from-emerald-500/50 via-emerald-500/10 to-transparent' : 'from-red-600/60 via-red-600/20 to-transparent'}`}>
+                            <div className="bg-slate-900/80 backdrop-blur-xl rounded-[23px] p-6 sm:p-10 shadow-2xl">
+
+                                {/* Trust Index Meter */}
+                                <div className="mb-10 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-6">
+                                    <div className="flex justify-between items-end mb-4">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-wider font-extrabold mb-1">Public Trust Index</p>
+                                            <h4 className="text-white text-3xl font-black">
+                                                {result.riskScore}<span className="text-slate-500 text-lg">/100</span>
+                                            </h4>
+                                        </div>
+                                        <div className={`px-4 py-1.5 rounded-full text-sm font-bold border ${result.riskScore >= 90 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : result.riskScore >= 50 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                            {result.riskScore >= 90 ? 'High Trust' : result.riskScore >= 50 ? 'Medium Risk' : 'Severe Risk'}
+                                        </div>
+                                    </div>
+                                    {/* Progress Bar */}
+                                    <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-1000 ease-out ${result.riskScore >= 90 ? 'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)]' : result.riskScore >= 50 ? 'bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]'}`}
+                                            style={{ width: `${result.riskScore}%` }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-3 font-medium">Score based on device history, vendor reputation, and network alerts.</p>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 mb-8">
+                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${result.status === 'CLEAN' ? 'bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'bg-gradient-to-br from-red-500/20 to-rose-600/20 text-red-400 border border-red-500/30'}`}>
+                                        {result.status === 'CLEAN' ? (
+                                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                        ) : (
+                                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-3xl font-black text-white">{result.status === 'CLEAN' ? 'Clean Device' : 'Flagged Device'}</h3>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="bg-slate-950/50 border border-slate-800/60 p-5 rounded-xl">
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Registered By</p>
+                                        <p className="font-semibold text-lg text-white truncate">{result.registeredBy}</p>
+                                    </div>
+                                    <div className="bg-slate-950/50 border border-slate-800/60 p-5 rounded-xl">
+                                        <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Device Identity</p>
+                                        <p className="font-semibold text-lg text-white truncate">{result.brand} {result.model}</p>
+                                    </div>
+                                    <div className="col-span-1 sm:col-span-2 bg-slate-950/50 border border-slate-800/60 p-5 rounded-xl flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Registered IMEI</p>
+                                            <p className="font-mono text-xl text-white tracking-[0.2em]">{result.imei}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {result.status !== 'CLEAN' && (
+                                    <div className="mt-8 p-5 bg-red-950/30 border border-red-900/50 rounded-xl flex gap-4 items-start">
+                                        <svg className="w-6 h-6 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <p className="text-sm text-red-200 leading-relaxed font-medium">
+                                            <strong>WARNING:</strong> This device is <span className="uppercase font-bold text-red-400">{result.status}</span>. PTS strongly advises against purchasing this device. A network block request may be active.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </main>
+
+            {/* Footer */}
+            <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    {/* Vexel Innovations Logo */}
+                    <div className="text-white w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl">
+                        <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            {/* Inner V */}
+                            <path d="M50 78L26 48L37 38L50 56L63 38L74 48L50 78Z" fill="white"/>
+                            {/* Left Outer Angle */}
+                            <path d="M22 30H42L35 38H30.5L16 54C16 54 12 48 16 38C17 35 19 30 22 30Z" fill="white"/>
+                            {/* Right Outer Angle */}
+                            <path d="M78 30H58L65 38H69.5L84 54C84 54 88 48 84 38C83 35 81 30 78 30Z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xl font-bold tracking-widest text-white uppercase">Vexel</p>
+                        <p className="text-xs font-medium tracking-[0.3em] text-slate-400 uppercase mt-0.5">Innovations</p>
+                    </div>
+                    <p className="text-sm text-slate-500 font-medium mt-2">
+                        &copy; Vexel Innovations 2026. All rights reserved.
+                    </p>
+                </div>
+            </footer>
+        </div>
+    );
+}
