@@ -94,18 +94,31 @@ export default function AdminDashboard() {
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
+    const [messageTarget, setMessageTarget] = useState('ROLE');
+    const [receiverRole, setReceiverRole] = useState('ALL');
+    const [receiverEmail, setReceiverEmail] = useState('');
+
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            let payload: any = { ...newMessage };
+            if (messageTarget === 'ROLE') {
+                payload.receiverRole = receiverRole;
+            } else {
+                const userObj = users.find(u => u.email === receiverEmail);
+                if (!userObj) throw new Error('User not found by that email');
+                payload.receiverId = userObj.id;
+            }
+
             const res = await fetch(`${apiUrl}/admin/messages`, {
                 method: 'POST',
                 headers: { ...headers, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newMessage, receiverRole: 'POLICE' })
+                body: JSON.stringify(payload)
             });
             if (!res.ok) throw new Error('Failed to send message');
             setNewMessage({ subject: '', body: '' });
             fetchData();
-            alert('Message sent to Law Enforcement');
+            alert('Message dispatched successfully');
         } catch (err: any) { alert(err.message); }
     };
 
@@ -140,6 +153,21 @@ export default function AdminDashboard() {
                 method: 'DELETE', headers
             });
             if (!res.ok) throw new Error('Failed to delete user');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const updateUserStatus = async (userId: string, status: string) => {
+        if (!confirm(`Are you sure you want to ${status === 'SUSPENDED' ? 'suspend' : 'activate'} this user?`)) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${userId}/status`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
             fetchData();
         } catch (err: any) { alert(err.message); }
     };
@@ -387,12 +415,22 @@ export default function AdminDashboard() {
                                                 </select>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(user.vendorStatus)}`}>{user.vendorStatus}</span>
+                                                <div className="flex flex-col gap-2">
+                                                    <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(user.vendorStatus)}`}>{user.vendorStatus}</span>
+                                                    <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${user.status === 'SUSPENDED' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{user.status || 'ACTIVE'}</span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-slate-300">{user._count?.devices || 0}</td>
                                             <td className="px-6 py-4 text-slate-500 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-right">
-                                                <button onClick={() => deleteUser(user.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                                <div className="flex flex-col gap-2 items-end">
+                                                    {user.status !== 'SUSPENDED' ? (
+                                                        <button onClick={() => updateUserStatus(user.id, 'SUSPENDED')} className="text-xs text-amber-500 hover:text-amber-400 font-bold">Suspend</button>
+                                                    ) : (
+                                                        <button onClick={() => updateUserStatus(user.id, 'ACTIVE')} className="text-xs text-emerald-500 hover:text-emerald-400 font-bold">Activate</button>
+                                                    )}
+                                                    <button onClick={() => deleteUser(user.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -522,18 +560,47 @@ export default function AdminDashboard() {
                 {activeTab === 'messages' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
-                            <h3 className="text-lg font-bold text-white mb-4">Message Law Enforcement</h3>
+                            <h3 className="text-lg font-bold text-white mb-4">Send System Notice</h3>
                             <form onSubmit={sendMessage} className="space-y-4">
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                                        <input type="radio" checked={messageTarget === 'ROLE'} onChange={() => setMessageTarget('ROLE')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                                        Target Role
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                                        <input type="radio" checked={messageTarget === 'USER'} onChange={() => setMessageTarget('USER')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                                        Target User
+                                    </label>
+                                </div>
+                                {messageTarget === 'ROLE' ? (
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Select Role Group</label>
+                                        <select value={receiverRole} onChange={e => setReceiverRole(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500">
+                                            <option value="ALL">Everyone (Global Broadcast)</option>
+                                            <option value="POLICE">Law Enforcement Only</option>
+                                            <option value="VENDOR">Vendors Only</option>
+                                            <option value="CONSUMER">Consumers Only</option>
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">User Email *</label>
+                                        <input type="email" value={receiverEmail} onChange={e => setReceiverEmail(e.target.value)} required placeholder="user@example.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                        <datalist id="user-emails">
+                                            {users.map(u => <option key={u.email} value={u.email} />)}
+                                        </datalist>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
-                                    <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Case investigation request..." />
+                                    <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="System update..." />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
-                                    <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to police..." />
+                                    <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to network..." />
                                 </div>
                                 <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Send Message
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Dispatch
                                 </button>
                             </form>
                         </div>

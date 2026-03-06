@@ -26,6 +26,9 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
                     include: {
                         certificates: {
                             where: { isActive: true }
+                        },
+                        incidents: {
+                            orderBy: { createdAt: 'desc' }
                         }
                     }
                 },
@@ -59,6 +62,28 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         }));
 
         res.json({ devices: user.devices, pendingTransfers: user.purchases, pastDevices, fullName: user.fullName, email: user.email });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/messages', authenticateToken, async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { receiverId: req.user.id },
+                    { receiverRole: 'ALL' },
+                    { receiverRole: user.role }
+                ]
+            },
+            include: { sender: { select: { email: true, fullName: true, role: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 20
+        });
+        res.json({ messages });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

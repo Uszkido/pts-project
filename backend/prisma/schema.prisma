@@ -12,6 +12,7 @@ model User {
   email       String   @unique
   password    String
   role        String   @default("VENDOR") // ADMIN, VENDOR, CONSUMER, POLICE, INSURANCE, TELECOM
+  status      String   @default("ACTIVE") // ACTIVE, SUSPENDED
   fullName    String?
   nationalId  String?
   companyName String?
@@ -36,6 +37,7 @@ model User {
   proofsOfSaleAsVendor ProofOfSale[] @relation("VendorSales")
   proofsOfSaleAsBuyer  ProofOfSale[] @relation("BuyerPurchases")
   sentMessages Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
   createdAt   DateTime @default(now())
 }
 
@@ -85,7 +87,7 @@ model TelecomSyncLog {
 model IncidentReport {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   reporterId  String
   reporter    User     @relation(fields: [reporterId], references: [id])
   type        String   // LOST, STOLEN, SNATCHED, FRAUD
@@ -104,7 +106,7 @@ model IncidentReport {
 model VendorSuspiciousAlert {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   vendorId    String
   vendor      User     @relation("VendorAlerts", fields: [vendorId], references: [id])
   sellerEmail String?
@@ -115,7 +117,7 @@ model VendorSuspiciousAlert {
 model Certificate {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
   issueDate   DateTime @default(now())
@@ -126,7 +128,7 @@ model Certificate {
 model OwnershipTransfer {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   sellerId    String
   seller      User     @relation("Sales", fields: [sellerId], references: [id])
   buyerId     String
@@ -138,7 +140,7 @@ model OwnershipTransfer {
 model TransactionHistory {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   actorId     String?
   actor       User?    @relation("ActionsPerformed", fields: [actorId], references: [id])
   type        String   // REGISTRATION, TRANSFER, STATUS_CHANGE, CERT_ISSUANCE, SALE, RECOVERY
@@ -150,7 +152,7 @@ model TransactionHistory {
 model ProofOfSale {
   id          String   @id @default(uuid())
   deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   vendorId    String
   vendor      User     @relation("VendorSales", fields: [vendorId], references: [id])
   buyerId     String?
@@ -192,7 +194,9 @@ model Message {
   id          String   @id @default(uuid())
   senderId    String
   sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiverRole String  // "ADMIN" or "POLICE" - broadcasts to role
+  receiverRole String? // If null, it's a direct message to receiverId. "ALL" for global broadcast.
+  receiverId  String?
+  receiver    User?    @relation("ReceivedMessages", fields: [receiverId], references: [id])
   subject     String
   body        String
   isRead      Boolean  @default(false)

@@ -57,7 +57,7 @@ router.get('/users', authenticateAdmin, async (req, res) => {
             where,
             select: {
                 id: true, email: true, role: true, fullName: true, companyName: true,
-                vendorTier: true, vendorStatus: true, nationalId: true,
+                vendorTier: true, vendorStatus: true, status: true, nationalId: true,
                 businessAddress: true, shopLatitude: true, shopLongitude: true,
                 shopPhotoUrl: true, businessRegNo: true, cacCertificateUrl: true,
                 createdAt: true,
@@ -149,6 +149,28 @@ router.delete('/users/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Change user status (Suspend/Activate)
+router.put('/users/:id/status', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!['ACTIVE', 'SUSPENDED'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Must be ACTIVE or SUSPENDED.' });
+        }
+
+        // Prevent admin from suspending themselves
+        if (id === req.user.id) {
+            return res.status(403).json({ error: 'You cannot suspend your own admin account.' });
+        }
+
+        const user = await prisma.user.update({ where: { id }, data: { status } });
+        res.json({ message: `User account is now ${status}`, user: { id: user.id, email: user.email, status: user.status } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ============ DEVICE MANAGEMENT ============
 router.get('/devices', authenticateAdmin, async (req, res) => {
     try {
@@ -202,8 +224,9 @@ router.put('/devices/:id/owner', authenticateAdmin, async (req, res) => {
 router.delete('/devices/:id', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
+        // Cascade triggers will remove associated certificates, logs, etc
         await prisma.device.delete({ where: { id } });
-        res.json({ message: 'Device deleted' });
+        res.json({ message: 'Device deleted recursively from the network.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
@@ -308,7 +331,7 @@ router.get('/documents', authenticateAdmin, async (req, res) => {
     }
 });
 
-// ============ MESSAGING (ADMIN ↔ POLICE) ============
+// ============ MESSAGING ============
 router.get('/messages', authenticateAdmin, async (req, res) => {
     try {
         const messages = await prisma.message.findMany({
@@ -318,7 +341,7 @@ router.get('/messages', authenticateAdmin, async (req, res) => {
                     { senderId: req.user.id }
                 ]
             },
-            include: { sender: { select: { email: true, fullName: true, role: true } } },
+            include: { sender: { select: { email: true, fullName: true, role: true } }, receiver: { select: { email: true } } },
             orderBy: { createdAt: 'desc' }
         });
         res.json({ messages });
@@ -330,18 +353,26 @@ router.get('/messages', authenticateAdmin, async (req, res) => {
 
 router.post('/messages', authenticateAdmin, async (req, res) => {
     try {
-        const { subject, body, receiverRole } = req.body;
-        if (!subject || !body || receiverRole !== 'POLICE') {
-            return res.status(400).json({ error: 'Invalid message data. Admin can only message POLICE role globally for now.' });
+        const { subject, body, receiverRole, receiverId } = req.body;
+
+        if (!subject || !body || (!receiverRole && !receiverId)) {
+            return res.status(400).json({ error: 'Subject, body, and either receiverRole or receiverId are required' });
+        }
+
+        const messageData = {
+            senderId: req.user.id,
+            subject,
+            body
+        };
+
+        if (receiverId) {
+            messageData.receiverId = receiverId;
+        } else if (receiverRole) {
+            messageData.receiverRole = receiverRole;
         }
 
         const message = await prisma.message.create({
-            data: {
-                senderId: req.user.id,
-                receiverRole: 'POLICE',
-                subject,
-                body
-            }
+            data: messageData
         });
 
         res.status(201).json({ message: 'Message sent', data: message });

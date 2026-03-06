@@ -14,6 +14,10 @@ export default function ConsumerDashboard() {
     const [isPassportOpen, setIsPassportOpen] = useState(false);
     const [passportLoading, setPassportLoading] = useState(false);
 
+    // Notifications State
+    const [messages, setMessages] = useState<any[]>([]);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
     // Incident Reporting State
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [reportTargetDevice, setReportTargetDevice] = useState<any>(null);
@@ -40,19 +44,26 @@ export default function ConsumerDashboard() {
     const certificateRef = useRef<HTMLDivElement>(null);
     const [certificateData, setCertificateData] = useState<any>(null);
 
-    const fetchDashboard = async () => {
+    const fetchDashboardAndMessages = async () => {
         setLoading(true);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-            const res = await fetch(`${apiUrl}/consumers/dashboard`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-            setUser(data.user || null);
-            setDevices(data.devices || []);
-            setPendingTransfers(data.pendingTransfers || []);
-            setPastDevices(data.pastDevices || []);
+            const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
+            const [dashRes, msgsRes] = await Promise.all([
+                fetch(`${apiUrl}/consumers/dashboard`, { headers }),
+                fetch(`${apiUrl}/consumers/messages`, { headers })
+            ]);
+            const dashData = await dashRes.json();
+            const msgsData = await msgsRes.json();
+
+            if (!dashRes.ok) throw new Error(dashData.error);
+            if (!msgsRes.ok) throw new Error(msgsData.error);
+
+            setUser(dashData.fullName || dashData.email ? { fullName: dashData.fullName, email: dashData.email } : null);
+            setDevices(dashData.devices || []);
+            setPendingTransfers(dashData.pendingTransfers || []);
+            setPastDevices(dashData.pastDevices || []);
+            setMessages(msgsData.messages || []);
         } catch (err: any) {
             setError(err.message);
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -68,7 +79,7 @@ export default function ConsumerDashboard() {
             window.location.href = '/consumer/login';
             return;
         }
-        fetchDashboard();
+        fetchDashboardAndMessages();
     }, []);
 
     const acceptTransfer = async (transferId: string) => {
@@ -82,7 +93,7 @@ export default function ConsumerDashboard() {
                 const data = await res.json();
                 throw new Error(data.error);
             }
-            fetchDashboard();
+            fetchDashboardAndMessages();
         } catch (err: any) {
             alert(err.message);
         }
@@ -123,7 +134,7 @@ export default function ConsumerDashboard() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
             alert('🚨 EMERGENCY FREEZE ACTIVATED. Your Certificate has been revoked.');
-            fetchDashboard();
+            fetchDashboardAndMessages();
         } catch (err: any) {
             alert(err.message);
         }
@@ -171,12 +182,11 @@ export default function ConsumerDashboard() {
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            alert('Incident Reported. Device has been locked and flagged on the network.');
+            if (!res.ok) throw new Error(data.error || 'Failed to submit report');
+            alert('Incident report submitted to Law Enforcement.');
             setIsReportOpen(false);
             setReportTargetDevice(null);
-            fetchDashboard();
+            fetchDashboardAndMessages();
         } catch (err: any) {
             setReportError(err.message);
         } finally {
@@ -227,14 +237,13 @@ export default function ConsumerDashboard() {
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            if (!res.ok) throw new Error(data.error || 'Registration failed');
 
-            alert('Device successfully registered and cryptographically secured.');
+            alert('Device successfully registered to your account.');
             setRegistrationForm({ brand: '', model: '', imei: '', serialNumber: '' });
             setReceiptFile(null);
             setCartonFile(null);
-            setActiveTab('active');
-            fetchDashboard();
+            fetchDashboardAndMessages();
         } catch (err: any) {
             setRegError(err.message);
         } finally {
@@ -297,6 +306,33 @@ export default function ConsumerDashboard() {
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="relative p-2 text-slate-400 hover:text-white transition-colors">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            {messages.length > 0 && <span className="absolute top-1 right-1 flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span></span>}
+                        </button>
+                        {isNotificationsOpen && (
+                            <div className="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                                <div className="p-4 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900/95 backdrop-blur-md">
+                                    <h3 className="text-sm font-bold text-white">System Messages</h3>
+                                </div>
+                                <div className="p-2 space-y-1">
+                                    {messages.length === 0 ? (
+                                        <div className="p-4 text-center text-xs text-slate-500">No new messages</div>
+                                    ) : messages.map((msg: any) => (
+                                        <div key={msg.id} className="p-3 bg-slate-800/30 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-700/50">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${msg.sender.role === 'ADMIN' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-400'}`}>{msg.sender.role} NOTICE</span>
+                                                <span className="text-[10px] text-slate-500 font-mono">{new Date(msg.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-white mb-0.5">{msg.subject}</p>
+                                            <p className="text-xs text-slate-400 line-clamp-2">{msg.body}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={() => { localStorage.removeItem('pts_token'); window.location.href = '/consumer/login'; }} className="text-sm font-medium text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 px-4 py-2 rounded-lg transition-colors border border-slate-700">Sign Out</button>
                 </div>
             </nav>
@@ -429,8 +465,28 @@ export default function ConsumerDashboard() {
                                                     </div>
                                                 </>
                                             ) : (
-                                                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center text-sm text-slate-400 cursor-not-allowed">
-                                                    Actions Locked due to {device.status} status.
+                                                <div className="space-y-3">
+                                                    <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center text-sm text-slate-400 cursor-not-allowed">
+                                                        Actions Locked due to {device.status} status.
+                                                    </div>
+
+                                                    {device.incidents && device.incidents.length > 0 && device.incidents[0].locationSharedWithOwner && (
+                                                        <div className="p-4 rounded-xl bg-purple-900/20 border border-purple-500/30 relative overflow-hidden">
+                                                            <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl animate-pulse"></div>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                <span className="text-xs font-bold text-purple-400 uppercase tracking-widest">Law Enforcement Active Tracking</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-300 mb-2">Police have authorized visibility on the latest ping for your device.</p>
+                                                            <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 font-mono text-xs text-emerald-400 flex items-center gap-2">
+                                                                <span className="relative flex h-2 w-2">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                                </span>
+                                                                {device.lastKnownLocation || 'Awaiting exact coordinates...'}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
