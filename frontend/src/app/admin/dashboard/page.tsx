@@ -40,6 +40,11 @@ export default function AdminDashboard() {
             ]);
 
             if (!dashRes.ok) throw new Error('Access denied. Admin privileges required.');
+            if (!usersRes.ok) throw new Error(`Users API failed with status ${usersRes.status}`);
+            if (!devicesRes.ok) throw new Error(`Devices API failed with status ${devicesRes.status}`);
+            if (!incidentsRes.ok) throw new Error(`Incidents API failed with status ${incidentsRes.status}`);
+            if (!docsRes.ok) throw new Error(`Documents API failed with status ${docsRes.status}`);
+            if (!msgsRes.ok) throw new Error(`Messages API failed with status ${msgsRes.status}`);
 
             const [dashData, usersData, devicesData, incidentsData, docsData, msgsData] = await Promise.all([
                 dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json(), docsRes.json(), msgsRes.json()
@@ -52,6 +57,7 @@ export default function AdminDashboard() {
             setDocuments(docsData || { userDocuments: [], deviceDocuments: [] });
             setMessages(msgsData.messages || []);
         } catch (err: any) {
+            console.error(err);
             setError(err.message);
             if (err.message.includes('401') || err.message.includes('403')) {
                 window.location.href = '/admin/login';
