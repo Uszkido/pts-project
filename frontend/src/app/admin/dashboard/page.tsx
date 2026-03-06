@@ -11,6 +11,10 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
+    // Create Account Modal
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [newUser, setNewUser] = useState({ email: '', password: '', role: 'CONSUMER', fullName: '', companyName: '', nationalId: '' });
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
@@ -83,6 +87,59 @@ export default function AdminDashboard() {
                 method: 'DELETE', headers
             });
             if (!res.ok) throw new Error('Failed to delete user');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const createUser = async () => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/users`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            setIsCreateOpen(false);
+            setNewUser({ email: '', password: '', role: 'CONSUMER', fullName: '', companyName: '', nationalId: '' });
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const updateDeviceStatus = async (deviceId: string, status: string) => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/devices/${deviceId}/status`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) throw new Error('Failed to update device status');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const transferDevice = async (deviceId: string) => {
+        const email = prompt('Enter new owner email:');
+        if (!email) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/devices/${deviceId}/owner`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newOwnerEmail: email })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const deleteDevice = async (deviceId: string) => {
+        if (!confirm('Delete this device permanently?')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/devices/${deviceId}`, { method: 'DELETE', headers });
+            if (!res.ok) throw new Error('Failed to delete device');
             fetchData();
         } catch (err: any) { alert(err.message); }
     };
@@ -210,10 +267,16 @@ export default function AdminDashboard() {
                 {/* TAB: Users */}
                 {activeTab === 'users' && (
                     <div>
-                        <div className="flex gap-2 mb-4">
-                            {['', 'ADMIN', 'VENDOR', 'CONSUMER', 'POLICE'].map(r => (
-                                <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${roleFilter === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-white'}`}>{r || 'All'}</button>
-                            ))}
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex gap-2">
+                                {['', 'ADMIN', 'VENDOR', 'CONSUMER', 'POLICE'].map(r => (
+                                    <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${roleFilter === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-white'}`}>{r || 'All'}</button>
+                                ))}
+                            </div>
+                            <button onClick={() => setIsCreateOpen(true)} className="bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                Create Account
+                            </button>
                         </div>
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                             <table className="w-full text-sm text-left">
@@ -266,6 +329,7 @@ export default function AdminDashboard() {
                                     <th className="px-6 py-4">Status</th>
                                     <th className="px-6 py-4">Owner</th>
                                     <th className="px-6 py-4">Risk</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
@@ -274,11 +338,19 @@ export default function AdminDashboard() {
                                         <td className="px-6 py-4 font-bold text-white">{d.brand} {d.model}</td>
                                         <td className="px-6 py-4 font-mono text-xs text-slate-400">{d.imei}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${d.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400' : d.status === 'STOLEN' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-400'}`}>{d.status}</span>
+                                            <select value={d.status} onChange={e => updateDeviceStatus(d.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                                                {['CLEAN', 'STOLEN', 'INVESTIGATING', 'RECOVERED', 'FROZEN', 'BLACKLISTED'].map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
                                         </td>
                                         <td className="px-6 py-4 text-xs text-slate-400">{d.registeredOwner?.email}</td>
                                         <td className="px-6 py-4">
                                             <span className={`font-bold ${d.riskScore >= 70 ? 'text-emerald-400' : d.riskScore >= 40 ? 'text-amber-400' : 'text-red-500'}`}>{d.riskScore}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => transferDevice(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Transfer</button>
+                                                <button onClick={() => deleteDevice(d.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -315,6 +387,50 @@ export default function AdminDashboard() {
                     </div>
                 )}
             </main>
+
+            {/* Create Account Modal */}
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-emerald-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-white">Create Account</h2>
+                            <button onClick={() => setIsCreateOpen(false)} className="text-slate-500 hover:text-white text-xl">✕</button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Role *</label>
+                                <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
+                                    {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Full Name *</label>
+                                <input type="text" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} placeholder="John Doe" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Email *</label>
+                                <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@pts.com" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Password *</label>
+                                <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                            </div>
+                            {newUser.role === 'VENDOR' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Company Name</label>
+                                    <input type="text" value={newUser.companyName} onChange={e => setNewUser({ ...newUser, companyName: e.target.value })} placeholder="Business Ltd" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN)</label>
+                                <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                            </div>
+                            <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
