@@ -6,7 +6,7 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "postinstall": "npx prisma generate",
-    "build": "echo 'Build step complete'"
+    "build": "npx prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -15,9 +15,11 @@
   "dependencies": {
     "@prisma/client": "^6.4.1",
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.5.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^1.4.5-lts.2",
     "multer-storage-cloudinary": "^4.0.0",
     "prisma": "^6.4.1",
     "sqlite3": "^5.1.7"
