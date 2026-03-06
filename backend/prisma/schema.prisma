@@ -12,7 +12,12 @@ model User {
   email       String   @unique
   password    String
   role        String   @default("VENDOR") // ADMIN, VENDOR, CONSUMER, POLICE, INSURANCE, TELECOM
+  fullName    String?
+  nationalId  String?
   companyName String?
+  facialDataUrl String?
+  biodataUrl    String?
+  cacCertificateUrl String?
   vendorTier  Int      @default(3) // 1: Verified, 2: Certified, 3: Informal, 4: Watchlist
   devices     Device[]
   certificates Certificate[]
@@ -35,6 +40,9 @@ model Device {
   model            String
   status           String   @default("CLEAN") // CLEAN, STOLEN, LOST, INVESTIGATING, VENDOR_HELD, ARCHIVED, RECOVERED
   riskScore        Int      @default(100)
+  lastKnownLocation String?
+  lastKnownIp      String?
+  lastLocationUpdate DateTime?
   registeredOwnerId String
   registeredOwner  User     @relation(fields: [registeredOwnerId], references: [id])
   certificates     Certificate[]
@@ -75,6 +83,7 @@ model IncidentReport {
   location    String?
   description String?
   policeReportNo String?
+  evidenceUrls String[]
   status      String   @default("OPEN") // OPEN, REVIEWING, RESOLVED
   createdAt   DateTime @default(now())
 }

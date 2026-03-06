@@ -13,6 +13,17 @@ export default function ConsumerDashboard() {
     const [isPassportOpen, setIsPassportOpen] = useState(false);
     const [passportLoading, setPassportLoading] = useState(false);
 
+    // Incident Reporting State
+    const [isReportOpen, setIsReportOpen] = useState(false);
+    const [reportTargetDevice, setReportTargetDevice] = useState<any>(null);
+    const [reportType, setReportType] = useState('STOLEN');
+    const [reportLocation, setReportLocation] = useState('');
+    const [reportDescription, setReportDescription] = useState('');
+    const [policeReportNo, setPoliceReportNo] = useState('');
+    const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+    const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+    const [reportError, setReportError] = useState('');
+
     // UI tabs
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
@@ -106,6 +117,61 @@ export default function ConsumerDashboard() {
             fetchDashboard();
         } catch (err: any) {
             alert(err.message);
+        }
+    };
+
+    const submitIncidentReport = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmittingReport(true);
+        setReportError('');
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            let evidenceUrls: string[] = [];
+
+            if (evidenceFile) {
+                const formData = new FormData();
+                formData.append('evidence', evidenceFile);
+
+                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload evidence');
+                evidenceUrls.push(uploadData.url);
+            }
+
+            const payload = {
+                deviceId: reportTargetDevice.id,
+                type: reportType,
+                location: reportLocation,
+                description: reportDescription,
+                policeReportNo,
+                evidenceUrls
+            };
+
+            const res = await fetch(`${apiUrl}/incidents/report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            alert('Incident Reported. Device has been locked and flagged on the network.');
+            setIsReportOpen(false);
+            setReportTargetDevice(null);
+            fetchDashboard();
+        } catch (err: any) {
+            setReportError(err.message);
+        } finally {
+            setIsSubmittingReport(false);
         }
     };
 
@@ -281,10 +347,15 @@ export default function ConsumerDashboard() {
                                                     <a href={`/consumer/transfer?deviceId=${device.id}`} className="block w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors border border-slate-700/50">
                                                         Transfer Asset
                                                     </a>
-                                                    <button onClick={() => emergencyFreeze(device.id)} className="flex items-center justify-center gap-2 w-full bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 text-sm font-bold py-3 rounded-xl transition-all shadow-lg hover:shadow-red-500/20">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                                                        Emergency Freeze
-                                                    </button>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button onClick={() => { setReportTargetDevice(device); setIsReportOpen(true); }} className="flex items-center justify-center gap-1 w-full bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white border border-amber-500/20 text-xs font-bold py-3 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 uppercase tracking-wide">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                            Report Loss
+                                                        </button>
+                                                        <button onClick={() => emergencyFreeze(device.id)} className="flex items-center justify-center gap-1 w-full bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 text-xs font-bold py-3 rounded-xl transition-all shadow-lg hover:shadow-red-500/20 uppercase tracking-wide">
+                                                            1-Click Freeze
+                                                        </button>
+                                                    </div>
                                                 </>
                                             ) : (
                                                 <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center text-sm text-slate-400 cursor-not-allowed">
@@ -394,6 +465,74 @@ export default function ConsumerDashboard() {
                                     Immutable Sync
                                 </span>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Report Incident Modal */}
+                {isReportOpen && reportTargetDevice && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col relative">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-amber-500"></div>
+                            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center border border-red-500/30">
+                                        <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white leading-tight">File Official Police Report</h2>
+                                        <p className="text-xs text-slate-400">Flag device on National Database</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { setIsReportOpen(false); setReportTargetDevice(null); }} className="text-slate-400 hover:text-white p-2">
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <form onSubmit={submitIncidentReport} className="p-6 space-y-4">
+                                {reportError && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm">{reportError}</div>}
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Target Device</label>
+                                    <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800 font-mono text-sm text-slate-400">{reportTargetDevice.brand} {reportTargetDevice.model} (IMEI: {reportTargetDevice.imei})</div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Incident Type</label>
+                                        <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500">
+                                            <option value="STOLEN">Stolen / Snatching</option>
+                                            <option value="LOST">Lost</option>
+                                            <option value="FRAUD">Fraudulent Sale</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Police Report No. (Opt.)</label>
+                                        <input type="text" value={policeReportNo} onChange={(e) => setPoliceReportNo(e.target.value)} placeholder="e.g. CR/2026/01A" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Location of Incident</label>
+                                    <input type="text" value={reportLocation} onChange={(e) => setReportLocation(e.target.value)} placeholder="E.g., Bus Stop, Main Street, Lagos" required className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
+                                    <textarea value={reportDescription} onChange={(e) => setReportDescription(e.target.value)} placeholder="Briefly describe what happened..." required rows={3} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500 resize-none"></textarea>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5 text-amber-500">Evidence Upload (CCTV / Photos)</label>
+                                    <input type="file" accept="image/*,video/mp4,application/pdf" onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-500/10 file:text-amber-500 hover:file:bg-amber-500/20 transition-colors cursor-pointer" />
+                                    <p className="text-[10px] text-slate-500 mt-2">Max limit 20MB. Accepted files: MP4 footage, JPG/PNG scenes.</p>
+                                </div>
+
+                                <button type="submit" disabled={isSubmittingReport} className="w-full mt-4 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50">
+                                    {isSubmittingReport && <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                                    {isSubmittingReport ? 'Uploading Evidence & Locking Device...' : 'Submit Official Report & Flag Network'}
+                                </button>
+                            </form>
                         </div>
                     </div>
                 )}

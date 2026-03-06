@@ -131,4 +131,33 @@ router.post('/:imei/report', authenticateToken, async (req, res) => {
     }
 });
 
+// Update Device Tracking Location (Ping)
+router.post('/:imei/track', async (req, res) => {
+    try {
+        const { imei } = req.params;
+        const { location, ip } = req.body;
+
+        if (!location) {
+            return res.status(400).json({ error: 'Location coordinates required' });
+        }
+
+        const device = await prisma.device.findUnique({ where: { imei } });
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        const updatedDevice = await prisma.device.update({
+            where: { imei },
+            data: {
+                lastKnownLocation: location,
+                lastKnownIp: ip || req.ip,
+                lastLocationUpdate: new Date()
+            }
+        });
+
+        res.json({ message: 'Device location updated securely', lastUpdate: updatedDevice.lastLocationUpdate });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

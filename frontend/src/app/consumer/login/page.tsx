@@ -7,12 +7,39 @@ export default function ConsumerLogin() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
+    // Identity fields
+    const [fullName, setFullName] = useState('');
+    const [nationalId, setNationalId] = useState('');
+    const [facialFile, setFacialFile] = useState<File | null>(null);
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
+        setError('');
         try {
-            const endpoint = isLogin ? '/api/v1/auth/login' : '/api/v1/auth/register';
-            const body = isLogin ? { email, password } : { email, password, role: 'CONSUMER' };
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            let facialDataUrl = '';
+
+            if (!isLogin && facialFile) {
+                // Upload facial data first
+                const formData = new FormData();
+                formData.append('file', facialFile);
+
+                const uploadRes = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/upload/document`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload facial data');
+                facialDataUrl = uploadData.url;
+            }
+
+            const endpoint = isLogin ? '/api/v1/auth/login' : '/api/v1/auth/register';
+            const body = isLogin
+                ? { email, password }
+                : { email, password, role: 'CONSUMER', fullName, nationalId, facialDataUrl };
 
             const res = await fetch(`${apiUrl.replace('/api/v1', '')}${endpoint}`, {
                 method: 'POST',
@@ -38,6 +65,8 @@ export default function ConsumerLogin() {
             window.location.href = '/consumer/dashboard';
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -54,6 +83,22 @@ export default function ConsumerLogin() {
                 {error && <p className="mb-4 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm text-center border border-red-500/20 font-medium">{error}</p>}
 
                 <form onSubmit={handleAuth} className="space-y-5">
+                    {!isLogin && (
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Legal Name</label>
+                                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">National ID Number</label>
+                                <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="NIN / SSN" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Facial Data (Selfie)</label>
+                                <input type="file" accept="image/*" onChange={e => setFacialFile(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors cursor-pointer" required={!isLogin} />
+                            </div>
+                        </>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
                         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
@@ -62,8 +107,9 @@ export default function ConsumerLogin() {
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
                         <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
                     </div>
-                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl mt-6 transition-colors shadow-lg shadow-emerald-500/20">
-                        {isLogin ? 'Access Vault' : 'Create Vault Identity'}
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl mt-6 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
+                        {isSubmitting && <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                        {isLogin ? 'Access Vault' : isSubmitting ? 'Verifying Identity...' : 'Create Vault Identity'}
                     </button>
                 </form>
 

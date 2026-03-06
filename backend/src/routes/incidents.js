@@ -20,7 +20,7 @@ const authenticateToken = (req, res, next) => {
 // Report a lost/stolen device (Consumer only)
 router.post('/report', authenticateToken, async (req, res) => {
     try {
-        const { deviceId, type, location, description, policeReportNo, incidentDate } = req.body;
+        const { deviceId, type, location, description, policeReportNo, incidentDate, evidenceUrls } = req.body;
 
         if (!['LOST', 'STOLEN', 'SNATCHED', 'FRAUD'].includes(type)) {
             return res.status(400).json({ error: 'Invalid incident type' });
@@ -43,7 +43,8 @@ router.post('/report', authenticateToken, async (req, res) => {
                 location,
                 description,
                 policeReportNo,
-                incidentDate: incidentDate ? new Date(incidentDate) : new Date()
+                incidentDate: incidentDate ? new Date(incidentDate) : new Date(),
+                evidenceUrls: evidenceUrls || []
             }
         });
 

@@ -9,7 +9,7 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, companyName, role } = req.body;
+        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl } = req.body;
 
         // Simple validation
         if (!email || !password) {
@@ -30,7 +30,12 @@ router.post('/register', async (req, res) => {
                 email,
                 password: hashedPassword,
                 companyName: finalRole === 'VENDOR' ? companyName : null,
-                role: finalRole
+                role: finalRole,
+                fullName,
+                nationalId,
+                facialDataUrl,
+                biodataUrl,
+                cacCertificateUrl: finalRole === 'VENDOR' ? cacCertificateUrl : null
             }
         });
 

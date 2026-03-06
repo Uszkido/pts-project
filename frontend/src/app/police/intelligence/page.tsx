@@ -100,23 +100,49 @@ export default function PoliceIntelligence() {
                         {incidents.length === 0 ? (
                             <div className="text-center py-10 text-slate-500 bg-slate-900/50 rounded-2xl border border-slate-800">No active incidents reported.</div>
                         ) : incidents.map(report => (
-                            <div key={report.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg hover:border-red-900/50 transition-colors">
-                                <div className="flex justify-between items-start mb-4">
+                            <div key={report.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg hover:border-red-900/50 transition-colors relative overflow-hidden">
+                                {report.device.lastKnownLocation && (
+                                    <div className="absolute top-0 right-0 p-4">
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                                            LIVE TRACKING: {report.device.lastKnownLocation}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-start mb-4 relative z-10">
                                     <div className="flex items-center gap-3">
                                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${report.type === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
                                             {report.type}
                                         </span>
                                         <span className="text-xs font-mono text-slate-500">{new Date(report.createdAt).toLocaleString()}</span>
                                     </div>
-                                    <span className="text-xs font-bold text-slate-400 bg-slate-800 px-3 py-1 rounded-full">{report.status}</span>
+                                    {/* Status chip moved to right aligned with location ping if available */}
                                 </div>
                                 <h3 className="text-xl font-bold text-white mb-1">{report.device.brand} {report.device.model}</h3>
-                                <p className="text-sm font-mono text-slate-400 tracking-widest mb-4">IMEI: {report.device.imei}</p>
+                                <p className="text-sm font-mono text-slate-400 tracking-widest mb-4 flex items-center gap-2">
+                                    IMEI: {report.device.imei}
+                                    <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md uppercase tracking-wider">{report.status}</span>
+                                </p>
 
                                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
                                     <p className="text-sm text-slate-300"><strong className="text-slate-500">Reporter:</strong> {report.reporter.email}</p>
-                                    {report.location && <p className="text-sm text-slate-300 mt-1"><strong className="text-slate-500">Location:</strong> {report.location}</p>}
-                                    {report.description && <p className="text-sm text-slate-300 mt-2 italic">"{report.description}"</p>}
+                                    {report.location && <p className="text-sm text-slate-300 mt-1"><strong className="text-slate-500">Known Incident Area:</strong> {report.location}</p>}
+                                    {report.description && <p className="text-sm text-slate-300 mt-2 italic border-l-2 border-slate-700 pl-3">"{report.description}"</p>}
+
+                                    {/* Evidence Render Block */}
+                                    {report.evidenceUrls && report.evidenceUrls.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-slate-800/50">
+                                            <p className="text-[10px] text-amber-500 uppercase tracking-widest font-bold mb-2">Attached Evidence (Classified)</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {report.evidenceUrls.map((url: string, i: number) => (
+                                                    <a key={i} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 text-xs font-semibold py-1.5 px-3 rounded-lg border border-slate-700 transition-colors">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                        Review Evidence File {i + 1}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
