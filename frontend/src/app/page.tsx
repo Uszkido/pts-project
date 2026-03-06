@@ -208,6 +208,7 @@ export default function Home() {
             {/* Footer */}
             <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
+                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Powered by</p>
                     {/* Vexel Innovations Logo */}
                     <div className="text-white w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl">
                         <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
