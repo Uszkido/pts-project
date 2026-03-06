@@ -1,5 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function ConsumerDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -13,6 +15,11 @@ export default function ConsumerDashboard() {
 
     // UI tabs
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+
+    // PDF Generation State
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState<string | null>(null);
+    const certificateRef = useRef<HTMLDivElement>(null);
+    const [certificateData, setCertificateData] = useState<any>(null);
 
     const fetchDashboard = async () => {
         setLoading(true);
@@ -100,6 +107,50 @@ export default function ConsumerDashboard() {
         } catch (err: any) {
             alert(err.message);
         }
+    };
+
+    const downloadCertificate = async (device: any) => {
+        setIsGeneratingPdf(device.id);
+        const activeCert = device.certificates && device.certificates.length > 0 ? device.certificates[0] : null;
+
+        if (!activeCert || !activeCert.isActive) {
+            alert('Cannot generate a certificate. Registration is missing or revoked.');
+            setIsGeneratingPdf(null);
+            return;
+        }
+
+        // Set the data for the invisible template
+        setCertificateData({
+            brand: device.brand,
+            model: device.model,
+            imei: device.imei,
+            serial: device.serialNumber || 'N/A',
+            owner: document.querySelector('.text-[10px].text-emerald-400')?.closest('nav')?.querySelector('button')?.parentElement?.previousElementSibling?.querySelector('span.leading-tight')?.textContent || 'Registered Owner', // Hacky fallback if no profile name available
+            date: new Date(activeCert.createdAt).toLocaleDateString(),
+            hash: activeCert.qrHash
+        });
+
+        // Small delay to allow React to render the invisible template
+        setTimeout(async () => {
+            if (certificateRef.current) {
+                try {
+                    const canvas = await html2canvas(certificateRef.current, { scale: 3, useCORS: true });
+                    const imgData = canvas.toDataURL('image/png');
+
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save(`PTS_Certificate_${device.imei}.pdf`);
+                } catch (err) {
+                    console.error('Failed to generate PDF:', err);
+                    alert('An error occurred while generating the certificate.');
+                }
+            }
+            setIsGeneratingPdf(null);
+            setCertificateData(null);
+        }, 500);
     };
 
     return (
@@ -212,10 +263,21 @@ export default function ConsumerDashboard() {
 
                                         <div className="mt-6 flex flex-col gap-3 relative z-10">
                                             <button onClick={() => fetchPassport(device.imei)} className="block w-full text-center bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-sm font-bold py-3 rounded-xl transition-all border border-blue-500/20">
-                                                View Device Passport
+                                                View Security Ledger
                                             </button>
+
                                             {device.status === 'CLEAN' ? (
                                                 <>
+                                                    {activeCert && activeCert.isActive && (
+                                                        <button
+                                                            onClick={() => downloadCertificate(device)}
+                                                            disabled={isGeneratingPdf === device.id}
+                                                            className={`block w-full text-center text-sm font-bold py-3 rounded-xl transition-all border ${isGeneratingPdf === device.id ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/30 cursor-wait' : 'bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white border-emerald-500/20'}`}
+                                                        >
+                                                            {isGeneratingPdf === device.id ? 'Generating Security PDF...' : 'Download Official Certificate'}
+                                                        </button>
+                                                    )}
+
                                                     <a href={`/consumer/transfer?deviceId=${device.id}`} className="block w-full text-center bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors border border-slate-700/50">
                                                         Transfer Asset
                                                     </a>
@@ -226,7 +288,7 @@ export default function ConsumerDashboard() {
                                                 </>
                                             ) : (
                                                 <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 text-center text-sm text-slate-400 cursor-not-allowed">
-                                                    Action Locked due to {device.status} status.
+                                                    Actions Locked due to {device.status} status.
                                                 </div>
                                             )}
                                         </div>
@@ -336,6 +398,94 @@ export default function ConsumerDashboard() {
                     </div>
                 )}
             </main>
+
+            {/* Inivisble PDF Template Container */}
+            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', pointerEvents: 'none' }}>
+                {certificateData && (
+                    <div ref={certificateRef} className="bg-white text-slate-900 w-[210mm] h-[297mm] relative p-16 font-serif flex flex-col justify-between overflow-hidden shadow-2xl">
+
+                        {/* Background Watermarks */}
+                        <div className="absolute inset-0 z-0 opacity-[0.03] flex items-center justify-center pointer-events-none">
+                            <div className="w-[150%] h-[150%] border-[200px] border-emerald-900 rounded-full"></div>
+                        </div>
+                        <div className="absolute inset-0 z-0 opacity-[0.02] flex flex-col justify-between items-center py-20 pointer-events-none">
+                            {Array.from({ length: 15 }).map((_, i) => (
+                                <p key={i} className="text-4xl font-mono uppercase tracking-[2em] whitespace-nowrap -rotate-12">AUTHENTIC • PTS REGISTRY • VERIFIED</p>
+                            ))}
+                        </div>
+
+                        {/* Certificate Content (z-index 10) */}
+                        <div className="relative z-10 h-full flex flex-col border-4 border-double border-slate-800 p-12">
+
+                            <div className="text-center mb-16 border-b-2 border-slate-300 pb-10">
+                                <div className="w-24 h-24 mx-auto bg-emerald-700 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white mb-6">
+                                    <span className="text-4xl font-black font-sans">PTS</span>
+                                </div>
+                                <h1 className="text-5xl font-black tracking-tight text-slate-900 uppercase">Certificate of Ownership</h1>
+                                <p className="text-lg text-slate-500 uppercase tracking-[0.2em] mt-4 font-bold">National Digital Asset Registry (UK)</p>
+                            </div>
+
+                            <div className="flex-1 text-center">
+                                <p className="text-2xl text-slate-600 mb-4 italic text-serif">This document legally certifies that</p>
+                                <h2 className="text-4xl font-bold text-slate-900 mb-10 pb-4 border-b border-slate-200 inline-block px-10">Digital Vault Identity</h2>
+
+                                <p className="text-xl text-slate-600 mb-8 italic text-serif">is the formally registered owner of the following telecommunications equipment:</p>
+
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-10 mx-10 text-left shadow-inner">
+                                    <div className="grid grid-cols-2 gap-y-6 gap-x-10">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Make / Brand</p>
+                                            <p className="text-2xl font-bold text-slate-900">{certificateData.brand}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Model Name</p>
+                                            <p className="text-2xl font-bold text-slate-900">{certificateData.model}</p>
+                                        </div>
+                                        <div className="col-span-2 pt-4 border-t border-slate-200">
+                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Int'l Mobile Equipment Identity (IMEI)</p>
+                                            <p className="text-3xl font-mono tracking-[0.1em] text-slate-900 bg-slate-200 py-2 px-4 rounded-lg inline-block">{certificateData.imei}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Hardware Serial NO.</p>
+                                            <p className="text-lg font-mono text-slate-700">{certificateData.serial}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Registry Enrolment Date</p>
+                                            <p className="text-lg font-bold text-slate-700">{certificateData.date}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-16 bg-slate-900 text-white rounded-xl p-8 flex items-center justify-between shadow-xl">
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Cryptographic DDOC Hash</p>
+                                    <p className="text-sm font-mono text-emerald-400 break-all bg-black/50 p-3 rounded-lg border border-slate-700">{certificateData.hash}</p>
+                                    <p className="text-xs text-slate-500 mt-4 leading-relaxed max-w-xl">This certificate is cryptographically verified on the PTS Network. Any transfer of ownership will automatically revoke this document digitally. For verification by Law Enforcement, scan the IMEI.</p>
+                                </div>
+                                <div className="ml-8 w-28 h-28 bg-white rounded-lg p-2 flex-shrink-0 flex items-center justify-center">
+                                    <div className="w-full h-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[10px] text-slate-500 text-center flex-col gap-1">
+                                        <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+                                        <span>QR Not Found</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-end mt-12 border-t border-slate-300 pt-8">
+                                <div>
+                                    <div className="w-48 border-b-2 border-slate-900 mb-2"></div>
+                                    <p className="text-sm font-bold uppercase tracking-wider text-slate-500">Authorized Signature</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-lg font-bold text-slate-900 uppercase">PTS Digital Authority</p>
+                                    <p className="text-sm text-slate-500 italic">Issued via automated registry terminal</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
         </div>
     );
 }
