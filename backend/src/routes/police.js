@@ -107,4 +107,33 @@ router.get('/vendor-alerts', authenticatePolice, async (req, res) => {
     }
 });
 
+// Fetch metrics for the dashboard
+router.get('/dashboard-metrics', authenticatePolice, async (req, res) => {
+    try {
+        const totalDevices = await prisma.device.count();
+        const cleanDevices = await prisma.device.count({ where: { status: 'CLEAN' } });
+        const stolenDevices = await prisma.device.count({ where: { status: 'STOLEN' } });
+        const lostDevices = await prisma.device.count({ where: { status: 'LOST' } });
+        const investigatingDevices = await prisma.device.count({ where: { status: 'INVESTIGATING' } });
+
+        const openIncidents = await prisma.incidentReport.count({ where: { status: 'OPEN' } });
+        const openAlerts = await prisma.vendorSuspiciousAlert.count();
+
+        res.json({
+            metrics: {
+                totalDevices,
+                cleanDevices,
+                stolenDevices,
+                lostDevices,
+                investigatingDevices,
+                openIncidents,
+                openAlerts
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

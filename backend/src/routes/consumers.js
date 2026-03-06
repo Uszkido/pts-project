@@ -40,7 +40,25 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
         });
 
         if (!user) return res.status(404).json({ error: 'User not found' });
-        res.json({ devices: user.devices, pendingTransfers: user.purchases });
+
+        const pastTransfers = await prisma.ownershipTransfer.findMany({
+            where: { sellerId: req.user.id, status: 'COMPLETED' },
+            include: {
+                device: true,
+                buyer: { select: { email: true, companyName: true } }
+            },
+            orderBy: { transferDate: 'desc' }
+        });
+
+        const pastDevices = pastTransfers.map(tx => ({
+            ...tx.device,
+            transferDetails: {
+                date: tx.transferDate,
+                buyer: tx.buyer
+            }
+        }));
+
+        res.json({ devices: user.devices, pendingTransfers: user.purchases, pastDevices });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
