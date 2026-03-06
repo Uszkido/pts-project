@@ -72,6 +72,7 @@ export default function Home() {
                         <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Registry</span>
                     </div>
                     <div className="flex gap-2 sm:gap-4">
+                        <a href="/admin/login" className="text-sm font-semibold text-amber-400 hover:text-white transition-all bg-amber-600/10 hover:bg-amber-600/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-amber-500/20 hover:border-amber-500/40 hidden sm:block">Admin</a>
                         <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
                         <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-blue-500/20 hidden sm:block">Vendor Portal</a>
                         <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 block">Device Owner Login</a>

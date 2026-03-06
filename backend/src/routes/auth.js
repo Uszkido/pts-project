@@ -9,7 +9,7 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl } = req.body;
+        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo } = req.body;
 
         // Simple validation
         if (!email || !password) {
@@ -35,11 +35,17 @@ router.post('/register', async (req, res) => {
                 nationalId,
                 facialDataUrl,
                 biodataUrl,
-                cacCertificateUrl: finalRole === 'VENDOR' ? cacCertificateUrl : null
+                cacCertificateUrl: finalRole === 'VENDOR' ? cacCertificateUrl : null,
+                businessAddress: finalRole === 'VENDOR' ? businessAddress : null,
+                shopLatitude: finalRole === 'VENDOR' && shopLatitude ? parseFloat(shopLatitude) : null,
+                shopLongitude: finalRole === 'VENDOR' && shopLongitude ? parseFloat(shopLongitude) : null,
+                shopPhotoUrl: finalRole === 'VENDOR' ? shopPhotoUrl : null,
+                businessRegNo: finalRole === 'VENDOR' ? businessRegNo : null,
+                vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED'
             }
         });
 
-        res.status(201).json({ message: 'User registered successfully', userId: user.id });
+        res.status(201).json({ message: finalRole === 'VENDOR' ? 'Vendor registration submitted. Awaiting admin approval.' : 'User registered successfully', userId: user.id });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

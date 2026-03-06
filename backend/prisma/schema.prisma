@@ -18,6 +18,12 @@ model User {
   facialDataUrl String?
   biodataUrl    String?
   cacCertificateUrl String?
+  businessAddress   String?
+  shopLatitude      Float?
+  shopLongitude     Float?
+  shopPhotoUrl      String?
+  businessRegNo     String?
+  vendorStatus      String   @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
   vendorTier  Int      @default(3) // 1: Verified, 2: Certified, 3: Informal, 4: Watchlist
   devices     Device[]
   certificates Certificate[]

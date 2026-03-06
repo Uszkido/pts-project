@@ -51,6 +51,7 @@ export default function Login() {
                     </button>
                 </form>
                 <div className="mt-8 text-center text-xs text-slate-500">
+                    <p className="mb-3">Don't have an account? <a href="/vendor/register" className="text-blue-400 hover:text-blue-300 font-bold">Register as Vendor</a></p>
                     <p>By logging in, you agree to the National Registry Guidelines.</p>
                 </div>
             </div>
