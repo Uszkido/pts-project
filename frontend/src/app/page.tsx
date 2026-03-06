@@ -71,10 +71,10 @@ export default function Home() {
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-blue-500/20 tracking-tighter">PTS</div>
                         <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Registry</span>
                     </div>
-                    <div className="flex gap-4">
-                        <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
-                        <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full shadow-md shadow-blue-500/20">Vendor Portal</a>
-                        <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Device Owner Login</a>
+                    <div className="flex gap-2 sm:gap-4">
+                        <a href="/police/login" className="text-sm font-semibold text-red-400 hover:text-white transition-all bg-red-900/30 hover:bg-red-800/50 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-red-800/50 hover:border-red-600 hidden sm:block">Law Enforcement</a>
+                        <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-blue-500/20 hidden sm:block">Vendor Portal</a>
+                        <a href="/consumer/login" className="text-sm font-semibold text-white transition-all bg-emerald-600 hover:bg-emerald-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-emerald-500/20 block">Device Owner Login</a>
                     </div>
                 </div>
             </nav>
