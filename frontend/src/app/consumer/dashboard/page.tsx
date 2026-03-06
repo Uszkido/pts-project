@@ -674,9 +674,9 @@ export default function ConsumerDashboard() {
             </main>
 
             {/* Inivisble PDF Template Container */}
-            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', pointerEvents: 'none' }}>
+            <div style={{ position: 'fixed', top: '0', left: '200%', pointerEvents: 'none' }}>
                 {certificateData && (
-                    <div ref={certificateRef} className="bg-white text-slate-900 w-[210mm] h-[297mm] relative p-16 font-serif flex flex-col justify-between overflow-hidden shadow-2xl">
+                    <div ref={certificateRef} style={{ width: '794px', height: '1123px' }} className="bg-white text-slate-900 relative p-16 font-serif flex flex-col justify-between overflow-hidden shadow-2xl">
 
                         {/* Background Watermarks */}
                         <div className="absolute inset-0 z-0 opacity-[0.03] flex items-center justify-center pointer-events-none">
