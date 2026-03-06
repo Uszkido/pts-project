@@ -1,31 +1,57 @@
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
-
 const prisma = new PrismaClient();
+const bcrypt = require('bcrypt');
 
 async function main() {
     const hashedPassword = await bcrypt.hash('password123', 10);
-    const user = await prisma.user.upsert({
-        where: { email: 'vendor@pts.com' },
-        update: {},
-        create: {
-            email: 'vendor@pts.com',
-            password: hashedPassword,
-            companyName: 'Lagos Tech Hub Vendor'
-        }
-    });
-    console.log('Test vendor created:', user.email);
 
-    const policeUser = await prisma.user.upsert({
-        where: { email: 'police@pts.com' },
-        update: {},
-        create: {
-            email: 'police@pts.com',
+    // 1. Create a dummy Test Vendor
+    const vendor = await prisma.user.create({
+        data: {
+            email: 'testvendor@example.com',
             password: hashedPassword,
-            role: 'POLICE',
-            companyName: 'Lagos State Police Command'
-        }
+            role: 'VENDOR',
+            companyName: 'Test Tech Shop',
+            vendorTier: 2,
+        },
     });
-    console.log('Test police created:', policeUser.email);
+
+    console.log('Created Vendor:', vendor.email);
+
+    // 2. Create a dummy Clean Device
+    const cleanDevice = await prisma.device.create({
+        data: {
+            imei: '111111111111111',
+            brand: 'Apple',
+            model: 'iPhone 15 Pro',
+            status: 'CLEAN',
+            riskScore: 98,
+            registeredOwnerId: vendor.id,
+        },
+    });
+
+    console.log('Created Device IMEI:', cleanDevice.imei);
+
+    // 3. Create a dummy Stolen Device
+    const stolenDevice = await prisma.device.create({
+        data: {
+            imei: '999999999999999',
+            brand: 'Samsung',
+            model: 'Galaxy S24 Ultra',
+            status: 'STOLEN',
+            riskScore: 12,
+            registeredOwnerId: vendor.id,
+        },
+    });
+
+    console.log('Created Device IMEI:', stolenDevice.imei);
 }
-main().catch(console.error).finally(() => prisma.$disconnect());
+
+main()
+    .catch((e) => {
+        console.error(e);
+        process.exit(1);
+    })
+    .finally(async () => {
+        await prisma.$disconnect();
+    });
