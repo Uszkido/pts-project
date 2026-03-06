@@ -22,6 +22,8 @@ export default function Dashboard() {
     const [serial, setSerial] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [isDirectSale, setIsDirectSale] = useState(false);
+    const [devicePhoto, setDevicePhoto] = useState<File | null>(null);
+    const [isRegistering, setIsRegistering] = useState(false);
 
     // UI State
     const [message, setMessage] = useState('');
@@ -73,8 +75,24 @@ export default function Dashboard() {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage(''); setError('');
+        setIsRegistering(true);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            let devicePhotoUrl = null;
+
+            if (devicePhoto) {
+                const formData = new FormData();
+                formData.append('evidence', devicePhoto);
+                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload photo');
+                devicePhotoUrl = uploadData.url;
+            }
+
             const res = await fetch(`${apiUrl}/devices`, {
                 method: 'POST',
                 headers: {
@@ -85,14 +103,15 @@ export default function Dashboard() {
                     imei,
                     brand,
                     model,
-                    serialNumber: serial
+                    serialNumber: serial,
+                    devicePhotoUrl
                 })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
             setMessage(`Device registered securely. IMEI: ${data.device.imei}`);
-            setImei(''); setBrand(''); setModel(''); setSerial('');
+            setImei(''); setBrand(''); setModel(''); setSerial(''); setDevicePhoto(null);
 
             // If direct sale, initiate transfer
             if (isDirectSale && customerEmail) {
@@ -102,6 +121,8 @@ export default function Dashboard() {
             }
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setIsRegistering(false);
         }
     };
 
@@ -309,14 +330,25 @@ export default function Dashboard() {
                                     <label className="block text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wide">Device Model <span className="text-red-500">*</span></label>
                                     <input type="text" value={model} onChange={e => setModel(e.target.value)} required placeholder="e.g. iPhone 14 Pro" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
                                 </div>
-                                <div className="sm:col-span-2 pt-4 border-t border-slate-800 hidden">
-                                    {/* Direct sale ui hidden for simplicity in this view */}
+                                <div className="sm:col-span-2">
+                                    <label className="block text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wide">Hardware Serial No (Opt)</label>
+                                    <input type="text" value={serial} onChange={e => setSerial(e.target.value)} placeholder="Found in Settings/About" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                                </div>
+                                <div className="sm:col-span-2 p-4 bg-blue-950/20 rounded-2xl border border-blue-900/30">
+                                    <label className="block text-sm font-semibold text-blue-400 mb-2 uppercase tracking-wide flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                        Device Photo Upload (Optional)
+                                    </label>
+                                    <input type="file" accept="image/*" onChange={(e) => setDevicePhoto(e.target.files?.[0] || null)} className="w-full text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 transition-colors cursor-pointer" />
                                 </div>
                             </div>
                             <div className="pt-4 border-t border-slate-800 flex justify-end">
-                                <button type="submit" disabled={imei.length < 15} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg flex items-center gap-2 disabled:opacity-50">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                                    Secure to Vendor Inventory
+                                <button type="submit" disabled={imei.length < 15 || isRegistering} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg flex items-center gap-2 disabled:opacity-50">
+                                    {isRegistering ? (
+                                        <><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Securing to DB...</>
+                                    ) : (
+                                        <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg> Secure to Vendor Inventory</>
+                                    )}
                                 </button>
                             </div>
                         </form>

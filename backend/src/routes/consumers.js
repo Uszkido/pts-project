@@ -58,7 +58,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
             }
         }));
 
-        res.json({ devices: user.devices, pendingTransfers: user.purchases, pastDevices });
+        res.json({ devices: user.devices, pendingTransfers: user.purchases, pastDevices, fullName: user.fullName, email: user.email });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

@@ -271,4 +271,45 @@ router.put('/incidents/:id/share-location', authenticatePolice, async (req, res)
     }
 });
 
+// ============ MESSAGING (ADMIN ↔ POLICE) ============
+router.get('/messages', authenticatePolice, async (req, res) => {
+    try {
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { receiverRole: 'POLICE' },
+                    { senderId: req.user.id }
+                ]
+            },
+            include: { sender: { select: { email: true, fullName: true, role: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ messages });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/messages', authenticatePolice, async (req, res) => {
+    try {
+        const { subject, body } = req.body;
+        if (!subject || !body) return res.status(400).json({ error: 'Subject and body are required' });
+
+        const message = await prisma.message.create({
+            data: {
+                senderId: req.user.id,
+                receiverRole: 'ADMIN',
+                subject,
+                body
+            }
+        });
+
+        res.status(201).json({ message: 'Message sent to Admins', data: message });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

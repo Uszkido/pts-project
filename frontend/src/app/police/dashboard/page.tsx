@@ -23,7 +23,11 @@ export default function PoliceDashboard() {
     const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
 
     // UI Tabs
-    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'suspects'>('registry');
+    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'suspects' | 'messages'>('registry');
+
+    // Messages
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState({ subject: '', body: '' });
 
     const fetchData = async () => {
         setLoading(true);
@@ -43,17 +47,20 @@ export default function PoliceDashboard() {
             const devicesData = await devicesRes.json();
             setDevices(devicesData.devices || []);
 
-            // Fetch incidents and alerts simultaneously
-            const [incidentsRes, alertsRes] = await Promise.all([
+            // Fetch incidents, alerts, messages simultaneously
+            const [incidentsRes, alertsRes, messagesRes] = await Promise.all([
                 fetch(`${apiUrl}/police/incidents`, { headers }),
-                fetch(`${apiUrl}/police/vendor-alerts`, { headers })
+                fetch(`${apiUrl}/police/vendor-alerts`, { headers }),
+                fetch(`${apiUrl}/police/messages`, { headers })
             ]);
 
             const incidentsData = await incidentsRes.json();
             const alertsData = await alertsRes.json();
+            const messagesData = await messagesRes.json();
 
             setReports(incidentsData.reports || []);
             setAlerts(alertsData.alerts || []);
+            setMessages(messagesData.messages || []);
 
             // Fetch suspects
             const suspectsRes = await fetch(`${apiUrl}/police/suspects`, { headers });
@@ -126,6 +133,25 @@ export default function PoliceDashboard() {
         } finally {
             setIsSubmittingSuspect(false);
         }
+    };
+
+    const sendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ ...newMessage, receiverRole: 'ADMIN' })
+            });
+            if (!res.ok) throw new Error('Failed to send message');
+            setNewMessage({ subject: '', body: '' });
+            fetchData();
+            alert('Intelligence dispatched to System Administrator.');
+        } catch (err: any) { alert(err.message); }
     };
 
     useEffect(() => {
@@ -278,6 +304,10 @@ export default function PoliceDashboard() {
                     <button onClick={() => setActiveTab('suspects')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'suspects' ? 'bg-slate-800 text-purple-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                         Suspect Registry ({suspects.length})
+                    </button>
+                    <button onClick={() => setActiveTab('messages')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-slate-800 text-blue-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                        Admin Comms
                     </button>
                 </div>
 
@@ -481,6 +511,44 @@ export default function PoliceDashboard() {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    ) : activeTab === 'messages' ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+                            <div className="lg:col-span-1 bg-slate-950/50 border border-slate-800 rounded-2xl p-6 shadow-md h-fit">
+                                <h3 className="text-lg font-bold text-white mb-4">Secure Comms to Admin</h3>
+                                <form onSubmit={sendMessage} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Subject Clearance *</label>
+                                        <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500" placeholder="e.g. Clearance request for IMEI..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Intelligence Body *</label>
+                                        <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500" placeholder="Type message to System Administrator..." />
+                                    </div>
+                                    <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-red-500/20">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Transmit
+                                    </button>
+                                </form>
+                            </div>
+                            <div className="lg:col-span-2 bg-slate-950/50 border border-slate-800 rounded-2xl p-6 shadow-md min-h-[500px]">
+                                <h3 className="text-lg font-bold text-white mb-6">Classified Communications Thread</h3>
+                                <div className="space-y-4">
+                                    {messages.map(msg => (
+                                        <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'POLICE' ? 'bg-red-500/5 border-red-500/20 ml-12' : 'bg-slate-800 border-slate-700 mr-12'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${msg.sender?.role === 'POLICE' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-500'}`}>{msg.sender?.role}</span>
+                                                    <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
+                                                </div>
+                                                <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
+                                            <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
+                                        </div>
+                                    ))}
+                                    {messages.length === 0 && <div className="text-center py-20 text-slate-500 font-mono text-sm max-w-sm mx-auto">&gt; NO ENCRYPTED MESSAGES IN THREAD.<br />&gt; AWAITING TRANSMISSION...</div>}
+                                </div>
+                            </div>
                         </div>
                     ) : null}
                 </div>

@@ -228,4 +228,127 @@ router.get('/incidents', authenticateAdmin, async (req, res) => {
     }
 });
 
+// ============ GLOBAL SEARCH ============
+router.get('/search', authenticateAdmin, async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.length < 2) return res.status(400).json({ error: 'Search query too short' });
+
+        const [users, devices] = await Promise.all([
+            prisma.user.findMany({
+                where: {
+                    OR: [
+                        { email: { contains: q, mode: 'insensitive' } },
+                        { fullName: { contains: q, mode: 'insensitive' } },
+                        { companyName: { contains: q, mode: 'insensitive' } }
+                    ]
+                },
+                select: { id: true, email: true, fullName: true, companyName: true, role: true },
+                take: 10
+            }),
+            prisma.device.findMany({
+                where: {
+                    OR: [
+                        { imei: { contains: q, mode: 'insensitive' } },
+                        { brand: { contains: q, mode: 'insensitive' } },
+                        { model: { contains: q, mode: 'insensitive' } }
+                    ]
+                },
+                select: { id: true, imei: true, brand: true, model: true, status: true },
+                take: 10
+            })
+        ]);
+
+        res.json({ results: { users, devices } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ DOCUMENT VIEWER ============
+router.get('/documents', authenticateAdmin, async (req, res) => {
+    try {
+        const usersWithDocs = await prisma.user.findMany({
+            where: {
+                OR: [
+                    { cacCertificateUrl: { not: null } },
+                    { shopPhotoUrl: { not: null } },
+                    { facialDataUrl: { not: null } },
+                    { biodataUrl: { not: null } }
+                ]
+            },
+            select: {
+                id: true, email: true, fullName: true, companyName: true, role: true,
+                cacCertificateUrl: true, shopPhotoUrl: true, facialDataUrl: true, biodataUrl: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        const devicesWithDocs = await prisma.device.findMany({
+            where: {
+                OR: [
+                    { devicePhotoUrl: { not: null } },
+                    { purchaseReceiptUrl: { not: null } },
+                    { cartonPhotoUrl: { not: null } }
+                ]
+            },
+            select: {
+                id: true, imei: true, brand: true, model: true,
+                devicePhotoUrl: true, purchaseReceiptUrl: true, cartonPhotoUrl: true,
+                registeredOwner: { select: { email: true, fullName: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({ userDocuments: usersWithDocs, deviceDocuments: devicesWithDocs });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ MESSAGING (ADMIN ↔ POLICE) ============
+router.get('/messages', authenticateAdmin, async (req, res) => {
+    try {
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { receiverRole: 'ADMIN' },
+                    { senderId: req.user.id }
+                ]
+            },
+            include: { sender: { select: { email: true, fullName: true, role: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ messages });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/messages', authenticateAdmin, async (req, res) => {
+    try {
+        const { subject, body, receiverRole } = req.body;
+        if (!subject || !body || receiverRole !== 'POLICE') {
+            return res.status(400).json({ error: 'Invalid message data. Admin can only message POLICE role globally for now.' });
+        }
+
+        const message = await prisma.message.create({
+            data: {
+                senderId: req.user.id,
+                receiverRole: 'POLICE',
+                subject,
+                body
+            }
+        });
+
+        res.status(201).json({ message: 'Message sent', data: message });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

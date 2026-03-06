@@ -7,6 +7,7 @@ export default function ConsumerDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
     const [pastDevices, setPastDevices] = useState<any[]>([]);
     const [pendingTransfers, setPendingTransfers] = useState<any[]>([]);
+    const [user, setUser] = useState<{ fullName?: string, email?: string } | null>(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedPassport, setSelectedPassport] = useState<any[] | null>(null);
@@ -24,8 +25,15 @@ export default function ConsumerDashboard() {
     const [isSubmittingReport, setIsSubmittingReport] = useState(false);
     const [reportError, setReportError] = useState('');
 
+    // Device Registration State
+    const [registrationForm, setRegistrationForm] = useState({ brand: '', model: '', imei: '', serialNumber: '' });
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [cartonFile, setCartonFile] = useState<File | null>(null);
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [regError, setRegError] = useState('');
+
     // UI tabs
-    const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+    const [activeTab, setActiveTab] = useState<'active' | 'history' | 'register'>('active');
 
     // PDF Generation State
     const [isGeneratingPdf, setIsGeneratingPdf] = useState<string | null>(null);
@@ -41,6 +49,7 @@ export default function ConsumerDashboard() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
+            setUser(data.user || null);
             setDevices(data.devices || []);
             setPendingTransfers(data.pendingTransfers || []);
             setPastDevices(data.pastDevices || []);
@@ -175,6 +184,64 @@ export default function ConsumerDashboard() {
         }
     };
 
+    const submitRegistration = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsRegistering(true);
+        setRegError('');
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            let purchaseReceiptUrl = null;
+            let cartonPhotoUrl = null;
+
+            // Upload Receipt
+            if (receiptFile) {
+                const formData = new FormData();
+                formData.append('evidence', receiptFile);
+                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }, body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload receipt');
+                purchaseReceiptUrl = uploadData.url;
+            }
+
+            // Upload Carton Photo
+            if (cartonFile) {
+                const formData = new FormData();
+                formData.append('evidence', cartonFile);
+                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }, body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload carton photo');
+                cartonPhotoUrl = uploadData.url;
+            }
+
+            const payload = { ...registrationForm, purchaseReceiptUrl, cartonPhotoUrl };
+
+            const res = await fetch(`${apiUrl}/devices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            alert('Device successfully registered and cryptographically secured.');
+            setRegistrationForm({ brand: '', model: '', imei: '', serialNumber: '' });
+            setReceiptFile(null);
+            setCartonFile(null);
+            setActiveTab('active');
+            fetchDashboard();
+        } catch (err: any) {
+            setRegError(err.message);
+        } finally {
+            setIsRegistering(false);
+        }
+    };
+
     const downloadCertificate = async (device: any) => {
         setIsGeneratingPdf(device.id);
         const activeCert = device.certificates && device.certificates.length > 0 ? device.certificates[0] : null;
@@ -225,8 +292,8 @@ export default function ConsumerDashboard() {
                 <div className="text-white font-bold flex items-center gap-3">
                     <span className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">PTS</span>
                     <div className="flex flex-col">
-                        <span className="leading-tight">Digital Vault</span>
-                        <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div> Secured</span>
+                        <span className="leading-tight">Digital Vault {user?.fullName && `— ${user.fullName}`}</span>
+                        <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-semibold flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div> Secured Account</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -260,9 +327,13 @@ export default function ConsumerDashboard() {
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-slate-800 pb-4">
                     <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Your Asset Portfolio</h1>
-                    <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1">
-                        <button onClick={() => setActiveTab('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-emerald-600/20 text-emerald-400' : 'text-slate-400 hover:text-white'}`}>Active Devices</button>
-                        <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600/20 text-blue-400' : 'text-slate-400 hover:text-white'}`}>Ownership History</button>
+                    <div className="flex flex-wrap bg-slate-900 border border-slate-800 rounded-lg p-1 gap-1">
+                        <button onClick={() => setActiveTab('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-emerald-600/20 text-emerald-400 shadow-md' : 'text-slate-400 hover:text-white'}`}>Active Devices</button>
+                        <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600/20 text-blue-400 shadow-md' : 'text-slate-400 hover:text-white'}`}>Ownership History</button>
+                        <button onClick={() => setActiveTab('register')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'register' ? 'bg-amber-600/20 text-amber-400 shadow-md border-amber-500/30 border' : 'text-amber-500/70 hover:text-amber-400 border border-transparent'}`}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                            Register Device
+                        </button>
                     </div>
                 </div>
 
@@ -368,7 +439,7 @@ export default function ConsumerDashboard() {
                             })
                         )}
                     </div>
-                ) : (
+                ) : activeTab === 'history' ? (
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
                         {pastDevices.length === 0 ? (
                             <div className="p-16 text-center border-b border-slate-800">
@@ -409,7 +480,71 @@ export default function ConsumerDashboard() {
                             </div>
                         )}
                     </div>
-                )}
+                ) : activeTab === 'register' ? (
+                    <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-10 animate-in fade-in slide-in-from-bottom-8 duration-500">
+                        <div className="mb-8 border-b border-slate-800 pb-6">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                </div>
+                                Direct Asset Registration
+                            </h2>
+                            <p className="text-slate-400 text-sm mt-3">Register a legally self-owned device to acquire an immutable certificate of ownership. Physical documentation (receipts/carton) is strictly recommended to prove legitimate purchase before generating a verifiable DDOC.</p>
+                        </div>
+
+                        <form onSubmit={submitRegistration} className="space-y-6">
+                            {regError && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm font-semibold">{regError}</div>}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-300 mb-2">Device Brand *</label>
+                                    <input type="text" value={registrationForm.brand} onChange={e => setRegistrationForm({ ...registrationForm, brand: e.target.value })} required placeholder="E.g. Apple, Samsung" className="w-full bg-slate-950/50 border border-slate-700/80 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500 transition-colors shadow-inner" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-300 mb-2">Model Name *</label>
+                                    <input type="text" value={registrationForm.model} onChange={e => setRegistrationForm({ ...registrationForm, model: e.target.value })} required placeholder="E.g. iPhone 15 Pro Max" className="w-full bg-slate-950/50 border border-slate-700/80 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-amber-500 transition-colors shadow-inner" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-300 mb-2">IMEI (Serial #1) *</label>
+                                    <input type="text" value={registrationForm.imei} onChange={e => setRegistrationForm({ ...registrationForm, imei: e.target.value })} required maxLength={15} placeholder="15-digit code (*#06#)" className="w-full bg-slate-950/50 border border-slate-700/80 rounded-xl px-4 py-3.5 text-white font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-300 mb-2">Hardware Serial No (Opt)</label>
+                                    <input type="text" value={registrationForm.serialNumber} onChange={e => setRegistrationForm({ ...registrationForm, serialNumber: e.target.value })} placeholder="Found in Settings/About" className="w-full bg-slate-950/50 border border-slate-700/80 rounded-xl px-4 py-3.5 text-white font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner" />
+                                </div>
+                            </div>
+
+                            <div className="p-5 bg-emerald-950/20 border border-emerald-900/30 rounded-2xl space-y-5">
+                                <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    Proof of Ownership Documents
+                                </h3>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-2">Purchase Receipt / Invoice (Optional)</label>
+                                    <input type="file" accept="image/*,application/pdf" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} className="w-full bg-slate-900/50 border border-slate-700 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 transition-colors cursor-pointer" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-2">Device Carton / Box Photo (Optional)</label>
+                                    <input type="file" accept="image/*" onChange={(e) => setCartonFile(e.target.files?.[0] || null)} className="w-full bg-slate-900/50 border border-slate-700 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-500/10 file:text-amber-500 hover:file:bg-amber-500/20 transition-colors cursor-pointer" />
+                                    <p className="text-[10px] text-slate-500 mt-2">Clear photo showing IMEI printed on the box.</p>
+                                </div>
+                            </div>
+
+                            <button type="submit" disabled={isRegistering} className="w-full mt-6 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-3">
+                                {isRegistering ? (
+                                    <><svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Securing Device on Blockchain...</>
+                                ) : (
+                                    <>Verify & Generate Certificates</>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                ) : null}
 
                 {/* Device Passport Modal */}
                 {isPassportOpen && (

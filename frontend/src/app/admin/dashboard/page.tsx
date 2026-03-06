@@ -8,8 +8,17 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
+
+    // New feature states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<{ users: any[], devices: any[] } | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const [documents, setDocuments] = useState<{ userDocuments: any[], deviceDocuments: any[] }>({ userDocuments: [], deviceDocuments: [] });
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState({ subject: '', body: '' });
 
     // Create Account Modal
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -21,23 +30,27 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [dashRes, usersRes, devicesRes, incidentsRes] = await Promise.all([
+            const [dashRes, usersRes, devicesRes, incidentsRes, docsRes, msgsRes] = await Promise.all([
                 fetch(`${apiUrl}/admin/dashboard`, { headers }),
                 fetch(`${apiUrl}/admin/users`, { headers }),
                 fetch(`${apiUrl}/admin/devices`, { headers }),
-                fetch(`${apiUrl}/admin/incidents`, { headers })
+                fetch(`${apiUrl}/admin/incidents`, { headers }),
+                fetch(`${apiUrl}/admin/documents`, { headers }),
+                fetch(`${apiUrl}/admin/messages`, { headers })
             ]);
 
             if (!dashRes.ok) throw new Error('Access denied. Admin privileges required.');
 
-            const [dashData, usersData, devicesData, incidentsData] = await Promise.all([
-                dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json()
+            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData] = await Promise.all([
+                dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json(), docsRes.json(), msgsRes.json()
             ]);
 
             setStats(dashData);
             setUsers(usersData.users || []);
             setDevices(devicesData.devices || []);
             setIncidents(incidentsData.incidents || []);
+            setDocuments(docsData || { userDocuments: [], deviceDocuments: [] });
+            setMessages(msgsData.messages || []);
         } catch (err: any) {
             setError(err.message);
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -55,6 +68,40 @@ export default function AdminDashboard() {
         }
         fetchData();
     }, []);
+
+    useEffect(() => {
+        if (searchQuery.length < 2) {
+            setSearchResults(null);
+            return;
+        }
+        const delayDebounceFn = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await fetch(`${apiUrl}/admin/search?q=${encodeURIComponent(searchQuery)}`, { headers });
+                if (res.ok) {
+                    const data = await res.json();
+                    setSearchResults(data.results);
+                }
+            } catch (error) { console.error('Search error', error); }
+            finally { setIsSearching(false); }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const sendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${apiUrl}/admin/messages`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...newMessage, receiverRole: 'POLICE' })
+            });
+            if (!res.ok) throw new Error('Failed to send message');
+            setNewMessage({ subject: '', body: '' });
+            fetchData();
+            alert('Message sent to Law Enforcement');
+        } catch (err: any) { alert(err.message); }
+    };
 
     const updateVendorStatus = async (userId: string, vendorStatus: string) => {
         try {
@@ -159,10 +206,41 @@ export default function AdminDashboard() {
     return (
         <div className="min-h-screen bg-slate-950 font-sans text-slate-200">
             <nav className="border-b border-amber-900/30 bg-slate-900/80 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 relative z-[100]">
                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-600 to-red-600 text-white flex items-center justify-center font-black text-sm shadow-lg">A</div>
-                    <span className="text-xl font-bold text-white tracking-tight">Admin Console</span>
-                    <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold uppercase">System Administrator</span>
+                    <span className="text-xl font-bold text-white tracking-tight hidden sm:block">Admin Console</span>
+                    <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-bold uppercase hidden sm:block">System Administrator</span>
+
+                    {/* Global Search */}
+                    <div className="relative ml-4 w-64 md:w-80">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            {isSearching ? <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+                        </div>
+                        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search users, email, IMEI..." className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors" />
+
+                        {/* Search Results Dropdown */}
+                        {searchResults && searchQuery.length >= 2 && (
+                            <div className="absolute top-full mt-2 w-96 max-h-96 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 left-0 sm:left-auto sm:right-0">
+                                <div className="px-4 py-2 text-xs font-bold uppercase text-slate-500 tracking-wider">Users matched ({searchResults.users.length})</div>
+                                {searchResults.users.map(u => (
+                                    <div key={u.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-amber-500">
+                                        <p className="font-bold text-white text-sm">{u.fullName || u.email}</p>
+                                        <p className="text-xs text-slate-400">{u.role} {u.companyName ? `• ${u.companyName}` : ''}</p>
+                                    </div>
+                                ))}
+                                <div className="px-4 py-2 text-xs font-bold uppercase text-slate-500 tracking-wider mt-2 border-t border-slate-800 pt-3">Devices matched ({searchResults.devices.length})</div>
+                                {searchResults.devices.map(d => (
+                                    <div key={d.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500">
+                                        <p className="font-bold text-white text-sm">{d.brand} {d.model}</p>
+                                        <p className="text-xs font-mono text-slate-400 mt-0.5">IMEI: {d.imei} <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-950 border border-slate-800">{d.status}</span></p>
+                                    </div>
+                                ))}
+                                {searchResults.users.length === 0 && searchResults.devices.length === 0 && (
+                                    <div className="px-4 py-6 text-center text-slate-500 text-sm">No results found for "{searchQuery}"</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <a href="/" className="text-xs text-slate-500 hover:text-white transition-colors">Homepage</a>
@@ -193,7 +271,7 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'vendors', 'users', 'devices', 'incidents'] as const).map(tab => (
+                    {(['overview', 'vendors', 'users', 'devices', 'incidents', 'documents', 'messages'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-amber-600/20 text-amber-400 shadow-lg border border-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${pendingVendors.length} pending)` : tab}
                         </button>
@@ -384,6 +462,94 @@ export default function AdminDashboard() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* TAB: Documents */}
+                {activeTab === 'documents' && (
+                    <div className="space-y-8">
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> User Documents</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {documents.userDocuments.map(u => (
+                                    <div key={u.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md">
+                                        <div className="mb-3">
+                                            <p className="font-bold text-white text-sm">{u.fullName || u.email}</p>
+                                            <p className="text-xs font-medium text-slate-500">{u.role} {u.companyName && `• ${u.companyName}`}</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {u.cacCertificateUrl && <a href={u.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📄 CAC Cert</a>}
+                                            {u.shopPhotoUrl && <a href={u.shopPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">🖼️ Shop</a>}
+                                            {u.facialDataUrl && <a href={u.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-purple-500/20">👤 Face</a>}
+                                            {u.biodataUrl && <a href={u.biodataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">📋 Biodata</a>}
+                                        </div>
+                                    </div>
+                                ))}
+                                {documents.userDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No user documents</p>}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
+                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Device Documents</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {documents.deviceDocuments.map(d => (
+                                    <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md">
+                                        <div className="mb-3">
+                                            <p className="font-bold text-white text-sm">{d.brand} {d.model}</p>
+                                            <p className="text-xs font-mono text-slate-400">IMEI: {d.imei}</p>
+                                            <p className="text-xs font-medium text-slate-500 mt-0.5">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
+                                            {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
+                                            {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
+                                        </div>
+                                    </div>
+                                ))}
+                                {documents.deviceDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No device documents</p>}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: Messages */}
+                {activeTab === 'messages' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
+                            <h3 className="text-lg font-bold text-white mb-4">Message Law Enforcement</h3>
+                            <form onSubmit={sendMessage} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
+                                    <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Case investigation request..." />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
+                                    <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to police..." />
+                                </div>
+                                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Send Message
+                                </button>
+                            </form>
+                        </div>
+                        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[500px]">
+                            <h3 className="text-lg font-bold text-white mb-6">Discussions Thread</h3>
+                            <div className="space-y-4">
+                                {messages.map(msg => (
+                                    <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/5 border-amber-500/20 ml-12' : 'bg-blue-500/5 border-blue-500/20 mr-12'}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>{msg.sender?.role}</span>
+                                                <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
+                                            </div>
+                                            <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
+                                        <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
+                                    </div>
+                                ))}
+                                {messages.length === 0 && <div className="text-center py-20 text-slate-500">No messages in thread yet.</div>}
+                            </div>
+                        </div>
                     </div>
                 )}
             </main>
