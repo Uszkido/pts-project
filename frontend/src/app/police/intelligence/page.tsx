@@ -8,6 +8,17 @@ export default function PoliceIntelligence() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'INCIDENTS' | 'ALERTS'>('INCIDENTS');
 
+    // Tracking Log State
+    const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+    const [trackingImei, setTrackingImei] = useState('');
+    const [trackingMethod, setTrackingMethod] = useState('GPS');
+    const [trackingLocation, setTrackingLocation] = useState('');
+    const [trackingAccuracy, setTrackingAccuracy] = useState('HIGH');
+    const [trackingIp, setTrackingIp] = useState('');
+    const [isSubmittingTracking, setIsSubmittingTracking] = useState(false);
+    const [trackingLogs, setTrackingLogs] = useState<any[]>([]);
+    const [showLogs, setShowLogs] = useState(false);
+
     useEffect(() => {
         if (!localStorage.getItem('pts_token')) {
             window.location.href = '/police/login';
@@ -43,6 +54,59 @@ export default function PoliceIntelligence() {
         fetchIntelligence();
     }, []);
 
+    const submitTrackingLog = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmittingTracking(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/tracking-log`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({
+                    deviceImei: trackingImei,
+                    method: trackingMethod,
+                    location: trackingLocation,
+                    accuracy: trackingAccuracy,
+                    ipAddress: trackingIp || undefined
+                })
+            });
+            if (!res.ok) throw new Error('Failed to log tracking data');
+            alert('Tracking data logged and device location updated.');
+            setIsTrackingOpen(false);
+            setTrackingLocation('');
+            setTrackingIp('');
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsSubmittingTracking(false);
+        }
+    };
+
+    const fetchTrackingLogs = async (imei: string) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/tracking-logs/${imei}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            const data = await res.json();
+            setTrackingLogs(data.logs || []);
+            setShowLogs(true);
+        } catch (err: any) {
+            alert(err.message);
+        }
+    };
+
+    const methodColors: Record<string, string> = {
+        GPS: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+        WIFI: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+        IP: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+        CELLULAR: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+        MANUAL: 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+    };
+
     return (
         <div className="min-h-screen bg-slate-950 font-sans text-slate-200">
             <nav className="border-b border-rose-900/50 bg-slate-900/80 backdrop-blur-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
@@ -67,6 +131,26 @@ export default function PoliceIntelligence() {
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Intelligence & Enforcement Portal</h1>
                         <p className="text-slate-400 text-sm mt-1">Live feed of consumer incident reports and vendor suspicious activity alerts.</p>
+                    </div>
+                </div>
+
+                {/* Tracking Method Panel */}
+                <div className="mb-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-white">Multi-Method Device Triangulation</h3>
+                                <p className="text-[10px] text-slate-500">GPS • WiFi Probe • IP Geolocation • Cellular Tower Triangulation • Manual Reports</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-1">
+                            {['GPS', 'WIFI', 'IP', 'CELLULAR', 'MANUAL'].map(m => (
+                                <span key={m} className={`px-2 py-1 rounded-md text-[9px] font-bold border ${methodColors[m]}`}>{m}</span>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -144,6 +228,16 @@ export default function PoliceIntelligence() {
                                         </div>
                                     )}
                                 </div>
+                                {/* Tracking Action Buttons */}
+                                <div className="mt-4 flex gap-2">
+                                    <button onClick={() => { setTrackingImei(report.device.imei); setIsTrackingOpen(true); }} className="flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white text-xs font-bold py-2 px-3 rounded-lg border border-emerald-500/20 transition-all">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                                        Log Tracking Data
+                                    </button>
+                                    <button onClick={() => fetchTrackingLogs(report.device.imei)} className="flex items-center gap-1.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white text-xs font-bold py-2 px-3 rounded-lg border border-blue-500/20 transition-all">
+                                        View Tracking History
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -174,6 +268,95 @@ export default function PoliceIntelligence() {
                     </div>
                 )}
             </main>
+
+            {/* Log Tracking Data Modal */}
+            {isTrackingOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Log Tracking Signal</h2>
+                                <p className="text-xs text-slate-400 font-mono">Device IMEI: {trackingImei}</p>
+                            </div>
+                            <button onClick={() => setIsTrackingOpen(false)} className="text-slate-400 hover:text-white p-2">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={submitTrackingLog} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Detection Method</label>
+                                    <select value={trackingMethod} onChange={e => setTrackingMethod(e.target.value)} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500">
+                                        <option value="GPS">📡 GPS Satellite</option>
+                                        <option value="WIFI">📶 WiFi Probe Request</option>
+                                        <option value="IP">🌐 IP Geolocation</option>
+                                        <option value="CELLULAR">📱 Cellular Triangulation</option>
+                                        <option value="MANUAL">✍️ Manual Report</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Signal Accuracy</label>
+                                    <select value={trackingAccuracy} onChange={e => setTrackingAccuracy(e.target.value)} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500">
+                                        <option value="HIGH">High (within 10m)</option>
+                                        <option value="MEDIUM">Medium (within 100m)</option>
+                                        <option value="LOW">Low (within 1km)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Detected Location</label>
+                                <input type="text" value={trackingLocation} onChange={e => setTrackingLocation(e.target.value)} placeholder="e.g., Lat: 6.5244, Lng: 3.3792 or Address" required className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" />
+                            </div>
+                            {(trackingMethod === 'IP' || trackingMethod === 'WIFI') && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">IP Address (if available)</label>
+                                    <input type="text" value={trackingIp} onChange={e => setTrackingIp(e.target.value)} placeholder="e.g., 102.89.23.45" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-emerald-500" />
+                                </div>
+                            )}
+                            <button type="submit" disabled={isSubmittingTracking} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isSubmittingTracking ? 'Logging Signal...' : 'Confirm & Update Device Location'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Tracking History Modal */}
+            {showLogs && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-white">Tracking Signal History</h2>
+                            <button onClick={() => { setShowLogs(false); setTrackingLogs([]); }} className="text-slate-400 hover:text-white p-2">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto">
+                            {trackingLogs.length === 0 ? (
+                                <p className="text-center text-slate-500 py-8">No tracking signals logged for this device yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {trackingLogs.map((log: any) => (
+                                        <div key={log.id} className="flex items-start gap-3 p-3 bg-slate-950/50 border border-slate-800 rounded-xl">
+                                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold border mt-1 ${methodColors[log.method] || 'bg-slate-800 text-slate-400'}`}>{log.method}</span>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-bold text-white">{log.location}</p>
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <span className="text-[10px] text-slate-500 font-mono">{new Date(log.createdAt).toLocaleString()}</span>
+                                                    {log.accuracy && <span className="text-[10px] text-slate-500">Accuracy: {log.accuracy}</span>}
+                                                    {log.ipAddress && <span className="text-[10px] text-cyan-400 font-mono">IP: {log.ipAddress}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

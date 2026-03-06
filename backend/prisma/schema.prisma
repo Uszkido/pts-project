@@ -85,6 +85,9 @@ model IncidentReport {
   policeReportNo String?
   evidenceUrls String[]
   status      String   @default("OPEN") // OPEN, REVIEWING, RESOLVED
+  locationSharedWithOwner Boolean @default(false)
+  suspectId   String?
+  suspect     Suspect? @relation(fields: [suspectId], references: [id])
   createdAt   DateTime @default(now())
 }
 
@@ -145,5 +148,32 @@ model ProofOfSale {
   transactionRef String?
   signedByVendor Boolean @default(false)
   signedByBuyer  Boolean @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Suspect {
+  id            String   @id @default(uuid())
+  fullName      String?
+  alias         String?
+  nationalId    String?
+  phoneNumber   String?
+  description   String?
+  photoUrl      String?
+  knownAddresses String?
+  dangerLevel   String   @default("UNKNOWN") // LOW, MEDIUM, HIGH, EXTREME, UNKNOWN
+  incidents     IncidentReport[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model DeviceTrackingLog {
+  id          String   @id @default(uuid())
+  deviceImei  String
+  method      String   // GPS, WIFI, IP, CELLULAR, MANUAL
+  location    String
+  accuracy    String?  // e.g. "High", "Medium", "Low"
+  ipAddress   String?
+  metadata    String?  // JSON - extra signal data
+  loggedById  String?
   createdAt   DateTime @default(now())
 }

@@ -10,8 +10,20 @@ export default function PoliceDashboard() {
     const [filter, setFilter] = useState(''); // '' means all, 'STOLEN', etc.
     const [loading, setLoading] = useState(true);
 
+    // Search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showSearch, setShowSearch] = useState(false);
+
+    // Suspects
+    const [suspects, setSuspects] = useState<any[]>([]);
+    const [isAddSuspectOpen, setIsAddSuspectOpen] = useState(false);
+    const [suspectForm, setSuspectForm] = useState({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
+    const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
+
     // UI Tabs
-    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts'>('registry');
+    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'suspects'>('registry');
 
     const fetchData = async () => {
         setLoading(true);
@@ -43,6 +55,11 @@ export default function PoliceDashboard() {
             setReports(incidentsData.reports || []);
             setAlerts(alertsData.alerts || []);
 
+            // Fetch suspects
+            const suspectsRes = await fetch(`${apiUrl}/police/suspects`, { headers });
+            const suspectsData = await suspectsRes.json();
+            setSuspects(suspectsData.suspects || []);
+
         } catch (err: any) {
             setError(err.message);
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -50,6 +67,64 @@ export default function PoliceDashboard() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSearch = async () => {
+        if (searchQuery.length < 2) return;
+        setIsSearching(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/search?q=${encodeURIComponent(searchQuery)}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            const data = await res.json();
+            setSearchResults(data.devices || []);
+            setShowSearch(true);
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const shareLocation = async (incidentId: string) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/share-location`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            if (!res.ok) throw new Error('Failed to share location');
+            alert('Device location is now visible to the victim.');
+            fetchData();
+        } catch (err: any) {
+            alert(err.message);
+        }
+    };
+
+    const createSuspect = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmittingSuspect(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/suspects`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify(suspectForm)
+            });
+            if (!res.ok) throw new Error('Failed to create suspect record');
+            alert('Suspect record created.');
+            setIsAddSuspectOpen(false);
+            setSuspectForm({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
+            fetchData();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsSubmittingSuspect(false);
         }
     };
 
@@ -111,6 +186,54 @@ export default function PoliceDashboard() {
 
                 {error && <p className="mb-6 p-4 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 font-medium">{error}</p>}
 
+                {/* Device Search Bar */}
+                <div className="mb-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                    <div className="flex gap-3">
+                        <div className="relative flex-1">
+                            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                                placeholder="Search devices by IMEI, brand, model, owner email..."
+                                className="w-full bg-slate-950/80 border border-slate-700/50 rounded-xl pl-12 pr-4 py-3.5 text-white focus:outline-none focus:border-red-600 transition-all placeholder:text-slate-600"
+                            />
+                        </div>
+                        <button onClick={handleSearch} disabled={isSearching || searchQuery.length < 2} className="bg-red-600 hover:bg-red-500 text-white font-bold px-8 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2">
+                            {isSearching ? 'Scanning...' : 'Search'}
+                        </button>
+                    </div>
+
+                    {/* Search Results Dropdown */}
+                    {showSearch && (
+                        <div className="mt-4 border-t border-slate-800 pt-4">
+                            <div className="flex justify-between items-center mb-3">
+                                <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Search Results ({searchResults.length})</p>
+                                <button onClick={() => { setShowSearch(false); setSearchResults([]); setSearchQuery(''); }} className="text-xs text-slate-500 hover:text-white">Clear</button>
+                            </div>
+                            {searchResults.length === 0 ? (
+                                <p className="text-sm text-slate-500 py-4 text-center">No devices found matching "{searchQuery}"</p>
+                            ) : (
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {searchResults.map((device: any) => (
+                                        <a key={device.id} href={`/police/forensics`} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
+                                            <div>
+                                                <p className="font-bold text-white group-hover:text-red-400 transition-colors">{device.brand} {device.model}</p>
+                                                <p className="text-xs font-mono text-slate-500 tracking-widest">{device.imei}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400' : device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>{device.status}</span>
+                                                <p className="text-xs text-slate-500 mt-1">{device.registeredOwner?.email}</p>
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Top Metrics Row */}
                 {metrics && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -151,6 +274,10 @@ export default function PoliceDashboard() {
                     <button onClick={() => setActiveTab('alerts')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'alerts' ? 'bg-slate-800 text-amber-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                         Vendor Alerts {metrics?.openAlerts > 0 && <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{metrics.openAlerts}</span>}
+                    </button>
+                    <button onClick={() => setActiveTab('suspects')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'suspects' ? 'bg-slate-800 text-purple-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        Suspect Registry ({suspects.length})
                     </button>
                 </div>
 
@@ -232,6 +359,7 @@ export default function PoliceDashboard() {
                                         <th className="px-6 py-4 font-semibold tracking-wider">Device Details</th>
                                         <th className="px-6 py-4 font-semibold tracking-wider">Narrative</th>
                                         <th className="px-6 py-4 font-semibold tracking-wider">Status</th>
+                                        <th className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
@@ -244,6 +372,12 @@ export default function PoliceDashboard() {
                                             <td className="px-6 py-4">
                                                 <div className="font-bold text-white">{report.device.brand} {report.device.model}</div>
                                                 <div className="text-xs text-slate-500 font-mono mt-1">{report.device.imei}</div>
+                                                {report.device.lastKnownLocation && (
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                                                        <span className="text-[10px] text-emerald-400 font-bold">TRACKED: {report.device.lastKnownLocation}</span>
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 max-w-sm">
                                                 <p className="text-sm text-slate-300 line-clamp-2">{report.description}</p>
@@ -252,6 +386,15 @@ export default function PoliceDashboard() {
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${report.status === 'OPEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30' : 'bg-slate-800 text-slate-400'}`}>
                                                     {report.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {!report.locationSharedWithOwner ? (
+                                                    <button onClick={() => shareLocation(report.id)} className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-500/20 transition-colors uppercase tracking-wide">
+                                                        Share Location
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 uppercase tracking-wide">Shared ✓</span>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -291,9 +434,124 @@ export default function PoliceDashboard() {
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                    ) : activeTab === 'suspects' ? (
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-white">Known Suspects & Thieves</h3>
+                            <button onClick={() => setIsAddSuspectOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                Add Suspect
+                            </button>
+                        </div>
+                        {suspects.length === 0 ? (
+                            <div className="text-center py-10 text-slate-500">No suspects recorded yet.</div>
+                        ) : (
+                            <div className="grid gap-4">
+                                {suspects.map((s: any) => (
+                                    <div key={s.id} className="bg-slate-950/50 border border-slate-800 rounded-2xl p-5 hover:border-purple-900/50 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="text-lg font-bold text-white">{s.fullName || 'Unknown'}</h4>
+                                                {s.alias && <p className="text-sm text-purple-400">a.k.a "{s.alias}"</p>}
+                                            </div>
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${s.dangerLevel === 'EXTREME' ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
+                                                s.dangerLevel === 'HIGH' ? 'bg-orange-500/20 text-orange-500 border border-orange-500/30' :
+                                                    s.dangerLevel === 'MEDIUM' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' :
+                                                        s.dangerLevel === 'LOW' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                                            'bg-slate-800 text-slate-400 border border-slate-700'
+                                                }`}>{s.dangerLevel}</span>
+                                        </div>
+                                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                            {s.nationalId && <div><span className="text-slate-500 text-xs">NIN:</span> <span className="text-slate-300 font-mono">{s.nationalId}</span></div>}
+                                            {s.phoneNumber && <div><span className="text-slate-500 text-xs">Phone:</span> <span className="text-slate-300">{s.phoneNumber}</span></div>}
+                                            {s.knownAddresses && <div className="col-span-2"><span className="text-slate-500 text-xs">Known Area:</span> <span className="text-slate-300">{s.knownAddresses}</span></div>}
+                                        </div>
+                                        {s.description && <p className="mt-2 text-sm text-slate-400 italic border-l-2 border-purple-500/30 pl-3">{s.description}</p>}
+                                        {s.incidents && s.incidents.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-slate-800">
+                                                <p className="text-[10px] text-red-400 uppercase tracking-widest font-bold mb-1">Linked Incidents ({s.incidents.length})</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {s.incidents.map((inc: any) => (
+                                                        <span key={inc.id} className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-md">{inc.device?.brand} {inc.device?.model} — {inc.device?.imei}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    ) : null}
                 </div>
             </main>
+
+            {/* Add Suspect Modal */}
+            {isAddSuspectOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-500 flex items-center justify-center border border-purple-500/30">
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">Register Suspect</h2>
+                                    <p className="text-xs text-slate-400">Add to National Suspect Database</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsAddSuspectOpen(false)} className="text-slate-400 hover:text-white p-2">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={createSuspect} className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>
+                                    <input type="text" value={suspectForm.fullName} onChange={e => setSuspectForm({ ...suspectForm, fullName: e.target.value })} placeholder="Legal name" required className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Alias / Street Name</label>
+                                    <input type="text" value={suspectForm.alias} onChange={e => setSuspectForm({ ...suspectForm, alias: e.target.value })} placeholder="e.g. Two-Phones" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">National ID (NIN)</label>
+                                    <input type="text" value={suspectForm.nationalId} onChange={e => setSuspectForm({ ...suspectForm, nationalId: e.target.value })} placeholder="ID Number" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Phone Number</label>
+                                    <input type="text" value={suspectForm.phoneNumber} onChange={e => setSuspectForm({ ...suspectForm, phoneNumber: e.target.value })} placeholder="+234..." className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Known Addresses / Areas</label>
+                                <input type="text" value={suspectForm.knownAddresses} onChange={e => setSuspectForm({ ...suspectForm, knownAddresses: e.target.value })} placeholder="e.g. Computer Village, Ikeja" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Description / Intel</label>
+                                <textarea value={suspectForm.description} onChange={e => setSuspectForm({ ...suspectForm, description: e.target.value })} placeholder="Physical description, known associates, MO..." rows={3} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 resize-none"></textarea>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Danger Level</label>
+                                <select value={suspectForm.dangerLevel} onChange={e => setSuspectForm({ ...suspectForm, dangerLevel: e.target.value })} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500">
+                                    <option value="UNKNOWN">Unknown</option>
+                                    <option value="LOW">Low — Petty Theft</option>
+                                    <option value="MEDIUM">Medium — Repeat Offender</option>
+                                    <option value="HIGH">High — Armed / Violent</option>
+                                    <option value="EXTREME">Extreme — Syndicate / Ring Leader</option>
+                                </select>
+                            </div>
+                            <button type="submit" disabled={isSubmittingSuspect} className="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isSubmittingSuspect && <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                                {isSubmittingSuspect ? 'Creating Record...' : 'Register Suspect in National Database'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

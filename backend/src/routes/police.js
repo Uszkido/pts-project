@@ -78,7 +78,7 @@ router.get('/incidents', authenticatePolice, async (req, res) => {
     try {
         const reports = await prisma.incidentReport.findMany({
             include: {
-                device: { select: { imei: true, brand: true, model: true } },
+                device: { select: { imei: true, brand: true, model: true, lastKnownLocation: true } },
                 reporter: { select: { email: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -130,6 +130,141 @@ router.get('/dashboard-metrics', authenticatePolice, async (req, res) => {
                 openAlerts
             }
         });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ DEVICE SEARCH ============
+router.get('/search', authenticatePolice, async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q || q.length < 2) return res.status(400).json({ error: 'Search query too short' });
+
+        const devices = await prisma.device.findMany({
+            where: {
+                OR: [
+                    { imei: { contains: q, mode: 'insensitive' } },
+                    { brand: { contains: q, mode: 'insensitive' } },
+                    { model: { contains: q, mode: 'insensitive' } },
+                    { serialNumber: { contains: q, mode: 'insensitive' } },
+                    { registeredOwner: { email: { contains: q, mode: 'insensitive' } } },
+                    { registeredOwner: { companyName: { contains: q, mode: 'insensitive' } } }
+                ]
+            },
+            include: {
+                registeredOwner: { select: { email: true, companyName: true, fullName: true } }
+            },
+            take: 20,
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        res.json({ devices });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ SUSPECT REGISTRY ============
+router.post('/suspects', authenticatePolice, async (req, res) => {
+    try {
+        const { fullName, alias, nationalId, phoneNumber, description, photoUrl, knownAddresses, dangerLevel } = req.body;
+
+        const suspect = await prisma.suspect.create({
+            data: { fullName, alias, nationalId, phoneNumber, description, photoUrl, knownAddresses, dangerLevel: dangerLevel || 'UNKNOWN' }
+        });
+
+        res.status(201).json({ message: 'Suspect record created', suspect });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/suspects', authenticatePolice, async (req, res) => {
+    try {
+        const suspects = await prisma.suspect.findMany({
+            include: { incidents: { include: { device: { select: { imei: true, brand: true, model: true } } } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ suspects });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Link a suspect to an incident
+router.put('/incidents/:id/suspect', authenticatePolice, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { suspectId } = req.body;
+
+        const report = await prisma.incidentReport.update({
+            where: { id },
+            data: { suspectId }
+        });
+
+        res.json({ message: 'Suspect linked to incident', report });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ TRACKING LOGS ============
+router.post('/tracking-log', authenticatePolice, async (req, res) => {
+    try {
+        const { deviceImei, method, location, accuracy, ipAddress, metadata } = req.body;
+
+        if (!deviceImei || !method || !location) {
+            return res.status(400).json({ error: 'deviceImei, method, and location are required' });
+        }
+
+        const log = await prisma.deviceTrackingLog.create({
+            data: { deviceImei, method, location, accuracy, ipAddress, metadata, loggedById: req.user.id }
+        });
+
+        // Also update device's last known location
+        await prisma.device.updateMany({
+            where: { imei: deviceImei },
+            data: { lastKnownLocation: location, lastKnownIp: ipAddress, lastLocationUpdate: new Date() }
+        });
+
+        res.status(201).json({ message: 'Tracking log recorded', log });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.get('/tracking-logs/:imei', authenticatePolice, async (req, res) => {
+    try {
+        const { imei } = req.params;
+        const logs = await prisma.deviceTrackingLog.findMany({
+            where: { deviceImei: imei },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ logs });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ LOCATION SHARING WITH VICTIM ============
+router.put('/incidents/:id/share-location', authenticatePolice, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const report = await prisma.incidentReport.update({
+            where: { id },
+            data: { locationSharedWithOwner: true }
+        });
+
+        res.json({ message: 'Device location is now shared with the victim account', report });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
