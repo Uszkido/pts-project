@@ -209,14 +209,18 @@ export default function Home() {
             <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     {/* Vexel Innovations Logo */}
-                    <div className="text-white w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl">
-                        <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <div className="text-white w-14 h-14 bg-black rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl overflow-hidden">
+                        <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                             {/* Inner V */}
-                            <path d="M50 78L26 48L37 38L50 56L63 38L74 48L50 78Z" fill="white" />
-                            {/* Left Outer Angle */}
-                            <path d="M22 30H42L35 38H30.5L16 54C16 54 12 48 16 38C17 35 19 30 22 30Z" fill="white" />
-                            {/* Right Outer Angle */}
-                            <path d="M78 30H58L65 38H69.5L84 54C84 54 88 48 84 38C83 35 81 30 78 30Z" fill="white" />
+                            <path d="M50 72.5L28 46L36 38L50 54L64 38L72 46L50 72.5Z" fill="white" />
+                            {/* Outer Left Arm */}
+                            <path d="M41 71L18 43V58C18 63 21 66 26 66H41V71Z" fill="white" />
+                            {/* Outer Right Arm */}
+                            <path d="M59 71L82 43V58C82 63 79 66 74 66H59V71Z" fill="white" />
+                            {/* Top Left Angle */}
+                            <path d="M42 38L21 63L18 59L35 38H42Z" fill="white" />
+                            {/* Top Right Angle */}
+                            <path d="M58 38L79 63L82 59L65 38H58Z" fill="white" />
                         </svg>
                     </div>
                     <div className="text-center">
