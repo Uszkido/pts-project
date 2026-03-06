@@ -209,8 +209,15 @@ export default function Home() {
             <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     {/* Vexel Innovations Logo */}
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-800 shadow-xl">
-                        <img src="/vexel-logo.png" alt="Vexel Innovations Logo" className="w-full h-full object-cover" />
+                    <div className="text-white w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 shadow-xl">
+                        <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            {/* Inner V */}
+                            <path d="M50 78L26 48L37 38L50 56L63 38L74 48L50 78Z" fill="white" />
+                            {/* Left Outer Angle */}
+                            <path d="M22 30H42L35 38H30.5L16 54C16 54 12 48 16 38C17 35 19 30 22 30Z" fill="white" />
+                            {/* Right Outer Angle */}
+                            <path d="M78 30H58L65 38H69.5L84 54C84 54 88 48 84 38C83 35 81 30 78 30Z" fill="white" />
+                        </svg>
                     </div>
                     <div className="text-center">
                         <p className="text-xl font-bold tracking-widest text-white uppercase">Vexel</p>
