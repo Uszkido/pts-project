@@ -19,9 +19,10 @@ export default function PoliceIntelligence() {
             try {
                 const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
 
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
                 const [incidentsRes, alertsRes] = await Promise.all([
-                    fetch('http://localhost:5000/api/v1/police/incidents', { headers }),
-                    fetch('http://localhost:5000/api/v1/police/vendor-alerts', { headers })
+                    fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/police/incidents`, { headers }),
+                    fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/police/vendor-alerts`, { headers })
                 ]);
 
                 const incidentsData = await incidentsRes.json();

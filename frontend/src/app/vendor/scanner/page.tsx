@@ -23,7 +23,8 @@ export default function VendorScanner() {
         setReportStatus(null);
 
         try {
-            const res = await fetch(`http://localhost:5000/api/v1/devices/verify/${imei}`);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/devices/verify/${imei}`);
             const data = await res.json();
             if (res.ok) setResult(data.device);
         } catch (err: any) { }
@@ -33,7 +34,8 @@ export default function VendorScanner() {
     const handleReport = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch('http://localhost:5000/api/v1/vendors/suspicious-alert', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/vendors/suspicious-alert`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

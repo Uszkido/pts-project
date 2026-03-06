@@ -22,7 +22,8 @@ export default function ForensicPortal() {
         setError('');
         setDeviceData(null);
         try {
-            const res = await fetch(`http://localhost:5000/api/v1/passports/${imei}`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/passports/${imei}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
             });
             const data = await res.json();
@@ -100,7 +101,7 @@ export default function ForensicPortal() {
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-slate-500">Registry Status</span>
                                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${deviceData.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                                    deviceData.status === 'STOLEN' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                deviceData.status === 'STOLEN' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                                 }`}>
                                                 {deviceData.status}
                                             </span>
@@ -140,9 +141,9 @@ export default function ForensicPortal() {
                                     {passport.map((entry) => (
                                         <div key={entry.id} className="relative">
                                             <div className={`absolute -left-[51px] top-0 w-8 h-8 rounded-full border-4 border-slate-900 flex items-center justify-center shadow-lg ${entry.type === 'REGISTRATION' ? 'bg-emerald-600' :
-                                                    entry.type === 'TRANSFER' ? 'bg-blue-600' :
-                                                        entry.type === 'STATUS_CHANGE' ? 'bg-amber-600' :
-                                                            entry.type === 'SALE' ? 'bg-purple-600' : 'bg-slate-600'
+                                                entry.type === 'TRANSFER' ? 'bg-blue-600' :
+                                                    entry.type === 'STATUS_CHANGE' ? 'bg-amber-600' :
+                                                        entry.type === 'SALE' ? 'bg-purple-600' : 'bg-slate-600'
                                                 }`}>
                                                 {entry.type === 'REGISTRATION' && <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
                                                 {entry.type === 'TRANSFER' && <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>}

@@ -16,7 +16,8 @@ function TransferForm() {
     useEffect(() => {
         const fetchDevices = async () => {
             try {
-                const res = await fetch('http://localhost:5000/api/v1/consumers/dashboard', {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/consumers/dashboard`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
                 });
                 const data = await res.json();
@@ -36,7 +37,8 @@ function TransferForm() {
         setError('');
 
         try {
-            const res = await fetch('http://localhost:5000/api/v1/transfers/initiate', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/transfers/initiate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

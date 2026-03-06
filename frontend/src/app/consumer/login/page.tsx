@@ -12,8 +12,9 @@ export default function ConsumerLogin() {
         try {
             const endpoint = isLogin ? '/api/v1/auth/login' : '/api/v1/auth/register';
             const body = isLogin ? { email, password } : { email, password, role: 'CONSUMER' };
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-            const res = await fetch(`http://localhost:5000${endpoint}`, {
+            const res = await fetch(`${apiUrl.replace('/api/v1', '')}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -23,7 +24,7 @@ export default function ConsumerLogin() {
 
             if (!isLogin) {
                 // Automatically log them in after registration
-                const loginRes = await fetch('http://localhost:5000/api/v1/auth/login', {
+                const loginRes = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
