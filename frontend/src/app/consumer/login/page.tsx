@@ -47,7 +47,7 @@ export default function ConsumerLogin() {
                 <div className="flex justify-center mb-6">
                     <div className="w-14 h-14 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-2xl border border-emerald-500/30 shadow-lg shadow-emerald-500/20">PTS</div>
                 </div>
-                <h2 className="text-2xl font-bold text-white text-center mb-2">{isLogin ? 'Consumer Login' : 'Create Consumer ID'}</h2>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">{isLogin ? 'Device Owner Login' : 'Create Device Owner ID'}</h2>
                 <p className="text-slate-400 text-sm text-center mb-8">Access your Digital Device Ownership Certificates</p>
 
                 {error && <p className="mb-4 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm text-center border border-red-500/20 font-medium">{error}</p>}

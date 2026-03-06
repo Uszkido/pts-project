@@ -73,8 +73,8 @@ export default function Home() {
                     </div>
                     <div className="flex gap-4">
                         <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
-                        <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Consumer Login</a>
                         <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full shadow-md shadow-blue-500/20">Vendor Portal</a>
+                        <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-5 py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Device Owner Login</a>
                     </div>
                 </div>
             </nav>
