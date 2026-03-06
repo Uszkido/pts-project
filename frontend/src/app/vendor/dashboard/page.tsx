@@ -242,8 +242,21 @@ export default function Dashboard() {
                                         {inventory.map(device => (
                                             <tr key={device.id} className="hover:bg-slate-800/30 transition-colors group">
                                                 <td className="p-5">
-                                                    <p className="font-bold text-white">{device.brand}</p>
-                                                    <p className="text-sm text-slate-400">{device.model}</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                            {device.devicePhotoUrl ? (
+                                                                <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-white">{device.brand}</p>
+                                                            <p className="text-sm text-slate-400">{device.model}</p>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="p-5 font-mono text-slate-300 tracking-widest">{device.imei}</td>
                                                 <td className="p-5">
@@ -288,8 +301,21 @@ export default function Dashboard() {
                                             <tr key={sale.id} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="p-5 text-sm font-medium text-slate-400">{new Date(sale.transferDate).toLocaleDateString()}</td>
                                                 <td className="p-5">
-                                                    <p className="font-bold text-white mb-0.5">{sale.device.brand} {sale.device.model}</p>
-                                                    <p className="text-xs font-mono text-slate-500 tracking-widest">{sale.device.imei}</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                            {sale.device.devicePhotoUrl ? (
+                                                                <img src={sale.device.devicePhotoUrl} alt={sale.device.model} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-white mb-0.5">{sale.device.brand} {sale.device.model}</p>
+                                                            <p className="text-xs font-mono text-slate-500 tracking-widest">{sale.device.imei}</p>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="p-5 text-slate-300">{sale.buyer.email}</td>
                                                 <td className="p-5 text-right">

@@ -277,7 +277,7 @@ router.get('/search', authenticateAdmin, async (req, res) => {
                         { model: { contains: q, mode: 'insensitive' } }
                     ]
                 },
-                select: { id: true, imei: true, brand: true, model: true, status: true },
+                select: { id: true, imei: true, brand: true, model: true, status: true, devicePhotoUrl: true },
                 take: 10
             })
         ]);

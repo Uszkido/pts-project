@@ -62,6 +62,7 @@ router.get('/:imei', authenticateToken, async (req, res) => {
                 model: device.model,
                 status: device.status,
                 riskScore: device.riskScore,
+                devicePhotoUrl: device.devicePhotoUrl,
                 currentOwner: device.registeredOwner
             },
             passport: device.history

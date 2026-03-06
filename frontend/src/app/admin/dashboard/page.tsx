@@ -264,9 +264,20 @@ export default function AdminDashboard() {
                                 ))}
                                 <div className="px-4 py-2 text-xs font-bold uppercase text-slate-500 tracking-wider mt-2 border-t border-slate-800 pt-3">Devices matched ({searchResults.devices.length})</div>
                                 {searchResults.devices.map(d => (
-                                    <div key={d.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500">
-                                        <p className="font-bold text-white text-sm">{d.brand} {d.model}</p>
-                                        <p className="text-xs font-mono text-slate-400 mt-0.5">IMEI: {d.imei} <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-950 border border-slate-800">{d.status}</span></p>
+                                    <div key={d.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                            {d.devicePhotoUrl ? (
+                                                <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-white text-sm">{d.brand} {d.model}</p>
+                                            <p className="text-xs font-mono text-slate-400 mt-0.5">IMEI: {d.imei} <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-950 border border-slate-800">{d.status}</span></p>
+                                        </div>
                                     </div>
                                 ))}
                                 {searchResults.users.length === 0 && searchResults.devices.length === 0 && (
@@ -457,7 +468,20 @@ export default function AdminDashboard() {
                             <tbody className="divide-y divide-slate-800">
                                 {devices.map(d => (
                                     <tr key={d.id} className="hover:bg-slate-800/30 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-white">{d.brand} {d.model}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                    {d.devicePhotoUrl ? (
+                                                        <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className="font-bold text-white whitespace-nowrap">{d.brand} {d.model}</span>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 font-mono text-xs text-slate-400">{d.imei}</td>
                                         <td className="px-6 py-4">
                                             <select value={d.status} onChange={e => updateDeviceStatus(d.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
@@ -537,16 +561,27 @@ export default function AdminDashboard() {
                             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Device Documents</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {documents.deviceDocuments.map(d => (
-                                    <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md">
-                                        <div className="mb-3">
-                                            <p className="font-bold text-white text-sm">{d.brand} {d.model}</p>
-                                            <p className="text-xs font-mono text-slate-400">IMEI: {d.imei}</p>
-                                            <p className="text-xs font-medium text-slate-500 mt-0.5">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
+                                    <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md flex gap-4">
+                                        <div className="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
+                                            {d.devicePhotoUrl ? (
+                                                <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
-                                            {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
-                                            {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="mb-3">
+                                                <p className="font-bold text-white text-sm truncate">{d.brand} {d.model}</p>
+                                                <p className="text-xs font-mono text-slate-400">IMEI: {d.imei}</p>
+                                                <p className="text-xs font-medium text-slate-500 mt-0.5 truncate">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
+                                                {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
+                                                {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

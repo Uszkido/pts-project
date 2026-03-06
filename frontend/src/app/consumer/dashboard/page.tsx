@@ -33,6 +33,7 @@ export default function ConsumerDashboard() {
     const [registrationForm, setRegistrationForm] = useState({ brand: '', model: '', imei: '', serialNumber: '' });
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
     const [cartonFile, setCartonFile] = useState<File | null>(null);
+    const [deviceFile, setDeviceFile] = useState<File | null>(null);
     const [isRegistering, setIsRegistering] = useState(false);
     const [regError, setRegError] = useState('');
 
@@ -203,6 +204,7 @@ export default function ConsumerDashboard() {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
             let purchaseReceiptUrl = null;
             let cartonPhotoUrl = null;
+            let devicePhotoUrl = null;
 
             // Upload Receipt
             if (receiptFile) {
@@ -228,7 +230,19 @@ export default function ConsumerDashboard() {
                 cartonPhotoUrl = uploadData.url;
             }
 
-            const payload = { ...registrationForm, purchaseReceiptUrl, cartonPhotoUrl };
+            // Upload Device Photo
+            if (deviceFile) {
+                const formData = new FormData();
+                formData.append('evidence', deviceFile);
+                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }, body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload device photo');
+                devicePhotoUrl = uploadData.url;
+            }
+
+            const payload = { ...registrationForm, devicePhotoUrl, purchaseReceiptUrl, cartonPhotoUrl };
 
             const res = await fetch(`${apiUrl}/devices`, {
                 method: 'POST',
@@ -243,6 +257,7 @@ export default function ConsumerDashboard() {
             setRegistrationForm({ brand: '', model: '', imei: '', serialNumber: '' });
             setReceiptFile(null);
             setCartonFile(null);
+            setDeviceFile(null);
             fetchDashboardAndMessages();
         } catch (err: any) {
             setRegError(err.message);
@@ -406,8 +421,21 @@ export default function ConsumerDashboard() {
                                             </div>
                                         </div>
 
-                                        <h3 className="text-xl font-bold text-white mb-1 relative">{device.brand} {device.model}</h3>
-                                        <p className="text-sm font-mono text-slate-400 mb-6 tracking-widest relative">{device.imei}</p>
+                                        <div className="flex gap-4 items-center mb-6 relative">
+                                            <div className="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                {device.devicePhotoUrl ? (
+                                                    <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <svg className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-xl font-bold text-white mb-1 truncate">{device.brand} {device.model}</h3>
+                                                <p className="text-sm font-mono text-slate-400 tracking-widest truncate">{device.imei}</p>
+                                            </div>
+                                        </div>
 
                                         <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800/80 relative">
                                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Digital Ownership Certificate (DDOC)</p>
@@ -576,8 +604,14 @@ export default function ConsumerDashboard() {
                             <div className="p-5 bg-emerald-950/20 border border-emerald-900/30 rounded-2xl space-y-5">
                                 <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-2">
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                    Proof of Ownership Documents
+                                    Asset Identification & Verification
                                 </h3>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-2">Device Photo (Mandatory) *</label>
+                                    <input type="file" accept="image/*" onChange={(e) => setDeviceFile(e.target.files?.[0] || null)} required className="w-full bg-slate-900/50 border border-slate-700 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20 transition-colors cursor-pointer" />
+                                    <p className="text-[10px] text-slate-500 mt-2">Clear photo of the device screen/body showing its condition.</p>
+                                </div>
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-300 mb-2">Purchase Receipt / Invoice (Optional)</label>

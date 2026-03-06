@@ -78,7 +78,7 @@ router.get('/incidents', authenticatePolice, async (req, res) => {
     try {
         const reports = await prisma.incidentReport.findMany({
             include: {
-                device: { select: { imei: true, brand: true, model: true, lastKnownLocation: true } },
+                device: { select: { imei: true, brand: true, model: true, lastKnownLocation: true, devicePhotoUrl: true } },
                 reporter: { select: { email: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -95,7 +95,7 @@ router.get('/vendor-alerts', authenticatePolice, async (req, res) => {
     try {
         const alerts = await prisma.vendorSuspiciousAlert.findMany({
             include: {
-                device: { select: { imei: true, brand: true, model: true } },
+                device: { select: { imei: true, brand: true, model: true, devicePhotoUrl: true } },
                 vendor: { select: { email: true, companyName: true } }
             },
             orderBy: { createdAt: 'desc' }

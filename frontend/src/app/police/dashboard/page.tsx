@@ -243,10 +243,19 @@ export default function PoliceDashboard() {
                             ) : (
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {searchResults.map((device: any) => (
-                                        <a key={device.id} href={`/police/forensics`} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
-                                            <div>
-                                                <p className="font-bold text-white group-hover:text-red-400 transition-colors">{device.brand} {device.model}</p>
-                                                <p className="text-xs font-mono text-slate-500 tracking-widest">{device.imei}</p>
+                                        <a key={device.id} href={`/police/forensics`} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
+                                            <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
+                                                {device.devicePhotoUrl ? (
+                                                    <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-white group-hover:text-red-400 transition-colors truncate">{device.brand} {device.model}</p>
+                                                <p className="text-xs font-mono text-slate-500 tracking-widest truncate">{device.imei}</p>
                                             </div>
                                             <div className="text-right">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400' : device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>{device.status}</span>
@@ -347,8 +356,21 @@ export default function PoliceDashboard() {
                                             <tr key={device.id} className="hover:bg-slate-800/30 transition-colors">
                                                 <td className="px-6 py-4 font-mono font-bold text-white tracking-widest">{device.imei}</td>
                                                 <td className="px-6 py-4">
-                                                    <div className="font-bold text-white">{device.brand} {device.model}</div>
-                                                    <div className="text-xs text-slate-500 mt-0.5">SN: {device.serialNumber || 'N/A'}</div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
+                                                            {device.devicePhotoUrl ? (
+                                                                <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-white">{device.brand} {device.model}</div>
+                                                            <div className="text-xs text-slate-500 mt-0.5">SN: {device.serialNumber || 'N/A'}</div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="text-white font-medium">{device.registeredOwner.companyName || 'Private Citizen'}</div>
@@ -400,8 +422,21 @@ export default function PoliceDashboard() {
                                             <td className="px-6 py-4 whitespace-nowrap text-slate-300">{new Date(report.createdAt).toLocaleString()}</td>
                                             <td className="px-6 py-4 font-medium text-white">{report.reporter.email}</td>
                                             <td className="px-6 py-4">
-                                                <div className="font-bold text-white">{report.device.brand} {report.device.model}</div>
-                                                <div className="text-xs text-slate-500 font-mono mt-1">{report.device.imei}</div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0 shadow-inner">
+                                                        {report.device.devicePhotoUrl ? (
+                                                            <img src={report.device.devicePhotoUrl} alt={report.device.model} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-white">{report.device.brand} {report.device.model}</div>
+                                                        <div className="text-xs text-slate-500 font-mono mt-1">{report.device.imei}</div>
+                                                    </div>
+                                                </div>
                                                 {report.device.lastKnownLocation && (
                                                     <div className="flex items-center gap-1 mt-1">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
@@ -453,8 +488,21 @@ export default function PoliceDashboard() {
                                                 <div className="text-xs text-slate-500">{alert.vendor.email}</div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="font-bold text-white">{alert.device.brand} {alert.device.model}</div>
-                                                <div className="text-xs text-slate-500 font-mono mt-1">{alert.device.imei}</div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
+                                                        {alert.device.devicePhotoUrl ? (
+                                                            <img src={alert.device.devicePhotoUrl} alt={alert.device.model} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-white">{alert.device.brand} {alert.device.model}</div>
+                                                        <div className="text-xs text-slate-500 font-mono mt-1">{alert.device.imei}</div>
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 max-w-sm">
                                                 <p className="text-sm text-slate-300 line-clamp-2">{alert.notes || 'No additional notes provided.'}</p>
