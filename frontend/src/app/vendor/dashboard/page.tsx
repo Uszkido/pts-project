@@ -127,7 +127,7 @@ export default function Dashboard() {
     };
 
     const runTransferPrompt = (deviceId: string) => {
-        const buyerEmail = prompt('Enter the customer\\'s PTS registered email to transfer ownership: ');
+        const buyerEmail = prompt("Enter the customer's PTS registered email to transfer ownership: ");
         if (buyerEmail) {
             initiateSale(deviceId, buyerEmail);
         }
