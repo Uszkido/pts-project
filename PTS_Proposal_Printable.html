@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTS | Project Proposal</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Outfit:wght@400;600;700&display=swap');
+
+        :root {
+            --primary: #c026d3;
+            /* Fuchia-600 */
+            --secondary: #2563eb;
+            /* Blue-600 */
+            --accent: #ef4444;
+            /* Red-500 */
+            --dark: #0f172a;
+            --text: #1e293b;
+            --light: #f8fafc;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+
+            .page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                border: none !important;
+            }
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text);
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 40px 0;
+            line-height: 1.6;
+        }
+
+        .page {
+            background: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 25mm;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            position: relative;
+            box-sizing: border-box;
+            border-top: 8px solid var(--primary);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 24px;
+            color: var(--dark);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--dark);
+            margin-bottom: 10px;
+            line-height: 1.1;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-top: 40px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .subtitle {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid var(--secondary);
+        }
+
+        .card-title {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            color: var(--dark);
+        }
+
+        .pillar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: flex-start;
+        }
+
+        .pillar-icon {
+            background: var(--primary);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .alert {
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin: 15px 0;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .download-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--dark);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            font-weight: bold;
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="page">
+        <div class="header">
+            <div class="logo">Vexel Innov<span>ations</span></div>
+            <div class="badge">CONFIDENTIAL PROPOSAL</div>
+        </div>
+
+        <h1>Phone Theft Tracking System (PTS)</h1>
+        <div class="subtitle">A Verifiable Authority for Device Ownership & Lifecycle Management</div>
+
+        <div style="margin: 30px 0; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.2);">
+            <img src="pts_hausa_casual_executive_mockup_v3_1772822893449.png"
+                alt="PTS Dashboard Vexel Innovations Mockup" style="width: 100%; display: block;">
+        </div>
+
+        <h2>I. Executive Overview</h2>
+        <p>The <strong>Phone Theft Tracking System (PTS)</strong> is a centralized ecosystem designed to eliminate the
+            secondary market for stolen mobile devices. By integrating legal ownership with digital verification, we
+            transform every smartphone into a verifiable asset with a traceable history.</p>
+
+        <div class="alert">
+            <strong>Key Objective:</strong> To render stolen devices economically worthless by preventing their resale
+            or reuse across all verified retail channels and law enforcement jurisdictions.
+        </div>
+
+        <h2>II. The "Digital Chain of Custody"</h2>
+        <p>Unlike traditional tracking apps that rely on battery life or GPS, PTS focuses on the <strong>Legal
+                Title</strong>. If the chain of custody is broken, the device becomes "Un-Verifiable" and cannot be
+            sold.</p>
+
+        <div class="grid">
+            <div class="card">
+                <span class="card-title">Immutable Registration</span>
+                <p style="font-size: 14px; color: #64748b;">Every device is registered by a Verified Vendor with visual
+                    proof (Carton, Receipt, Device Photos).</p>
+            </div>
+            <div class="card" style="border-left-color: var(--primary);">
+                <span class="card-title">Digital Certificates</span>
+                <p style="font-size: 14px; color: #64748b;">Instant, QR-enabled proof of ownership that moves with the
+                    device, not the person.</p>
+            </div>
+        </div>
+
+        <h2>III. Core Ecosystem Stakeholders</h2>
+
+        <div class="pillar">
+            <div class="pillar-icon">01</div>
+            <div>
+                <span class="card-title">The Consumer (Asset Protector)</span>
+                <p style="font-size: 14px;">Total control over their device portfolio. Instant "Stolen" flagging that
+                    alerts all police and vendors within seconds.</p>
+            </div>
+        </div>
+
+        <div class="pillar">
+            <div class="pillar-icon">02</div>
+            <div>
+                <span class="card-title">The Police (Intelligence Engine)</span>
+                <p style="font-size: 14px;">Access to Forensic Passports and "Multi-Method Triangulation" tracking (GPS,
+                    WiFi, IP, Cellular).</p>
+            </div>
+        </div>
+
+        <div class="pillar">
+            <div class="pillar-icon">03</div>
+            <div>
+                <span class="card-title">The Vendor (Trusted Authority)</span>
+                <p style="font-size: 14px;">Prevention of accidental trade-ins of stolen goods. Direct line to police
+                    for reporting suspicious walk-ins.</p>
+            </div>
+        </div>
+
+        <h2>IV. Technical Excellence</h2>
+        <p>PTS is built using enterprise-grade architecture for maximum uptime and security:</p>
+        <ul>
+            <li><strong>Next.js Infrastructure:</strong> For lightning-fast global access.</li>
+            <li><strong>Prisma/PostgreSQL Ledger:</strong> A robust, relational record of every transfer.</li>
+            <li><strong>Cloudinary Forensics:</strong> Encrypted storage for visual device documentation.</li>
+        </ul>
+
+        <h2>V. Strategic Impact</h2>
+        <p>Implementing PTS directly affects national security by reducing street-level crime and protecting the
+            investments of millions of citizens. It creates a "Safe Zone" for digital commerce.</p>
+
+        <div class="footer">
+            &copy; 2026 Vexel Innovations | Proprietary & Confidential | Phone Theft Tracking System
+        </div>
+    </div>
+
+    <div class="download-hint no-print">
+        💡 Pro Tip: Press <b>Ctrl + P</b> and select "Save as PDF"
+    </div>
+
+</body>
+
+</html>
