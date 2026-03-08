@@ -563,6 +563,12 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4">
                                                     <div className="font-bold text-white">{user.fullName || user.companyName || 'N/A'}</div>
                                                     <div className="text-xs text-slate-500">{user.email}</div>
+                                                    {!user.isEmailConfirmed && user.emailVerificationOtp && (
+                                                        <div className="mt-1 flex items-center gap-1.5">
+                                                            <span className="text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold uppercase">Unconfirmed</span>
+                                                            <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">OTP: {user.emailVerificationOtp}</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <select value={user.role} onChange={e => updateUserRole(user.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
@@ -902,6 +908,7 @@ export default function AdminDashboard() {
                                     <th className="px-6 py-4">User Email</th>
                                     <th className="px-6 py-4">Role</th>
                                     <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4">OTP</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -921,6 +928,13 @@ export default function AdminDashboard() {
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
                                                 {req.status}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {req.otp ? (
+                                                <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{req.otp}</span>
+                                            ) : (
+                                                <span className="text-slate-600 italic text-xs">N/A</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             {req.status === 'PENDING' && (

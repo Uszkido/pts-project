@@ -41,6 +41,8 @@ model User {
   createdAt   DateTime @default(now())
   phoneNumber String?
   address     String?
+  isEmailConfirmed Boolean @default(false)
+  emailVerificationOtp String?
   passwordResetRequests PasswordResetRequest[]
 }
 
@@ -50,6 +52,7 @@ model PasswordResetRequest {
   user            User     @relation(fields: [userId], references: [id])
   newPasswordHash String
   status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  otp             String?
   adminNotes      String?
   createdAt       DateTime @default(now())
 }

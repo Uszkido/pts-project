@@ -60,7 +60,7 @@ router.get('/users', authenticateAdmin, async (req, res) => {
                 vendorTier: true, vendorStatus: true, status: true, nationalId: true,
                 businessAddress: true, shopLatitude: true, shopLongitude: true,
                 shopPhotoUrl: true, businessRegNo: true, cacCertificateUrl: true,
-                createdAt: true,
+                createdAt: true, isEmailConfirmed: true, emailVerificationOtp: true,
                 _count: { select: { devices: true, incidentsReported: true } }
             },
             orderBy: { createdAt: 'desc' }

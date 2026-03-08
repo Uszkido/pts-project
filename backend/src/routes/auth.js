@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
 router.post('/register', async (req, res) => {
     try {
         const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo, phoneNumber, address } = req.body;
@@ -22,6 +24,7 @@ router.post('/register', async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const otp = generateOTP();
 
         const finalRole = role === 'CONSUMER' ? 'CONSUMER' : 'VENDOR';
 
@@ -43,11 +46,17 @@ router.post('/register', async (req, res) => {
                 businessRegNo: finalRole === 'VENDOR' ? businessRegNo : null,
                 vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED',
                 phoneNumber,
-                address
+                address,
+                isEmailConfirmed: false,
+                emailVerificationOtp: otp
             }
         });
 
-        res.status(201).json({ message: finalRole === 'VENDOR' ? 'Vendor registration submitted. Awaiting admin approval.' : 'User registered successfully', userId: user.id });
+        res.status(201).json({
+            message: finalRole === 'VENDOR' ? 'Vendor registration submitted. Please verify your email with the OTP from admin.' : 'User registered. Please verify your email with the OTP.',
+            userId: user.id,
+            requiresOtp: true
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
@@ -65,6 +74,10 @@ router.post('/login', async (req, res) => {
 
         if (user.status === 'SUSPENDED') {
             return res.status(403).json({ error: 'Your account has been suspended. Please contact the administrator.' });
+        }
+
+        if (!user.isEmailConfirmed) {
+            return res.status(403).json({ error: 'Please confirm your email using the OTP before logging in.', requiresOtp: true });
         }
 
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
@@ -90,19 +103,61 @@ router.post('/reset-password', async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const otp = generateOTP();
 
         // Create request instead of updating directly
         await prisma.passwordResetRequest.create({
             data: {
                 userId: user.id,
                 newPasswordHash: hashedPassword,
-                status: 'PENDING'
+                status: 'PENDING',
+                otp: otp
             }
         });
 
-        res.json({ message: 'Password reset request submitted. Awaiting administrator approval.' });
+        res.json({ message: 'Password reset request submitted. Please provide the OTP from the administrator to verify.', requiresOtp: true });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/verify-email', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user || user.emailVerificationOtp !== otp) {
+            return res.status(400).json({ error: 'Invalid OTP' });
+        }
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { isEmailConfirmed: true, emailVerificationOtp: null }
+        });
+
+        res.json({ message: 'Email confirmed successfully. You can now log in.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/verify-reset-otp', async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const request = await prisma.passwordResetRequest.findFirst({
+            where: { userId: user.id, status: 'PENDING', otp: otp },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (!request) return res.status(400).json({ error: 'Invalid OTP' });
+
+        res.json({ message: 'OTP verified. Awaiting final administrator approval.' });
+    } catch (error) {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
