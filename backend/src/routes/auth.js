@@ -72,4 +72,32 @@ router.post('/login', async (req, res) => {
     }
 });
 
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, newPassword } = req.body;
+
+        if (!email || !newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'Valid email and new password (min 6 characters) are required.' });
+        }
+
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (!existingUser) {
+            // Delay for security to mask non-existent emails
+            await new Promise(resolve => setTimeout(resolve, 500));
+            return res.status(404).json({ error: 'No account found with that email address.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { email },
+            data: { password: hashedPassword }
+        });
+
+        res.json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

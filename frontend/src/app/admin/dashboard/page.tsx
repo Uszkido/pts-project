@@ -24,6 +24,14 @@ export default function AdminDashboard() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newUser, setNewUser] = useState({ email: '', password: '', role: 'CONSUMER', fullName: '', companyName: '', nationalId: '' });
 
+    // User Details & Edit Modal
+    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [editUserForm, setEditUserForm] = useState({ email: '', fullName: '', companyName: '', nationalId: '' });
+    const [resetPassword, setResetPassword] = useState('');
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
@@ -185,6 +193,56 @@ export default function AdminDashboard() {
             setIsCreateOpen(false);
             setNewUser({ email: '', password: '', role: 'CONSUMER', fullName: '', companyName: '', nationalId: '' });
             fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const fetchUserDetails = async (userId: string) => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${userId}/details`, { headers });
+            if (!res.ok) throw new Error('Failed to fetch user details');
+            const data = await res.json();
+            setSelectedUser(data.user);
+            setEditUserForm({
+                email: data.user.email || '',
+                fullName: data.user.fullName || '',
+                companyName: data.user.companyName || '',
+                nationalId: data.user.nationalId || ''
+            });
+            setEditMode(false);
+            setIsResettingPassword(false);
+            setResetPassword('');
+            setIsDetailsModalOpen(true);
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const saveUserDetails = async () => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${selectedUser.id}/details`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify(editUserForm)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            setEditMode(false);
+            fetchUserDetails(selectedUser.id);
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const handleResetPassword = async () => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${selectedUser.id}/password`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newPassword: resetPassword })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            setIsResettingPassword(false);
+            setResetPassword('');
         } catch (err: any) { alert(err.message); }
     };
 
@@ -377,7 +435,8 @@ export default function AdminDashboard() {
                                     {vendor.shopPhotoUrl && <a href={vendor.shopPhotoUrl} target="_blank" rel="noreferrer" className="text-xs bg-purple-500/10 text-purple-400 px-3 py-1.5 rounded-lg border border-purple-500/20 hover:bg-purple-500/20 transition-colors">View Shop Photo</a>}
                                     {vendor.shopLatitude && vendor.shopLongitude && <a href={`https://maps.google.com/?q=${vendor.shopLatitude},${vendor.shopLongitude}`} target="_blank" rel="noreferrer" className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">📍 View on Map</a>}
                                 </div>
-                                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800">
+                                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-800">
+                                    <button onClick={() => fetchUserDetails(vendor.id)} className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors">View Details</button>
                                     {vendor.vendorStatus !== 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'APPROVED')} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors">✓ Approve</button>}
                                     {vendor.vendorStatus !== 'REJECTED' && <button onClick={() => updateVendorStatus(vendor.id, 'REJECTED')} className="text-xs font-bold bg-red-600/80 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">✕ Reject</button>}
                                     {vendor.vendorStatus === 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'SUSPENDED')} className="text-xs font-bold bg-amber-600/80 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors">⚠ Suspend</button>}
@@ -435,6 +494,7 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4 text-slate-500 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col gap-2 items-end">
+                                                    <button onClick={() => fetchUserDetails(user.id)} className="text-xs text-blue-500 hover:text-blue-400 font-bold">View / Edit</button>
                                                     {user.status !== 'SUSPENDED' ? (
                                                         <button onClick={() => updateUserStatus(user.id, 'SUSPENDED')} className="text-xs text-amber-500 hover:text-amber-400 font-bold">Suspend</button>
                                                     ) : (
@@ -701,6 +761,147 @@ export default function AdminDashboard() {
                                 <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
                             </div>
                             <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* User Details Modal */}
+            {isDetailsModalOpen && selectedUser && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative my-8">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-amber-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-start sticky top-0 bg-slate-900 z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center relative">
+                                    {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) ? (
+                                        <img src={selectedUser.facialDataUrl || selectedUser.cacCertificateUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className={`text-2xl font-black ${selectedUser.role === 'ADMIN' ? 'text-amber-500' : selectedUser.role === 'VENDOR' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                                            {selectedUser.role.charAt(0)}
+                                        </span>
+                                    )}
+                                    {selectedUser.cacCertificateUrl && !selectedUser.facialDataUrl && (
+                                        <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[8px] text-center text-slate-300 py-0.5 font-bold uppercase tracking-widest backdrop-blur-sm">CAC</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white mb-1">{selectedUser.fullName || selectedUser.email}</h2>
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <span className={`px-2 py-0.5 rounded-full font-bold uppercase ${selectedUser.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : selectedUser.role === 'VENDOR' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{selectedUser.role}</span>
+                                        {selectedUser.companyName && <span className="text-slate-400">@ {selectedUser.companyName}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors">✕</button>
+                        </div>
+
+                        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Left Column: Info & Edit Form */}
+                            <div className="lg:col-span-1 space-y-6">
+                                <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-white">Profile Details</h3>
+                                        <button onClick={() => setEditMode(!editMode)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">{editMode ? 'Cancel' : 'Edit'}</button>
+                                    </div>
+
+                                    {editMode ? (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs text-slate-500 mb-1 block">Full Name</label>
+                                                <input type="text" value={editUserForm.fullName} onChange={e => setEditUserForm({ ...editUserForm, fullName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-500 mb-1 block">Email</label>
+                                                <input type="email" value={editUserForm.email} onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                            </div>
+                                            {selectedUser.role === 'VENDOR' && (
+                                                <div>
+                                                    <label className="text-xs text-slate-500 mb-1 block">Company Name</label>
+                                                    <input type="text" value={editUserForm.companyName} onChange={e => setEditUserForm({ ...editUserForm, companyName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className="text-xs text-slate-500 mb-1 block">National ID</label>
+                                                <input type="text" value={editUserForm.nationalId} onChange={e => setEditUserForm({ ...editUserForm, nationalId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                            </div>
+                                            <button onClick={saveUserDetails} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Changes</button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3 text-sm">
+                                            <div><span className="text-slate-500 block text-xs">Email</span><span className="text-white break-all">{selectedUser.email}</span></div>
+                                            <div><span className="text-slate-500 block text-xs">Role</span><span className="text-white">{selectedUser.role}</span></div>
+                                            <div><span className="text-slate-500 block text-xs">Status</span><span className={`font-bold ${selectedUser.status === 'SUSPENDED' ? 'text-red-400' : 'text-emerald-400'}`}>{selectedUser.status}</span></div>
+                                            {selectedUser.companyName && <div><span className="text-slate-500 block text-xs">Company Name</span><span className="text-white">{selectedUser.companyName}</span></div>}
+                                            {selectedUser.nationalId && <div><span className="text-slate-500 block text-xs">National ID</span><span className="text-white font-mono">{selectedUser.nationalId}</span></div>}
+                                            <div><span className="text-slate-500 block text-xs">Joined</span><span className="text-white">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
+
+                                            {/* Link out to view full size images if they exist */}
+                                            {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) && (
+                                                <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap gap-2">
+                                                    {selectedUser.facialDataUrl && <a href={selectedUser.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full Selfie</a>}
+                                                    {selectedUser.cacCertificateUrl && <a href={selectedUser.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full CAC Doc</a>}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-white">Security</h3>
+                                    </div>
+                                    {!isResettingPassword ? (
+                                        <button onClick={() => setIsResettingPassword(true)} className="w-full bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold py-2 rounded transition-colors text-sm">Reset Password</button>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <input type="password" placeholder="New Password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                            <div className="flex gap-2">
+                                                <button onClick={handleResetPassword} disabled={!resetPassword || resetPassword.length < 6} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold py-2 rounded transition-colors text-sm">Confirm</button>
+                                                <button onClick={() => { setIsResettingPassword(false); setResetPassword(''); }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded transition-colors text-sm">Cancel</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right Column: Devices List */}
+                            <div className="lg:col-span-2 space-y-6">
+                                <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full min-h-[400px]">
+                                    <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                                        <h3 className="font-bold text-white flex items-center justify-between">
+                                            Registered Devices
+                                            <span className="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300">{selectedUser.devices?.length || 0}</span>
+                                        </h3>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto max-h-[500px]">
+                                        {(!selectedUser.devices || selectedUser.devices.length === 0) ? (
+                                            <div className="p-8 text-center text-slate-500 text-sm">No devices registered by this user.</div>
+                                        ) : (
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="text-xs text-slate-400 uppercase bg-slate-900/30 border-b border-slate-800 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-4 py-3">Device</th>
+                                                        <th className="px-4 py-3">IMEI</th>
+                                                        <th className="px-4 py-3">Status</th>
+                                                        <th className="px-4 py-3">Registered</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-800/50">
+                                                    {selectedUser.devices.map((device: any) => (
+                                                        <tr key={device.id} className="hover:bg-slate-900/50">
+                                                            <td className="px-4 py-3 font-medium text-white">{device.brand} {device.model}</td>
+                                                            <td className="px-4 py-3 font-mono text-xs text-slate-400">{device.imei}</td>
+                                                            <td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">{device.status}</span></td>
+                                                            <td className="px-4 py-3 text-xs text-slate-500">{new Date(device.createdAt).toLocaleDateString()}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

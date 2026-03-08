@@ -3,9 +3,12 @@ import { useState } from 'react';
 
 export default function ConsumerLogin() {
     const [isLogin, setIsLogin] = useState(true);
+    const [isForgotPassword, setIsForgotPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
 
     // Identity fields
     const [fullName, setFullName] = useState('');
@@ -18,10 +21,28 @@ export default function ConsumerLogin() {
         e.preventDefault();
         setIsSubmitting(true);
         setError('');
+        setSuccessMsg('');
+
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-            let facialDataUrl = '';
 
+            if (isForgotPassword) {
+                const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, newPassword })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                setSuccessMsg(data.message);
+                setIsForgotPassword(false);
+                setPassword('');
+                setNewPassword('');
+                return; // Stop here, reset is complete
+            }
+
+            let facialDataUrl = '';
             if (!isLogin && facialFile) {
                 // Upload facial data first
                 const formData = new FormData();
@@ -77,25 +98,26 @@ export default function ConsumerLogin() {
                 <div className="flex justify-center mb-6">
                     <div className="w-14 h-14 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-2xl border border-emerald-500/30 shadow-lg shadow-emerald-500/20">PTS</div>
                 </div>
-                <h2 className="text-2xl font-bold text-white text-center mb-2">{isLogin ? 'Device Owner Login' : 'Create Device Owner ID'}</h2>
-                <p className="text-slate-400 text-sm text-center mb-8">Access your Digital Device Ownership Certificates</p>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">{isForgotPassword ? 'Reset Password' : isLogin ? 'Device Owner Login' : 'Create Device Owner ID'}</h2>
+                <p className="text-slate-400 text-sm text-center mb-8">{isForgotPassword ? 'Enter your email and a new password' : 'Access your Digital Device Ownership Certificates'}</p>
 
                 {error && <p className="mb-4 text-red-400 bg-red-500/10 p-3 rounded-lg text-sm text-center border border-red-500/20 font-medium">{error}</p>}
+                {successMsg && <p className="mb-4 text-emerald-400 bg-emerald-500/10 p-3 rounded-lg text-sm text-center border border-emerald-500/20 font-medium">{successMsg}</p>}
 
                 <form onSubmit={handleAuth} className="space-y-5">
-                    {!isLogin && (
+                    {!isLogin && !isForgotPassword && (
                         <>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Legal Name</label>
-                                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin} />
+                                <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin && !isForgotPassword} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1.5">National ID Number</label>
-                                <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="NIN / SSN" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin} />
+                                <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="NIN / SSN" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin && !isForgotPassword} />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Facial Data (Selfie)</label>
-                                <input type="file" accept="image/*" onChange={e => setFacialFile(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors cursor-pointer" required={!isLogin} />
+                                <input type="file" accept="image/*" onChange={e => setFacialFile(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors cursor-pointer" required={!isLogin && !isForgotPassword} />
                             </div>
                         </>
                     )}
@@ -103,20 +125,37 @@ export default function ConsumerLogin() {
                         <label className="block text-sm font-medium text-slate-300 mb-1.5">Email Address</label>
                         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
-                    </div>
+                    {isForgotPassword ? (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1.5">New Password</label>
+                            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required minLength={6} />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
+                        </div>
+                    )}
                     <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl mt-6 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
                         {isSubmitting && <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                        {isLogin ? 'Access Vault' : isSubmitting ? 'Verifying Identity...' : 'Create Vault Identity'}
+                        {isForgotPassword ? 'Reset Password' : isLogin ? 'Access Vault' : isSubmitting ? 'Verifying Identity...' : 'Create Vault Identity'}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center">
-                    <button onClick={() => setIsLogin(!isLogin)} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                <div className="mt-6 text-center space-y-3 flex flex-col items-center">
+                    {!isForgotPassword && isLogin && (
+                        <button onClick={() => setIsForgotPassword(true)} className="text-sm font-medium text-emerald-400 hover:text-emerald-300 transition-colors">
+                            Forgot Password?
+                        </button>
+                    )}
+                    <button onClick={() => { setIsLogin(!isLogin); setIsForgotPassword(false); }} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
                         {isLogin ? "Don't have a PTS Identity? Create one." : "Already have an account? Log in."}
                     </button>
+                    {isForgotPassword && (
+                        <button onClick={() => setIsForgotPassword(false)} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
+                            Back to Login
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

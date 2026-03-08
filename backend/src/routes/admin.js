@@ -171,6 +171,75 @@ router.put('/users/:id/status', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Get full user details (including devices)
+router.get('/users/:id/details', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await prisma.user.findUnique({
+            where: { id },
+            include: {
+                devices: {
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Remove password hash from response
+        const { password, ...userWithoutPassword } = user;
+        res.json({ user: userWithoutPassword });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Update user details
+router.put('/users/:id/details', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email, fullName, companyName, nationalId } = req.body;
+
+        const existingEmail = await prisma.user.findUnique({ where: { email } });
+        if (existingEmail && existingEmail.id !== id) {
+            return res.status(400).json({ error: 'Email already in use by another account' });
+        }
+
+        const user = await prisma.user.update({
+            where: { id },
+            data: { email, fullName, companyName, nationalId }
+        });
+        res.json({ message: 'User details updated successfully', user: { id: user.id, email: user.email } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Reset user password
+router.put('/users/:id/password', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { id },
+            data: { password: hashedPassword }
+        });
+
+        res.json({ message: 'User password reset successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ============ DEVICE MANAGEMENT ============
 router.get('/devices', authenticateAdmin, async (req, res) => {
     try {
