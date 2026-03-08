@@ -76,7 +76,7 @@ router.post('/login', async (req, res) => {
             return res.status(403).json({ error: 'Your account has been suspended. Please contact the administrator.' });
         }
 
-        if (!user.isEmailConfirmed) {
+        if (!user.isEmailConfirmed && !['ADMIN', 'POLICE', 'INSURANCE', 'TELECOM'].includes(user.role)) {
             return res.status(403).json({ error: 'Please confirm your email using the OTP before logging in.', requiresOtp: true });
         }
 
