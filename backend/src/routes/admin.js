@@ -320,6 +320,55 @@ router.get('/incidents', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Admin clears an incident
+router.put('/incidents/:id/clear', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const report = await prisma.incidentReport.update({
+            where: { id },
+            data: { status: 'CLEARED' }
+        });
+        res.json({ message: 'Incident cleared successfully', report });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ SUSPECT MANAGEMENT ============
+router.get('/suspects', authenticateAdmin, async (req, res) => {
+    try {
+        const suspects = await prisma.suspect.findMany({
+            include: { incidents: { include: { device: { select: { imei: true, brand: true, model: true } } } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ suspects });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/suspects/:id/status', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body; // ACTIVE, CLEARED, GUILTY, NOT_GUILTY
+
+        if (!['ACTIVE', 'CLEARED', 'GUILTY', 'NOT_GUILTY'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid suspect status' });
+        }
+
+        const suspect = await prisma.suspect.update({
+            where: { id },
+            data: { status }
+        });
+        res.json({ message: `Suspect status updated to ${status}`, suspect });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ============ GLOBAL SEARCH ============
 router.get('/search', authenticateAdmin, async (req, res) => {
     try {
@@ -445,6 +494,72 @@ router.post('/messages', authenticateAdmin, async (req, res) => {
         });
 
         res.status(201).json({ message: 'Message sent', data: message });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin deletes a message
+router.delete('/messages/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.message.delete({ where: { id } });
+        res.json({ message: 'Message deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// ============ AUTH REQUESTS ============
+router.get('/password-reset-requests', authenticateAdmin, async (req, res) => {
+    try {
+        const requests = await prisma.passwordResetRequest.findMany({
+            include: { user: { select: { id: true, email: true, role: true, fullName: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json({ requests });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/password-reset-requests/:id/approve', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const resetRequest = await prisma.passwordResetRequest.findUnique({ where: { id } });
+        if (!resetRequest) return res.status(404).json({ error: 'Request not found' });
+        if (resetRequest.status !== 'PENDING') return res.status(400).json({ error: 'Request already processed' });
+
+        await prisma.$transaction([
+            prisma.user.update({
+                where: { id: resetRequest.userId },
+                data: { password: resetRequest.newPasswordHash }
+            }),
+            prisma.passwordResetRequest.update({
+                where: { id },
+                data: { status: 'APPROVED' }
+            })
+        ]);
+
+        res.json({ message: 'Password reset approved and updated.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/password-reset-requests/:id/reject', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { notes } = req.body;
+        await prisma.passwordResetRequest.update({
+            where: { id },
+            data: { status: 'REJECTED', adminNotes: notes }
+        });
+        res.json({ message: 'Password reset rejected.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

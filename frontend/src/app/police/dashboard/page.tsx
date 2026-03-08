@@ -1,5 +1,5 @@
-'use client';
 import { useState, useEffect } from 'react';
+import LiveView from '@/components/LiveView';
 
 export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -29,6 +29,9 @@ export default function PoliceDashboard() {
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState({ subject: '', body: '' });
 
+    // Live Tracking
+    const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -47,24 +50,21 @@ export default function PoliceDashboard() {
             const devicesData = await devicesRes.json();
             setDevices(devicesData.devices || []);
 
-            // Fetch incidents, alerts, messages simultaneously
-            const [incidentsRes, alertsRes, messagesRes] = await Promise.all([
+            const [incidentsRes, alertsRes, messagesRes, suspectsRes] = await Promise.all([
                 fetch(`${apiUrl}/police/incidents`, { headers }),
                 fetch(`${apiUrl}/police/vendor-alerts`, { headers }),
-                fetch(`${apiUrl}/police/messages`, { headers })
+                fetch(`${apiUrl}/police/messages`, { headers }),
+                fetch(`${apiUrl}/police/suspects`, { headers })
             ]);
 
             const incidentsData = await incidentsRes.json();
             const alertsData = await alertsRes.json();
             const messagesData = await messagesRes.json();
+            const suspectsData = await suspectsRes.json();
 
-            setReports(incidentsData.reports || []);
+            setReports(incidentsData.incidents || []);
             setAlerts(alertsData.alerts || []);
             setMessages(messagesData.messages || []);
-
-            // Fetch suspects
-            const suspectsRes = await fetch(`${apiUrl}/police/suspects`, { headers });
-            const suspectsData = await suspectsRes.json();
             setSuspects(suspectsData.suspects || []);
 
         } catch (err: any) {
@@ -108,6 +108,35 @@ export default function PoliceDashboard() {
         } catch (err: any) {
             alert(err.message);
         }
+    };
+
+    const clearIncident = async (incidentId: string) => {
+        if (!confirm('Mark this incident as cleared/resolved?')) return;
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/clear`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            if (!res.ok) throw new Error('Failed to clear incident');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const updateSuspectStatus = async (suspectId: string, status: string) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/suspects/${suspectId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) throw new Error('Failed to update suspect status');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
     };
 
     const createSuspect = async (e: React.FormEvent) => {
@@ -452,13 +481,23 @@ export default function PoliceDashboard() {
                                                     {report.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right">
+                                            <td className="px-6 py-4 text-right space-x-2">
                                                 {!report.locationSharedWithOwner ? (
                                                     <button onClick={() => shareLocation(report.id)} className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-500/20 transition-colors uppercase tracking-wide">
                                                         Share Location
                                                     </button>
                                                 ) : (
                                                     <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 uppercase tracking-wide">Shared ✓</span>
+                                                )}
+                                                {report.status !== 'CLEARED' && (
+                                                    <button onClick={() => clearIncident(report.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-colors uppercase tracking-wide">
+                                                        Clear
+                                                    </button>
+                                                )}
+                                                {report.status !== 'CLEAN' && (
+                                                    <button onClick={() => setLiveTrackingImei(report.device.imei)} className="text-[10px] font-bold text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-500/20 transition-colors uppercase tracking-wide">
+                                                        Track Live
+                                                    </button>
                                                 )}
                                             </td>
                                         </tr>
@@ -530,19 +569,30 @@ export default function PoliceDashboard() {
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <h4 className="text-lg font-bold text-white">{s.fullName || 'Unknown'}</h4>
-                                                    {s.alias && <p className="text-sm text-purple-400">a.k.a "{s.alias}"</p>}
+                                                    {s.alias && <p className="text-sm text-purple-400 font-bold italic">a.k.a "{s.alias}"</p>}
                                                 </div>
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${s.dangerLevel === 'EXTREME' ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
-                                                    s.dangerLevel === 'HIGH' ? 'bg-orange-500/20 text-orange-500 border border-orange-500/30' :
-                                                        s.dangerLevel === 'MEDIUM' ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30' :
-                                                            s.dangerLevel === 'LOW' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${s.status === 'GUILTY' ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
+                                                        s.status === 'NOT_GUILTY' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                                                            s.status === 'CLEARED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
                                                                 'bg-slate-800 text-slate-400 border border-slate-700'
-                                                    }`}>{s.dangerLevel}</span>
+                                                        }`}>{s.status || 'ACTIVE'}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight ${s.dangerLevel === 'EXTREME' ? 'bg-red-600/20 text-red-600' :
+                                                        s.dangerLevel === 'HIGH' ? 'bg-orange-500/20 text-orange-500' :
+                                                            'bg-slate-800 text-slate-500'
+                                                        }`}>{s.dangerLevel} Level</span>
+                                                </div>
                                             </div>
-                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                                                {s.nationalId && <div><span className="text-slate-500 text-xs">NIN:</span> <span className="text-slate-300 font-mono">{s.nationalId}</span></div>}
-                                                {s.phoneNumber && <div><span className="text-slate-500 text-xs">Phone:</span> <span className="text-slate-300">{s.phoneNumber}</span></div>}
-                                                {s.knownAddresses && <div className="col-span-2"><span className="text-slate-500 text-xs">Known Area:</span> <span className="text-slate-300">{s.knownAddresses}</span></div>}
+                                            <div className="mt-3 flex justify-between items-center">
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    {s.nationalId && <div><span className="text-slate-500 text-xs font-bold">NIN:</span> <span className="text-slate-300 font-mono">{s.nationalId}</span></div>}
+                                                    {s.phoneNumber && <div><span className="text-slate-500 text-xs font-bold">Phone:</span> <span className="text-slate-300">{s.phoneNumber}</span></div>}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'GUILTY')} className="text-[9px] font-black text-red-500 hover:text-red-400 bg-red-500/5 px-2 py-1 rounded border border-red-500/10">GUILTY</button>
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'NOT_GUILTY')} className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">NOT GUILTY</button>
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'CLEARED')} className="text-[9px] font-black text-blue-500 hover:text-blue-400 bg-blue-500/5 px-2 py-1 rounded border border-blue-500/10">CLEAR</button>
+                                                </div>
                                             </div>
                                             {s.description && <p className="mt-2 text-sm text-slate-400 italic border-l-2 border-purple-500/30 pl-3">{s.description}</p>}
                                             {s.incidents && s.incidents.length > 0 && (
@@ -668,6 +718,7 @@ export default function PoliceDashboard() {
                     </div>
                 </div>
             )}
+            {liveTrackingImei && <LiveView imei={liveTrackingImei} onClose={() => setLiveTrackingImei(null)} />}
         </div>
     );
 }

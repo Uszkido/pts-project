@@ -9,7 +9,7 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo } = req.body;
+        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo, phoneNumber, address } = req.body;
 
         // Simple validation
         if (!email || !password) {
@@ -41,7 +41,9 @@ router.post('/register', async (req, res) => {
                 shopLongitude: finalRole === 'VENDOR' && shopLongitude ? parseFloat(shopLongitude) : null,
                 shopPhotoUrl: finalRole === 'VENDOR' ? shopPhotoUrl : null,
                 businessRegNo: finalRole === 'VENDOR' ? businessRegNo : null,
-                vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED'
+                vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED',
+                phoneNumber,
+                address
             }
         });
 
@@ -80,20 +82,25 @@ router.post('/reset-password', async (req, res) => {
             return res.status(400).json({ error: 'Valid email and new password (min 6 characters) are required.' });
         }
 
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (!existingUser) {
-            // Delay for security to mask non-existent emails
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+            // Delay for security
             await new Promise(resolve => setTimeout(resolve, 500));
             return res.status(404).json({ error: 'No account found with that email address.' });
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await prisma.user.update({
-            where: { email },
-            data: { password: hashedPassword }
+
+        // Create request instead of updating directly
+        await prisma.passwordResetRequest.create({
+            data: {
+                userId: user.id,
+                newPasswordHash: hashedPassword,
+                status: 'PENDING'
+            }
         });
 
-        res.json({ message: 'Password reset successfully. You can now log in.' });
+        res.json({ message: 'Password reset request submitted. Awaiting administrator approval.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

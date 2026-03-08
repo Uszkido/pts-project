@@ -214,6 +214,42 @@ router.put('/incidents/:id/suspect', authenticatePolice, async (req, res) => {
     }
 });
 
+// Police clears an incident
+router.put('/incidents/:id/clear', authenticatePolice, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const report = await prisma.incidentReport.update({
+            where: { id },
+            data: { status: 'CLEARED' }
+        });
+        res.json({ message: 'Incident cleared successfully', report });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.put('/suspects/:id/status', authenticatePolice, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body; // ACTIVE, CLEARED, GUILTY, NOT_GUILTY
+
+        if (!['ACTIVE', 'CLEARED', 'GUILTY', 'NOT_GUILTY'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid suspect status' });
+        }
+
+        const suspect = await prisma.suspect.update({
+            where: { id },
+            data: { status }
+        });
+
+        res.json({ message: `Suspect status updated to ${status}`, suspect });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ============ TRACKING LOGS ============
 router.post('/tracking-log', authenticatePolice, async (req, res) => {
     try {

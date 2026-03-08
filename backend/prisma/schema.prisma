@@ -39,6 +39,19 @@ model User {
   sentMessages Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
   createdAt   DateTime @default(now())
+  phoneNumber String?
+  address     String?
+  passwordResetRequests PasswordResetRequest[]
+}
+
+model PasswordResetRequest {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  newPasswordHash String
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminNotes      String?
+  createdAt       DateTime @default(now())
 }
 
 model Device {
@@ -173,6 +186,7 @@ model Suspect {
   photoUrl      String?
   knownAddresses String?
   dangerLevel   String   @default("UNKNOWN") // LOW, MEDIUM, HIGH, EXTREME, UNKNOWN
+  status        String   @default("ACTIVE") // ACTIVE, CLEARED, GUILTY, NOT_GUILTY
   incidents     IncidentReport[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

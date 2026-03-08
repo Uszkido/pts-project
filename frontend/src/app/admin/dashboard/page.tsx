@@ -1,5 +1,5 @@
-'use client';
 import { useState, useEffect } from 'react';
+import LiveView from '@/components/LiveView';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
@@ -8,7 +8,7 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
     // New feature states
@@ -32,6 +32,15 @@ export default function AdminDashboard() {
     const [resetPassword, setResetPassword] = useState('');
     const [isResettingPassword, setIsResettingPassword] = useState(false);
 
+    // Suspects state
+    const [suspects, setSuspects] = useState<any[]>([]);
+
+    // Password Resets
+    const [authRequests, setAuthRequests] = useState<any[]>([]);
+
+    // Live Tracking
+    const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
@@ -44,7 +53,8 @@ export default function AdminDashboard() {
                 fetch(`${apiUrl}/admin/devices`, { headers }),
                 fetch(`${apiUrl}/admin/incidents`, { headers }),
                 fetch(`${apiUrl}/admin/documents`, { headers }),
-                fetch(`${apiUrl}/admin/messages`, { headers })
+                fetch(`${apiUrl}/admin/messages`, { headers }),
+                fetch(`${apiUrl}/admin/password-reset-requests`, { headers })
             ]);
 
             if (!dashRes.ok) throw new Error('Access denied. Admin privileges required.');
@@ -54,9 +64,13 @@ export default function AdminDashboard() {
             if (!docsRes.ok) throw new Error(`Documents API failed with status ${docsRes.status}`);
             if (!msgsRes.ok) throw new Error(`Messages API failed with status ${msgsRes.status}`);
 
-            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData] = await Promise.all([
-                dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json(), docsRes.json(), msgsRes.json()
+            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData, authRes, suspectsRes] = await Promise.all([
+                dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json(), docsRes.json(), msgsRes.json(),
+                fetch(`${apiUrl}/admin/password-reset-requests`, { headers }),
+                fetch(`${apiUrl}/admin/suspects`, { headers })
             ]);
+
+            const suspectsData = suspectsRes.ok ? await suspectsRes.json() : { suspects: [] };
 
             setStats(dashData);
             setUsers(usersData.users || []);
@@ -64,6 +78,9 @@ export default function AdminDashboard() {
             setIncidents(incidentsData.incidents || []);
             setDocuments(docsData || { userDocuments: [], deviceDocuments: [] });
             setMessages(msgsData.messages || []);
+            setSuspects(suspectsData.suspects || []);
+            const authData = authRes.ok ? await authRes.json() : { requests: [] };
+            setAuthRequests(authData.requests || []);
         } catch (err: any) {
             console.error(err);
             setError(err.message);
@@ -274,11 +291,70 @@ export default function AdminDashboard() {
         } catch (err: any) { alert(err.message); }
     };
 
+    const approveReset = async (requestId: string) => {
+        if (!confirm('Approve this password reset? This will immediately update the user\'s password.')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/password-reset-requests/${requestId}/approve`, {
+                method: 'PUT', headers
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const rejectReset = async (requestId: string) => {
+        const notes = prompt('Reason for rejection (optional):');
+        if (notes === null) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/password-reset-requests/${requestId}/reject`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
     const deleteDevice = async (deviceId: string) => {
         if (!confirm('Delete this device permanently?')) return;
         try {
             const res = await fetch(`${apiUrl}/admin/devices/${deviceId}`, { method: 'DELETE', headers });
             if (!res.ok) throw new Error('Failed to delete device');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const deleteMessage = async (messageId: string) => {
+        if (!confirm('Delete this message from the thread?')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/messages/${messageId}`, { method: 'DELETE', headers });
+            if (!res.ok) throw new Error('Failed to delete message');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const clearIncident = async (incidentId: string) => {
+        if (!confirm('Mark this incident as cleared/resolved?')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/incidents/${incidentId}/clear`, { method: 'PUT', headers });
+            if (!res.ok) throw new Error('Failed to clear incident');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const updateSuspectStatus = async (suspectId: string, status: string) => {
+        try {
+            const res = await fetch(`${apiUrl}/admin/suspects/${suspectId}/status`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) throw new Error('Failed to update suspect status');
             fetchData();
         } catch (err: any) { alert(err.message); }
     };
@@ -374,133 +450,198 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'vendors', 'users', 'devices', 'incidents', 'documents', 'messages'] as const).map(tab => (
+                    {(['overview', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-amber-600/20 text-amber-400 shadow-lg border border-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
-                            {tab === 'vendors' ? `Vendors (${pendingVendors.length} pending)` : tab}
+                            {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
+                                tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length})` :
+                                    tab}
                         </button>
                     ))}
                 </div>
 
                 {/* TAB: Overview */}
-                {activeTab === 'overview' && stats && (
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                            <h3 className="text-lg font-bold text-white mb-4">Users by Role</h3>
-                            <div className="space-y-3">
-                                {stats.usersByRole.map((r: any) => (
-                                    <div key={r.role} className="flex justify-between items-center">
-                                        <span className={`font-bold ${roleColor(r.role)}`}>{r.role}</span>
-                                        <span className="bg-slate-800 px-3 py-1 rounded-full text-sm font-bold text-white">{r.count}</span>
-                                    </div>
-                                ))}
+                {
+                    activeTab === 'overview' && stats && (
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-bold text-white mb-4">Users by Role</h3>
+                                <div className="space-y-3">
+                                    {stats.usersByRole.map((r: any) => (
+                                        <div key={r.role} className="flex justify-between items-center">
+                                            <span className={`font-bold ${roleColor(r.role)}`}>{r.role}</span>
+                                            <span className="bg-slate-800 px-3 py-1 rounded-full text-sm font-bold text-white">{r.count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <h3 className="text-lg font-bold text-white mb-4">Devices by Status</h3>
+                                <div className="space-y-3">
+                                    {stats.devicesByStatus.map((d: any) => (
+                                        <div key={d.status} className="flex justify-between items-center">
+                                            <span className="text-slate-300 font-medium">{d.status}</span>
+                                            <span className="bg-slate-800 px-3 py-1 rounded-full text-sm font-bold text-white">{d.count}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                            <h3 className="text-lg font-bold text-white mb-4">Devices by Status</h3>
-                            <div className="space-y-3">
-                                {stats.devicesByStatus.map((d: any) => (
-                                    <div key={d.status} className="flex justify-between items-center">
-                                        <span className="text-slate-300 font-medium">{d.status}</span>
-                                        <span className="bg-slate-800 px-3 py-1 rounded-full text-sm font-bold text-white">{d.count}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* TAB: Vendor Approvals */}
-                {activeTab === 'vendors' && (
-                    <div className="space-y-4">
-                        {users.filter(u => u.role === 'VENDOR').length === 0 ? (
-                            <div className="text-center py-12 text-slate-500">No vendor accounts registered.</div>
-                        ) : users.filter(u => u.role === 'VENDOR').map(vendor => (
-                            <div key={vendor.id} className={`bg-slate-900 border rounded-2xl p-6 ${vendor.vendorStatus === 'PENDING' ? 'border-amber-500/30' : 'border-slate-800'}`}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="text-lg font-bold text-white">{vendor.companyName || vendor.email}</h4>
-                                        <p className="text-sm text-slate-400">{vendor.email}</p>
-                                        {vendor.fullName && <p className="text-xs text-slate-500">Contact: {vendor.fullName}</p>}
+                {
+                    activeTab === 'vendors' && (
+                        <div className="space-y-4">
+                            {users.filter(u => u.role === 'VENDOR').length === 0 ? (
+                                <div className="text-center py-12 text-slate-500">No vendor accounts registered.</div>
+                            ) : users.filter(u => u.role === 'VENDOR').map(vendor => (
+                                <div key={vendor.id} className={`bg-slate-900 border rounded-2xl p-6 ${vendor.vendorStatus === 'PENDING' ? 'border-amber-500/30' : 'border-slate-800'}`}>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="text-lg font-bold text-white">{vendor.companyName || vendor.email}</h4>
+                                            <p className="text-sm text-slate-400">{vendor.email}</p>
+                                            {vendor.fullName && <p className="text-xs text-slate-500">Contact: {vendor.fullName}</p>}
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${statusColor(vendor.vendorStatus)}`}>{vendor.vendorStatus}</span>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${statusColor(vendor.vendorStatus)}`}>{vendor.vendorStatus}</span>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
+                                        {vendor.businessAddress && <div><span className="text-slate-500 text-xs block">Business Address</span><span className="text-slate-300">{vendor.businessAddress}</span></div>}
+                                        {vendor.businessRegNo && <div><span className="text-slate-500 text-xs block">CAC/Reg No</span><span className="text-slate-300 font-mono">{vendor.businessRegNo}</span></div>}
+                                        {vendor.nationalId && <div><span className="text-slate-500 text-xs block">NIN</span><span className="text-slate-300 font-mono">{vendor.nationalId}</span></div>}
+                                        <div><span className="text-slate-500 text-xs block">Devices</span><span className="text-slate-300">{vendor._count?.devices || 0}</span></div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {vendor.cacCertificateUrl && <a href={vendor.cacCertificateUrl} target="_blank" rel="noreferrer" className="text-xs bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-colors">View CAC Certificate</a>}
+                                        {vendor.shopPhotoUrl && <a href={vendor.shopPhotoUrl} target="_blank" rel="noreferrer" className="text-xs bg-purple-500/10 text-purple-400 px-3 py-1.5 rounded-lg border border-purple-500/20 hover:bg-purple-500/20 transition-colors">View Shop Photo</a>}
+                                        {vendor.shopLatitude && vendor.shopLongitude && <a href={`https://maps.google.com/?q=${vendor.shopLatitude},${vendor.shopLongitude}`} target="_blank" rel="noreferrer" className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">📍 View on Map</a>}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-800">
+                                        <button onClick={() => fetchUserDetails(vendor.id)} className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors">View Details</button>
+                                        {vendor.vendorStatus !== 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'APPROVED')} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors">✓ Approve</button>}
+                                        {vendor.vendorStatus !== 'REJECTED' && <button onClick={() => updateVendorStatus(vendor.id, 'REJECTED')} className="text-xs font-bold bg-red-600/80 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">✕ Reject</button>}
+                                        {vendor.vendorStatus === 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'SUSPENDED')} className="text-xs font-bold bg-amber-600/80 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors">⚠ Suspend</button>}
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
-                                    {vendor.businessAddress && <div><span className="text-slate-500 text-xs block">Business Address</span><span className="text-slate-300">{vendor.businessAddress}</span></div>}
-                                    {vendor.businessRegNo && <div><span className="text-slate-500 text-xs block">CAC/Reg No</span><span className="text-slate-300 font-mono">{vendor.businessRegNo}</span></div>}
-                                    {vendor.nationalId && <div><span className="text-slate-500 text-xs block">NIN</span><span className="text-slate-300 font-mono">{vendor.nationalId}</span></div>}
-                                    <div><span className="text-slate-500 text-xs block">Devices</span><span className="text-slate-300">{vendor._count?.devices || 0}</span></div>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {vendor.cacCertificateUrl && <a href={vendor.cacCertificateUrl} target="_blank" rel="noreferrer" className="text-xs bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-colors">View CAC Certificate</a>}
-                                    {vendor.shopPhotoUrl && <a href={vendor.shopPhotoUrl} target="_blank" rel="noreferrer" className="text-xs bg-purple-500/10 text-purple-400 px-3 py-1.5 rounded-lg border border-purple-500/20 hover:bg-purple-500/20 transition-colors">View Shop Photo</a>}
-                                    {vendor.shopLatitude && vendor.shopLongitude && <a href={`https://maps.google.com/?q=${vendor.shopLatitude},${vendor.shopLongitude}`} target="_blank" rel="noreferrer" className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">📍 View on Map</a>}
-                                </div>
-                                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-800">
-                                    <button onClick={() => fetchUserDetails(vendor.id)} className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors">View Details</button>
-                                    {vendor.vendorStatus !== 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'APPROVED')} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors">✓ Approve</button>}
-                                    {vendor.vendorStatus !== 'REJECTED' && <button onClick={() => updateVendorStatus(vendor.id, 'REJECTED')} className="text-xs font-bold bg-red-600/80 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">✕ Reject</button>}
-                                    {vendor.vendorStatus === 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'SUSPENDED')} className="text-xs font-bold bg-amber-600/80 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors">⚠ Suspend</button>}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )
+                }
 
                 {/* TAB: Users */}
-                {activeTab === 'users' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="flex gap-2">
-                                {['', 'ADMIN', 'VENDOR', 'CONSUMER', 'POLICE'].map(r => (
-                                    <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${roleFilter === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-white'}`}>{r || 'All'}</button>
-                                ))}
+                {
+                    activeTab === 'users' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="flex gap-2">
+                                    {['', 'ADMIN', 'VENDOR', 'CONSUMER', 'POLICE'].map(r => (
+                                        <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${roleFilter === r ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-white'}`}>{r || 'All'}</button>
+                                    ))}
+                                </div>
+                                <button onClick={() => setIsCreateOpen(true)} className="bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    Create Account
+                                </button>
                             </div>
-                            <button onClick={() => setIsCreateOpen(true)} className="bg-amber-600 hover:bg-amber-500 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                Create Account
-                            </button>
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
+                                        <tr>
+                                            <th className="px-6 py-4">User</th>
+                                            <th className="px-6 py-4">Role</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Devices</th>
+                                            <th className="px-6 py-4">Joined</th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {filteredUsers.map(user => (
+                                            <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-white">{user.fullName || user.companyName || 'N/A'}</div>
+                                                    <div className="text-xs text-slate-500">{user.email}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <select value={user.role} onChange={e => updateUserRole(user.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                                                        {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
+                                                    </select>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(user.vendorStatus)}`}>{user.vendorStatus}</span>
+                                                        <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${user.status === 'SUSPENDED' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{user.status || 'ACTIVE'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-300">{user._count?.devices || 0}</td>
+                                                <td className="px-6 py-4 text-slate-500 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex flex-col gap-2 items-end">
+                                                        <button onClick={() => fetchUserDetails(user.id)} className="text-xs text-blue-500 hover:text-blue-400 font-bold">View / Edit</button>
+                                                        {user.status !== 'SUSPENDED' ? (
+                                                            <button onClick={() => updateUserStatus(user.id, 'SUSPENDED')} className="text-xs text-amber-500 hover:text-amber-400 font-bold">Suspend</button>
+                                                        ) : (
+                                                            <button onClick={() => updateUserStatus(user.id, 'ACTIVE')} className="text-xs text-emerald-500 hover:text-emerald-400 font-bold">Activate</button>
+                                                        )}
+                                                        <button onClick={() => deleteUser(user.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+                    )
+                }
+
+                {/* TAB: Devices */}
+                {
+                    activeTab === 'devices' && (
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
                                     <tr>
-                                        <th className="px-6 py-4">User</th>
-                                        <th className="px-6 py-4">Role</th>
+                                        <th className="px-6 py-4">Device</th>
+                                        <th className="px-6 py-4">IMEI</th>
                                         <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Devices</th>
-                                        <th className="px-6 py-4">Joined</th>
+                                        <th className="px-6 py-4">Owner</th>
+                                        <th className="px-6 py-4">Risk</th>
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
-                                    {filteredUsers.map(user => (
-                                        <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
+                                    {devices.map(d => (
+                                        <tr key={d.id} className="hover:bg-slate-800/30 transition-colors">
                                             <td className="px-6 py-4">
-                                                <div className="font-bold text-white">{user.fullName || user.companyName || 'N/A'}</div>
-                                                <div className="text-xs text-slate-500">{user.email}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select value={user.role} onChange={e => updateUserRole(user.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
-                                                    {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col gap-2">
-                                                    <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColor(user.vendorStatus)}`}>{user.vendorStatus}</span>
-                                                    <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold border ${user.status === 'SUSPENDED' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>{user.status || 'ACTIVE'}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                        {d.devicePhotoUrl ? (
+                                                            <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="font-bold text-white whitespace-nowrap">{d.brand} {d.model}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-slate-300">{user._count?.devices || 0}</td>
-                                            <td className="px-6 py-4 text-slate-500 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 font-mono text-xs text-slate-400">{d.imei}</td>
+                                            <td className="px-6 py-4">
+                                                <select value={d.status} onChange={e => updateDeviceStatus(d.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
+                                                    {['CLEAN', 'STOLEN', 'INVESTIGATING', 'RECOVERED', 'FROZEN', 'BLACKLISTED'].map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs text-slate-400">{d.registeredOwner?.email}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`font-bold ${d.riskScore >= 70 ? 'text-emerald-400' : d.riskScore >= 40 ? 'text-amber-400' : 'text-red-500'}`}>{d.riskScore}</span>
+                                            </td>
                                             <td className="px-6 py-4 text-right">
-                                                <div className="flex flex-col gap-2 items-end">
-                                                    <button onClick={() => fetchUserDetails(user.id)} className="text-xs text-blue-500 hover:text-blue-400 font-bold">View / Edit</button>
-                                                    {user.status !== 'SUSPENDED' ? (
-                                                        <button onClick={() => updateUserStatus(user.id, 'SUSPENDED')} className="text-xs text-amber-500 hover:text-amber-400 font-bold">Suspend</button>
-                                                    ) : (
-                                                        <button onClick={() => updateUserStatus(user.id, 'ACTIVE')} className="text-xs text-emerald-500 hover:text-emerald-400 font-bold">Activate</button>
-                                                    )}
-                                                    <button onClick={() => deleteUser(user.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                                <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => transferDevice(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Transfer</button>
+                                                    <button onClick={() => setLiveTrackingImei(d.imei)} className="text-xs text-red-500 hover:text-red-400 font-bold">Track</button>
+                                                    <button onClick={() => deleteDevice(d.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -508,404 +649,483 @@ export default function AdminDashboard() {
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
-                {/* TAB: Devices */}
-                {activeTab === 'devices' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                {/* TAB: Incidents */}
+                {
+                    activeTab === 'incidents' && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
+                                    <tr>
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Type</th>
+                                        <th className="px-6 py-4">Device</th>
+                                        <th className="px-6 py-4">Reporter</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {incidents.map(inc => (
+                                        <tr key={inc.id} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="px-6 py-4 text-xs text-slate-400">{new Date(inc.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4"><span className="bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{inc.type}</span></td>
+                                            <td className="px-6 py-4"><span className="font-bold text-white">{inc.device?.brand} {inc.device?.model}</span><span className="text-xs text-slate-500 font-mono ml-2">{inc.device?.imei}</span></td>
+                                            <td className="px-6 py-4 text-xs text-slate-400">{inc.reporter?.email}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${inc.status === 'CLEARED' ? 'bg-emerald-500/10 text-emerald-500' : inc.status === 'OPEN' ? 'bg-red-500/10 text-red-500' : 'bg-slate-700 text-slate-400'}`}>
+                                                    {inc.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex gap-2 justify-end">
+                                                    {inc.status !== 'CLEARED' && (
+                                                        <button onClick={() => clearIncident(inc.id)} className="text-xs text-emerald-500 hover:text-emerald-400 font-bold border border-emerald-500/20 px-2 py-1 rounded">Clear</button>
+                                                    )}
+                                                    {inc.device && (
+                                                        <button onClick={() => setLiveTrackingImei(inc.device.imei)} className="text-xs text-red-500 hover:text-red-400 font-bold border border-red-500/20 px-2 py-1 rounded">Track</button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                }
+
+                {/* TAB: Suspects */}
+                {
+                    activeTab === 'suspects' && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
+                                    <tr>
+                                        <th className="px-6 py-4">Suspect Details</th>
+                                        <th className="px-6 py-4">Verification</th>
+                                        <th className="px-6 py-4">Status / Verdict</th>
+                                        <th className="px-6 py-4">Danger Level</th>
+                                        <th className="px-6 py-4 text-right">Adjudication</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {suspects.map(s => (
+                                        <tr key={s.id} className="hover:bg-slate-800/30 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-white text-base">{s.fullName}</div>
+                                                <div className="text-xs text-slate-500 font-medium">{s.phoneNumber}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-white font-mono text-xs">{s.nationalId || 'No NIN'}</div>
+                                                <div className="text-[10px] text-amber-500 font-bold italic truncate max-w-[150px]">"{s.alias || 'No Alias'}"</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border ${s.status === 'GUILTY' ? 'bg-red-500/10 text-red-500 border-red-500/30' :
+                                                    s.status === 'NOT_GUILTY' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' :
+                                                        s.status === 'CLEARED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' :
+                                                            'bg-slate-800/50 text-slate-400 border-slate-700'
+                                                    }`}>
+                                                    {s.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className={`w-2 h-2 rounded-full ${s.dangerLevel === 'EXTREME' ? 'bg-red-600 animate-pulse' : s.dangerLevel === 'HIGH' ? 'bg-red-500' : s.dangerLevel === 'MEDIUM' ? 'bg-amber-500' : 'bg-slate-500'}`} />
+                                                    <span className="text-[10px] font-bold text-slate-300">{s.dangerLevel}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'GUILTY')} className="text-[9px] font-black bg-red-500/10 text-red-500 hover:bg-red-500/20 px-2 py-1 rounded border border-red-500/20 transition-all">GUILTY</button>
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'NOT_GUILTY')} className="text-[9px] font-black bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 px-2 py-1 rounded border border-emerald-500/20 transition-all">NOT GUILTY</button>
+                                                    <button onClick={() => updateSuspectStatus(s.id, 'CLEARED')} className="text-[9px] font-black bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 px-2 py-1 rounded border border-blue-500/20 transition-all">CLEAR</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {suspects.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium italic">No suspects in the national registry.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                }
+
+                {/* TAB: Documents */}
+                {
+                    activeTab === 'documents' && (
+                        <div className="space-y-8">
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> User Documents</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {documents.userDocuments.map(u => (
+                                        <div key={u.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md">
+                                            <div className="mb-3">
+                                                <p className="font-bold text-white text-sm">{u.fullName || u.email}</p>
+                                                <p className="text-xs font-medium text-slate-500">{u.role} {u.companyName && `• ${u.companyName}`}</p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {u.cacCertificateUrl && <a href={u.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📄 CAC Cert</a>}
+                                                {u.shopPhotoUrl && <a href={u.shopPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">🖼️ Shop</a>}
+                                                {u.facialDataUrl && <a href={u.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-purple-500/20">👤 Face</a>}
+                                                {u.biodataUrl && <a href={u.biodataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">📋 Biodata</a>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {documents.userDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No user documents</p>}
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
+                                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Device Documents</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {documents.deviceDocuments.map(d => (
+                                        <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md flex gap-4">
+                                            <div className="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
+                                                {d.devicePhotoUrl ? (
+                                                    <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="mb-3">
+                                                    <p className="font-bold text-white text-sm truncate">{d.brand} {d.model}</p>
+                                                    <p className="text-xs font-mono text-slate-400">IMEI: {d.imei}</p>
+                                                    <p className="text-xs font-medium text-slate-500 mt-0.5 truncate">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
+                                                    {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
+                                                    {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {documents.deviceDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No device documents</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* TAB: Messages */}
+                {
+                    activeTab === 'messages' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
+                                <h3 className="text-lg font-bold text-white mb-4">Send System Notice</h3>
+                                <form onSubmit={sendMessage} className="space-y-4">
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                                            <input type="radio" checked={messageTarget === 'ROLE'} onChange={() => setMessageTarget('ROLE')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                                            Target Role
+                                        </label>
+                                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                                            <input type="radio" checked={messageTarget === 'USER'} onChange={() => setMessageTarget('USER')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                                            Target User
+                                        </label>
+                                    </div>
+                                    {messageTarget === 'ROLE' ? (
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-1">Select Role Group</label>
+                                            <select value={receiverRole} onChange={e => setReceiverRole(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500">
+                                                <option value="ALL">Everyone (Global Broadcast)</option>
+                                                <option value="POLICE">Law Enforcement Only</option>
+                                                <option value="VENDOR">Vendors Only</option>
+                                                <option value="CONSUMER">Consumers Only</option>
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-1">User Email *</label>
+                                            <input type="email" value={receiverEmail} onChange={e => setReceiverEmail(e.target.value)} required placeholder="user@example.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                            <datalist id="user-emails">
+                                                {users.map(u => <option key={u.email} value={u.email} />)}
+                                            </datalist>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
+                                        <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="System update..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
+                                        <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to network..." />
+                                    </div>
+                                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Dispatch
+                                    </button>
+                                </form>
+                            </div>
+                            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[500px]">
+                                <h3 className="text-lg font-bold text-white mb-6">Discussions Thread</h3>
+                                <div className="space-y-4">
+                                    {messages.map(msg => (
+                                        <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/5 border-amber-500/20 ml-12' : 'bg-blue-500/5 border-blue-500/20 mr-12'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>{msg.sender?.role}</span>
+                                                    <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
+                                                    <button onClick={() => deleteMessage(msg.id)} className="text-slate-600 hover:text-red-500 transition-colors p-1" title="Delete message">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
+                                            <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
+                                        </div>
+                                    ))}
+                                    {messages.length === 0 && <div className="text-center py-20 text-slate-500">No messages in thread yet.</div>}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* TAB: Auth Requests */}
+                {activeTab === 'auth-requests' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
+                            <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
                                 <tr>
-                                    <th className="px-6 py-4">Device</th>
-                                    <th className="px-6 py-4">IMEI</th>
+                                    <th className="px-6 py-4">Request Date</th>
+                                    <th className="px-6 py-4">User Email</th>
+                                    <th className="px-6 py-4">Role</th>
                                     <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Owner</th>
-                                    <th className="px-6 py-4">Risk</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
-                                {devices.map(d => (
-                                    <tr key={d.id} className="hover:bg-slate-800/30 transition-colors">
+                                {authRequests.length === 0 ? (
+                                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No password reset requests found.</td></tr>
+                                ) : authRequests.map(req => (
+                                    <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
+                                        <td className="px-6 py-4 text-xs text-slate-400">{new Date(req.createdAt).toLocaleString()}</td>
+                                        <td className="px-6 py-4 font-bold text-white">{req.user?.email}</td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                    {d.devicePhotoUrl ? (
-                                                        <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-slate-600">
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(req.user?.role)}`}>
+                                                {req.user?.role}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                {req.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            {req.status === 'PENDING' && (
+                                                <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => approveReset(req.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded transition-colors uppercase">Approve</button>
+                                                    <button onClick={() => rejectReset(req.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded transition-colors uppercase">Reject</button>
+                                                </div>
+                                            )}
+                                            {req.adminNotes && <p className="text-[10px] text-slate-500 mt-1 italic">Note: {req.adminNotes}</p>}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Create Account Modal */}
+                {
+                    isCreateOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-emerald-500"></div>
+                                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                                    <h2 className="text-xl font-bold text-white">Create Account</h2>
+                                    <button onClick={() => setIsCreateOpen(false)} className="text-slate-500 hover:text-white text-xl">✕</button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Role *</label>
+                                        <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
+                                            {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Full Name *</label>
+                                        <input type="text" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} placeholder="John Doe" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Email *</label>
+                                        <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@pts.com" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Password *</label>
+                                        <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                    </div>
+                                    {newUser.role === 'VENDOR' && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-400 mb-1">Company Name</label>
+                                            <input type="text" value={newUser.companyName} onChange={e => setNewUser({ ...newUser, companyName: e.target.value })} placeholder="Business Ltd" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN)</label>
+                                        <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                                    </div>
+                                    <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* User Details Modal */}
+                {
+                    isDetailsModalOpen && selectedUser && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm overflow-y-auto">
+                            <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative my-8">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-amber-500"></div>
+                                <div className="p-6 border-b border-slate-800 flex justify-between items-start sticky top-0 bg-slate-900 z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center relative">
+                                            {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) ? (
+                                                <img src={selectedUser.facialDataUrl || selectedUser.cacCertificateUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className={`text-2xl font-black ${selectedUser.role === 'ADMIN' ? 'text-amber-500' : selectedUser.role === 'VENDOR' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                                                    {selectedUser.role.charAt(0)}
+                                                </span>
+                                            )}
+                                            {selectedUser.cacCertificateUrl && !selectedUser.facialDataUrl && (
+                                                <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[8px] text-center text-slate-300 py-0.5 font-bold uppercase tracking-widest backdrop-blur-sm">CAC</div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white mb-1">{selectedUser.fullName || selectedUser.email}</h2>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className={`px-2 py-0.5 rounded-full font-bold uppercase ${selectedUser.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : selectedUser.role === 'VENDOR' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{selectedUser.role}</span>
+                                                {selectedUser.companyName && <span className="text-slate-400">@ {selectedUser.companyName}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors">✕</button>
+                                </div>
+
+                                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Left Column: Info & Edit Form */}
+                                    <div className="lg:col-span-1 space-y-6">
+                                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-white">Profile Details</h3>
+                                                <button onClick={() => setEditMode(!editMode)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">{editMode ? 'Cancel' : 'Edit'}</button>
+                                            </div>
+
+                                            {editMode ? (
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="text-xs text-slate-500 mb-1 block">Full Name</label>
+                                                        <input type="text" value={editUserForm.fullName} onChange={e => setEditUserForm({ ...editUserForm, fullName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs text-slate-500 mb-1 block">Email</label>
+                                                        <input type="email" value={editUserForm.email} onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                    </div>
+                                                    {selectedUser.role === 'VENDOR' && (
+                                                        <div>
+                                                            <label className="text-xs text-slate-500 mb-1 block">Company Name</label>
+                                                            <input type="text" value={editUserForm.companyName} onChange={e => setEditUserForm({ ...editUserForm, companyName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <label className="text-xs text-slate-500 mb-1 block">National ID</label>
+                                                        <input type="text" value={editUserForm.nationalId} onChange={e => setEditUserForm({ ...editUserForm, nationalId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                    </div>
+                                                    <button onClick={saveUserDetails} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Changes</button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 text-sm">
+                                                    <div><span className="text-slate-500 block text-xs">Email</span><span className="text-white break-all">{selectedUser.email}</span></div>
+                                                    <div><span className="text-slate-500 block text-xs">Role</span><span className="text-white">{selectedUser.role}</span></div>
+                                                    <div><span className="text-slate-500 block text-xs">Status</span><span className={`font-bold ${selectedUser.status === 'SUSPENDED' ? 'text-red-400' : 'text-emerald-400'}`}>{selectedUser.status}</span></div>
+                                                    {selectedUser.companyName && <div><span className="text-slate-500 block text-xs">Company Name</span><span className="text-white">{selectedUser.companyName}</span></div>}
+                                                    {selectedUser.nationalId && <div><span className="text-slate-500 block text-xs">National ID</span><span className="text-white font-mono">{selectedUser.nationalId}</span></div>}
+                                                    <div><span className="text-slate-500 block text-xs">Joined</span><span className="text-white">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
+
+                                                    {/* Link out to view full size images if they exist */}
+                                                    {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) && (
+                                                        <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap gap-2">
+                                                            {selectedUser.facialDataUrl && <a href={selectedUser.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full Selfie</a>}
+                                                            {selectedUser.cacCertificateUrl && <a href={selectedUser.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full CAC Doc</a>}
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="font-bold text-white whitespace-nowrap">{d.brand} {d.model}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 font-mono text-xs text-slate-400">{d.imei}</td>
-                                        <td className="px-6 py-4">
-                                            <select value={d.status} onChange={e => updateDeviceStatus(d.id, e.target.value)} className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white">
-                                                {['CLEAN', 'STOLEN', 'INVESTIGATING', 'RECOVERED', 'FROZEN', 'BLACKLISTED'].map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </td>
-                                        <td className="px-6 py-4 text-xs text-slate-400">{d.registeredOwner?.email}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`font-bold ${d.riskScore >= 70 ? 'text-emerald-400' : d.riskScore >= 40 ? 'text-amber-400' : 'text-red-500'}`}>{d.riskScore}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex gap-2 justify-end">
-                                                <button onClick={() => transferDevice(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Transfer</button>
-                                                <button onClick={() => deleteDevice(d.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* TAB: Incidents */}
-                {activeTab === 'incidents' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
-                                <tr>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Type</th>
-                                    <th className="px-6 py-4">Device</th>
-                                    <th className="px-6 py-4">Reporter</th>
-                                    <th className="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                                {incidents.map(inc => (
-                                    <tr key={inc.id} className="hover:bg-slate-800/30 transition-colors">
-                                        <td className="px-6 py-4 text-xs text-slate-400">{new Date(inc.createdAt).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4"><span className="bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full text-[10px] font-bold">{inc.type}</span></td>
-                                        <td className="px-6 py-4"><span className="font-bold text-white">{inc.device?.brand} {inc.device?.model}</span><span className="text-xs text-slate-500 font-mono ml-2">{inc.device?.imei}</span></td>
-                                        <td className="px-6 py-4 text-xs text-slate-400">{inc.reporter?.email}</td>
-                                        <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${inc.status === 'OPEN' ? 'bg-red-500/10 text-red-500' : 'bg-slate-700 text-slate-400'}`}>{inc.status}</span></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* TAB: Documents */}
-                {activeTab === 'documents' && (
-                    <div className="space-y-8">
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
-                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> User Documents</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {documents.userDocuments.map(u => (
-                                    <div key={u.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md">
-                                        <div className="mb-3">
-                                            <p className="font-bold text-white text-sm">{u.fullName || u.email}</p>
-                                            <p className="text-xs font-medium text-slate-500">{u.role} {u.companyName && `• ${u.companyName}`}</p>
+                                            )}
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {u.cacCertificateUrl && <a href={u.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📄 CAC Cert</a>}
-                                            {u.shopPhotoUrl && <a href={u.shopPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">🖼️ Shop</a>}
-                                            {u.facialDataUrl && <a href={u.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-purple-500/20">👤 Face</a>}
-                                            {u.biodataUrl && <a href={u.biodataUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">📋 Biodata</a>}
-                                        </div>
-                                    </div>
-                                ))}
-                                {documents.userDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No user documents</p>}
-                            </div>
-                        </div>
 
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden p-6 shadow-xl">
-                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg> Device Documents</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {documents.deviceDocuments.map(d => (
-                                    <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md flex gap-4">
-                                        <div className="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
-                                            {d.devicePhotoUrl ? (
-                                                <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-white">Security</h3>
+                                            </div>
+                                            {!isResettingPassword ? (
+                                                <button onClick={() => setIsResettingPassword(true)} className="w-full bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold py-2 rounded transition-colors text-sm">Reset Password</button>
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
-                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                <div className="space-y-3">
+                                                    <input type="password" placeholder="New Password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                                    <div className="flex gap-2">
+                                                        <button onClick={handleResetPassword} disabled={!resetPassword || resetPassword.length < 6} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold py-2 rounded transition-colors text-sm">Confirm</button>
+                                                        <button onClick={() => { setIsResettingPassword(false); setResetPassword(''); }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded transition-colors text-sm">Cancel</button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="mb-3">
-                                                <p className="font-bold text-white text-sm truncate">{d.brand} {d.model}</p>
-                                                <p className="text-xs font-mono text-slate-400">IMEI: {d.imei}</p>
-                                                <p className="text-xs font-medium text-slate-500 mt-0.5 truncate">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
-                                                {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
-                                                {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
-                                            </div>
-                                        </div>
                                     </div>
-                                ))}
-                                {documents.deviceDocuments.length === 0 && <p className="text-slate-500 text-sm italic">No device documents</p>}
-                            </div>
-                        </div>
-                    </div>
-                )}
 
-                {/* TAB: Messages */}
-                {activeTab === 'messages' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
-                            <h3 className="text-lg font-bold text-white mb-4">Send System Notice</h3>
-                            <form onSubmit={sendMessage} className="space-y-4">
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                                        <input type="radio" checked={messageTarget === 'ROLE'} onChange={() => setMessageTarget('ROLE')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
-                                        Target Role
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                                        <input type="radio" checked={messageTarget === 'USER'} onChange={() => setMessageTarget('USER')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
-                                        Target User
-                                    </label>
-                                </div>
-                                {messageTarget === 'ROLE' ? (
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Select Role Group</label>
-                                        <select value={receiverRole} onChange={e => setReceiverRole(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500">
-                                            <option value="ALL">Everyone (Global Broadcast)</option>
-                                            <option value="POLICE">Law Enforcement Only</option>
-                                            <option value="VENDOR">Vendors Only</option>
-                                            <option value="CONSUMER">Consumers Only</option>
-                                        </select>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">User Email *</label>
-                                        <input type="email" value={receiverEmail} onChange={e => setReceiverEmail(e.target.value)} required placeholder="user@example.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                        <datalist id="user-emails">
-                                            {users.map(u => <option key={u.email} value={u.email} />)}
-                                        </datalist>
-                                    </div>
-                                )}
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
-                                    <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="System update..." />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
-                                    <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to network..." />
-                                </div>
-                                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Dispatch
-                                </button>
-                            </form>
-                        </div>
-                        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[500px]">
-                            <h3 className="text-lg font-bold text-white mb-6">Discussions Thread</h3>
-                            <div className="space-y-4">
-                                {messages.map(msg => (
-                                    <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/5 border-amber-500/20 ml-12' : 'bg-blue-500/5 border-blue-500/20 mr-12'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>{msg.sender?.role}</span>
-                                                <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
+                                    {/* Right Column: Devices List */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full min-h-[400px]">
+                                            <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                                                <h3 className="font-bold text-white flex items-center justify-between">
+                                                    Registered Devices
+                                                    <span className="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300">{selectedUser.devices?.length || 0}</span>
+                                                </h3>
                                             </div>
-                                            <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
+                                            <div className="flex-1 overflow-y-auto max-h-[500px]">
+                                                {(!selectedUser.devices || selectedUser.devices.length === 0) ? (
+                                                    <div className="p-8 text-center text-slate-500 text-sm">No devices registered by this user.</div>
+                                                ) : (
+                                                    <table className="w-full text-sm text-left">
+                                                        <thead className="text-xs text-slate-400 uppercase bg-slate-900/30 border-b border-slate-800 sticky top-0">
+                                                            <tr>
+                                                                <th className="px-4 py-3">Device</th>
+                                                                <th className="px-4 py-3">IMEI</th>
+                                                                <th className="px-4 py-3">Status</th>
+                                                                <th className="px-4 py-3">Registered</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-800/50">
+                                                            {selectedUser.devices.map((device: any) => (
+                                                                <tr key={device.id} className="hover:bg-slate-900/50">
+                                                                    <td className="px-4 py-3 font-medium text-white">{device.brand} {device.model}</td>
+                                                                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{device.imei}</td>
+                                                                    <td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">{device.status}</span></td>
+                                                                    <td className="px-4 py-3 text-xs text-slate-500">{new Date(device.createdAt).toLocaleDateString()}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
                                         </div>
-                                        <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
-                                        <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
                                     </div>
-                                ))}
-                                {messages.length === 0 && <div className="text-center py-20 text-slate-500">No messages in thread yet.</div>}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
             </main>
-
-            {/* Create Account Modal */}
-            {isCreateOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-emerald-500"></div>
-                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-white">Create Account</h2>
-                            <button onClick={() => setIsCreateOpen(false)} className="text-slate-500 hover:text-white text-xl">✕</button>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Role *</label>
-                                <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
-                                    {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Full Name *</label>
-                                <input type="text" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} placeholder="John Doe" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Email *</label>
-                                <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@pts.com" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Password *</label>
-                                <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                            </div>
-                            {newUser.role === 'VENDOR' && (
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-400 mb-1">Company Name</label>
-                                    <input type="text" value={newUser.companyName} onChange={e => setNewUser({ ...newUser, companyName: e.target.value })} placeholder="Business Ltd" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                </div>
-                            )}
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN)</label>
-                                <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                            </div>
-                            <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* User Details Modal */}
-            {isDetailsModalOpen && selectedUser && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative my-8">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-amber-500"></div>
-                        <div className="p-6 border-b border-slate-800 flex justify-between items-start sticky top-0 bg-slate-900 z-10">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center relative">
-                                    {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) ? (
-                                        <img src={selectedUser.facialDataUrl || selectedUser.cacCertificateUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className={`text-2xl font-black ${selectedUser.role === 'ADMIN' ? 'text-amber-500' : selectedUser.role === 'VENDOR' ? 'text-blue-500' : 'text-emerald-500'}`}>
-                                            {selectedUser.role.charAt(0)}
-                                        </span>
-                                    )}
-                                    {selectedUser.cacCertificateUrl && !selectedUser.facialDataUrl && (
-                                        <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[8px] text-center text-slate-300 py-0.5 font-bold uppercase tracking-widest backdrop-blur-sm">CAC</div>
-                                    )}
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white mb-1">{selectedUser.fullName || selectedUser.email}</h2>
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <span className={`px-2 py-0.5 rounded-full font-bold uppercase ${selectedUser.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : selectedUser.role === 'VENDOR' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{selectedUser.role}</span>
-                                        {selectedUser.companyName && <span className="text-slate-400">@ {selectedUser.companyName}</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors">✕</button>
-                        </div>
-
-                        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Left Column: Info & Edit Form */}
-                            <div className="lg:col-span-1 space-y-6">
-                                <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-white">Profile Details</h3>
-                                        <button onClick={() => setEditMode(!editMode)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">{editMode ? 'Cancel' : 'Edit'}</button>
-                                    </div>
-
-                                    {editMode ? (
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="text-xs text-slate-500 mb-1 block">Full Name</label>
-                                                <input type="text" value={editUserForm.fullName} onChange={e => setEditUserForm({ ...editUserForm, fullName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 mb-1 block">Email</label>
-                                                <input type="email" value={editUserForm.email} onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                            </div>
-                                            {selectedUser.role === 'VENDOR' && (
-                                                <div>
-                                                    <label className="text-xs text-slate-500 mb-1 block">Company Name</label>
-                                                    <input type="text" value={editUserForm.companyName} onChange={e => setEditUserForm({ ...editUserForm, companyName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                </div>
-                                            )}
-                                            <div>
-                                                <label className="text-xs text-slate-500 mb-1 block">National ID</label>
-                                                <input type="text" value={editUserForm.nationalId} onChange={e => setEditUserForm({ ...editUserForm, nationalId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                            </div>
-                                            <button onClick={saveUserDetails} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Changes</button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3 text-sm">
-                                            <div><span className="text-slate-500 block text-xs">Email</span><span className="text-white break-all">{selectedUser.email}</span></div>
-                                            <div><span className="text-slate-500 block text-xs">Role</span><span className="text-white">{selectedUser.role}</span></div>
-                                            <div><span className="text-slate-500 block text-xs">Status</span><span className={`font-bold ${selectedUser.status === 'SUSPENDED' ? 'text-red-400' : 'text-emerald-400'}`}>{selectedUser.status}</span></div>
-                                            {selectedUser.companyName && <div><span className="text-slate-500 block text-xs">Company Name</span><span className="text-white">{selectedUser.companyName}</span></div>}
-                                            {selectedUser.nationalId && <div><span className="text-slate-500 block text-xs">National ID</span><span className="text-white font-mono">{selectedUser.nationalId}</span></div>}
-                                            <div><span className="text-slate-500 block text-xs">Joined</span><span className="text-white">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
-
-                                            {/* Link out to view full size images if they exist */}
-                                            {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) && (
-                                                <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap gap-2">
-                                                    {selectedUser.facialDataUrl && <a href={selectedUser.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full Selfie</a>}
-                                                    {selectedUser.cacCertificateUrl && <a href={selectedUser.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full CAC Doc</a>}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-white">Security</h3>
-                                    </div>
-                                    {!isResettingPassword ? (
-                                        <button onClick={() => setIsResettingPassword(true)} className="w-full bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold py-2 rounded transition-colors text-sm">Reset Password</button>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <input type="password" placeholder="New Password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                            <div className="flex gap-2">
-                                                <button onClick={handleResetPassword} disabled={!resetPassword || resetPassword.length < 6} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold py-2 rounded transition-colors text-sm">Confirm</button>
-                                                <button onClick={() => { setIsResettingPassword(false); setResetPassword(''); }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded transition-colors text-sm">Cancel</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Right Column: Devices List */}
-                            <div className="lg:col-span-2 space-y-6">
-                                <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full min-h-[400px]">
-                                    <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-                                        <h3 className="font-bold text-white flex items-center justify-between">
-                                            Registered Devices
-                                            <span className="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300">{selectedUser.devices?.length || 0}</span>
-                                        </h3>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto max-h-[500px]">
-                                        {(!selectedUser.devices || selectedUser.devices.length === 0) ? (
-                                            <div className="p-8 text-center text-slate-500 text-sm">No devices registered by this user.</div>
-                                        ) : (
-                                            <table className="w-full text-sm text-left">
-                                                <thead className="text-xs text-slate-400 uppercase bg-slate-900/30 border-b border-slate-800 sticky top-0">
-                                                    <tr>
-                                                        <th className="px-4 py-3">Device</th>
-                                                        <th className="px-4 py-3">IMEI</th>
-                                                        <th className="px-4 py-3">Status</th>
-                                                        <th className="px-4 py-3">Registered</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-800/50">
-                                                    {selectedUser.devices.map((device: any) => (
-                                                        <tr key={device.id} className="hover:bg-slate-900/50">
-                                                            <td className="px-4 py-3 font-medium text-white">{device.brand} {device.model}</td>
-                                                            <td className="px-4 py-3 font-mono text-xs text-slate-400">{device.imei}</td>
-                                                            <td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">{device.status}</span></td>
-                                                            <td className="px-4 py-3 text-xs text-slate-500">{new Date(device.createdAt).toLocaleDateString()}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {liveTrackingImei && <LiveView imei={liveTrackingImei as string} onClose={() => setLiveTrackingImei(null)} />}
         </div>
     );
 }

@@ -1,5 +1,5 @@
-'use client';
 import { useState } from 'react';
+import FaceCapture from '@/components/FaceCapture';
 
 export default function VendorRegister() {
     const [step, setStep] = useState(1);
@@ -14,6 +14,9 @@ export default function VendorRegister() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [nationalId, setNationalId] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [facialFile, setFacialFile] = useState<File | null>(null);
+    const [facialDataUrl, setFacialDataUrl] = useState('');
 
     // Step 2: Business
     const [companyName, setCompanyName] = useState('');
@@ -67,7 +70,7 @@ export default function VendorRegister() {
                 body: JSON.stringify({
                     email, password, fullName, nationalId, companyName,
                     businessAddress, businessRegNo, shopPhotoUrl, cacCertificateUrl,
-                    shopLatitude, shopLongitude, role: 'VENDOR'
+                    shopLatitude, shopLongitude, role: 'VENDOR', phoneNumber, facialDataUrl
                 })
             });
             const data = await res.json();
@@ -135,6 +138,10 @@ export default function VendorRegister() {
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN) *</label>
                                 <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5">Phone Number *</label>
+                                <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+234..." className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors" required />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -221,6 +228,13 @@ export default function VendorRegister() {
                                         <span className="text-xs text-slate-400">{uploading === 'cac' ? 'Uploading...' : 'Click to upload CAC certificate (JPG, PNG, PDF)'}</span>
                                     </label>
                                 )}
+                            </div>
+                            <div className="pt-2">
+                                <FaceCapture onCapture={async (file) => {
+                                    setFacialFile(file);
+                                    const url = await uploadFile(file, 'facial');
+                                    if (url) setFacialDataUrl(url);
+                                }} label="Owner Face Verification (Live Capture) *" />
                             </div>
                             <div className="flex gap-3 mt-4">
                                 <button onClick={() => setStep(2)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors">← Back</button>

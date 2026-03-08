@@ -1,5 +1,5 @@
-'use client';
 import { useState } from 'react';
+import FaceCapture from '@/components/FaceCapture';
 
 export default function ConsumerLogin() {
     const [isLogin, setIsLogin] = useState(true);
@@ -14,6 +14,9 @@ export default function ConsumerLogin() {
     const [fullName, setFullName] = useState('');
     const [nationalId, setNationalId] = useState('');
     const [facialFile, setFacialFile] = useState<File | null>(null);
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [address, setAddress] = useState('');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,6 +25,12 @@ export default function ConsumerLogin() {
         setIsSubmitting(true);
         setError('');
         setSuccessMsg('');
+
+        if ((!isLogin || isForgotPassword) && password !== confirmPassword && newPassword !== confirmPassword) {
+            setError('Passwords do not match');
+            setIsSubmitting(false);
+            return;
+        }
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -60,7 +69,7 @@ export default function ConsumerLogin() {
             const endpoint = isLogin ? '/api/v1/auth/login' : '/api/v1/auth/register';
             const body = isLogin
                 ? { email, password }
-                : { email, password, role: 'CONSUMER', fullName, nationalId, facialDataUrl };
+                : { email, password, role: 'CONSUMER', fullName, nationalId, facialDataUrl, phoneNumber, address };
 
             const res = await fetch(`${apiUrl.replace('/api/v1', '')}${endpoint}`, {
                 method: 'POST',
@@ -116,8 +125,15 @@ export default function ConsumerLogin() {
                                 <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="NIN / SSN" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin && !isForgotPassword} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Facial Data (Selfie)</label>
-                                <input type="file" accept="image/*" onChange={e => setFacialFile(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors cursor-pointer" required={!isLogin && !isForgotPassword} />
+                                <FaceCapture onCapture={setFacialFile} label="Identity Verification (Live Selfie)" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Phone Number</label>
+                                <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+234..." className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin && !isForgotPassword} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Physical Address</label>
+                                <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Full residential address" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors h-20" required={!isLogin && !isForgotPassword} />
                             </div>
                         </>
                     )}
@@ -126,14 +142,28 @@ export default function ConsumerLogin() {
                         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
                     </div>
                     {isForgotPassword ? (
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1.5">New Password</label>
-                            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required minLength={6} />
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">New Password</label>
+                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required minLength={6} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm New Password</label>
+                                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required minLength={6} />
+                            </div>
                         </div>
                     ) : (
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
+                            </div>
+                            {!isLogin && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm Password</label>
+                                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required />
+                                </div>
+                            )}
                         </div>
                     )}
                     <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl mt-6 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2">

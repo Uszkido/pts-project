@@ -263,6 +263,12 @@ export default function Dashboard() {
                                                     <span className={`inline-flex px-2 py-1 rounded-md text-xs font-bold ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                                                         {device.status}
                                                     </span>
+                                                    {device.incidents && device.incidents.length > 0 && device.incidents[0].locationSharedWithOwner && (
+                                                        <div className="mt-1 flex items-center gap-1.5 animate-pulse">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+                                                            <span className="text-[10px] font-black text-purple-400 uppercase tracking-tighter">Live Shared</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="p-5 font-bold text-slate-300">{device.riskScore}</td>
                                                 <td className="p-5 text-right opacity-0 group-hover:opacity-100 transition-opacity">
