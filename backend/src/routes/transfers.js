@@ -34,20 +34,53 @@ router.post('/initiate', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Buyer not found. They must register for a PTS account first.' });
         }
 
+        // Generate 6-digit Handover Code (2FA)
+        const crypto = require('crypto');
+        const handoverCode = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
+        const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours validity
+
         // Create transfer record
         const transfer = await prisma.ownershipTransfer.create({
             data: {
                 deviceId,
                 sellerId: req.user.id,
                 buyerId: buyer.id,
+                handoverCode,
+                expiresAt,
                 status: 'PENDING'
             }
         });
 
-        res.json({ message: 'Transfer initiated. Awaiting buyer confirmation.', transfer });
+        res.json({
+            message: 'Transfer initiated. Give this Handover Code to the buyer: ' + handoverCode,
+            handoverCode,
+            transfer
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Get pending transfers for the logged in user (as buyer)
+router.get('/pending', authenticateToken, async (req, res) => {
+    try {
+        const pending = await prisma.ownershipTransfer.findMany({
+            where: {
+                buyerId: req.user.id,
+                status: 'PENDING',
+                expiresAt: { gt: new Date() }
+            },
+            include: {
+                device: true,
+                seller: {
+                    select: { fullName: true, email: true, companyName: true }
+                }
+            }
+        });
+        res.json({ pending });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch pending transfers' });
     }
 });
 
@@ -55,12 +88,28 @@ router.post('/initiate', authenticateToken, async (req, res) => {
 router.post('/accept/:transferId', authenticateToken, async (req, res) => {
     try {
         const { transferId } = req.params;
+        const { handoverCode } = req.body; // 2FA code required
+
+        if (!handoverCode) {
+            return res.status(400).json({ error: 'Handover Code is required to complete the 2FA transfer.' });
+        }
 
         // Transaction to ensure atomicity
         const result = await prisma.$transaction(async (tx) => {
             const transfer = await tx.ownershipTransfer.findUnique({ where: { id: transferId } });
+
             if (!transfer || transfer.buyerId !== req.user.id || transfer.status !== 'PENDING') {
                 throw new Error('Invalid or unauthorized transfer request.');
+            }
+
+            // Verify Handover Code
+            if (transfer.handoverCode !== handoverCode.toUpperCase()) {
+                throw new Error('Incorrect Handover Code. 2FA verification failed.');
+            }
+
+            // Verify Expiry
+            if (transfer.expiresAt && transfer.expiresAt < new Date()) {
+                throw new Error('Transfer request has expired. Seller must re-initiate.');
             }
 
             // 1. Mark transfer as completed

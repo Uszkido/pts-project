@@ -13,6 +13,8 @@ export default function ConsumerDashboard() {
     const [selectedPassport, setSelectedPassport] = useState<any[] | null>(null);
     const [isPassportOpen, setIsPassportOpen] = useState(false);
     const [passportLoading, setPassportLoading] = useState(false);
+    const [selectedMaintenance, setSelectedMaintenance] = useState<any[] | null>(null);
+    const [passportTab, setPassportTab] = useState<'chain' | 'service'>('chain');
 
     // Notifications State
     const [messages, setMessages] = useState<any[]>([]);
@@ -33,7 +35,7 @@ export default function ConsumerDashboard() {
     const [registrationForm, setRegistrationForm] = useState({ brand: '', model: '', imei: '', serialNumber: '' });
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
     const [cartonFile, setCartonFile] = useState<File | null>(null);
-    const [deviceFile, setDeviceFile] = useState<File | null>(null);
+    const [deviceFiles, setDeviceFiles] = useState<File[]>([]);
     const [isRegistering, setIsRegistering] = useState(false);
     const [regError, setRegError] = useState('');
 
@@ -84,16 +86,26 @@ export default function ConsumerDashboard() {
     }, []);
 
     const acceptTransfer = async (transferId: string) => {
+        const handoverCode = prompt("Enter the 6-digit Handover Code provided by the seller/vendor to verify device 2FA handover:");
+        if (!handoverCode) return;
+
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
             const res = await fetch(`${apiUrl}/transfers/accept/${transferId}`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ handoverCode })
             });
+
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error);
+                throw new Error(data.error || 'Transfer verification failed.');
             }
+
+            alert('Transfer Verified! Device is now cryptographically bound to your portfolio.');
             fetchDashboardAndMessages();
         } catch (err: any) {
             alert(err.message);
@@ -111,6 +123,8 @@ export default function ConsumerDashboard() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
             setSelectedPassport(data.passport);
+            setSelectedMaintenance(data.maintenance || []);
+            setPassportTab('chain');
         } catch (err: any) {
             alert(err.message);
             setIsPassportOpen(false);
@@ -204,7 +218,7 @@ export default function ConsumerDashboard() {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
             let purchaseReceiptUrl = null;
             let cartonPhotoUrl = null;
-            let devicePhotoUrl = null;
+            let devicePhotos: string[] = [];
 
             // Upload Receipt
             if (receiptFile) {
@@ -230,19 +244,22 @@ export default function ConsumerDashboard() {
                 cartonPhotoUrl = uploadData.url;
             }
 
-            // Upload Device Photo
-            if (deviceFile) {
+            // Upload Device Photos (Visual Identity — Multi-angle)
+            if (deviceFiles.length > 0) {
                 const formData = new FormData();
-                formData.append('evidence', deviceFile);
-                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
-                    method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }, body: formData
+                deviceFiles.forEach(file => formData.append('files', file));
+
+                const uploadRes = await fetch(`${apiUrl}/upload/multi`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                    body: formData
                 });
                 const uploadData = await uploadRes.json();
-                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload device photo');
-                devicePhotoUrl = uploadData.url;
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload device photos');
+                devicePhotos = uploadData.urls;
             }
 
-            const payload = { ...registrationForm, devicePhotoUrl, purchaseReceiptUrl, cartonPhotoUrl };
+            const payload = { ...registrationForm, devicePhotos, purchaseReceiptUrl, cartonPhotoUrl };
 
             const res = await fetch(`${apiUrl}/devices`, {
                 method: 'POST',
@@ -257,7 +274,7 @@ export default function ConsumerDashboard() {
             setRegistrationForm({ brand: '', model: '', imei: '', serialNumber: '' });
             setReceiptFile(null);
             setCartonFile(null);
-            setDeviceFile(null);
+            setDeviceFiles([]);
             fetchDashboardAndMessages();
         } catch (err: any) {
             setRegError(err.message);
@@ -282,24 +299,29 @@ export default function ConsumerDashboard() {
             model: device.model,
             imei: device.imei,
             serial: device.serialNumber || 'N/A',
-            owner: document.querySelector('.text-[10px].text-emerald-400')?.closest('nav')?.querySelector('button')?.parentElement?.previousElementSibling?.querySelector('span.leading-tight')?.textContent || 'Registered Owner', // Hacky fallback if no profile name available
-            date: new Date(activeCert.createdAt).toLocaleDateString(),
-            hash: activeCert.qrHash
+            owner: user?.fullName || user?.email || 'Registered Owner',
+            date: new Date(activeCert.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+            hash: activeCert.qrHash,
+            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://pts-registry.vercel.app/verify/${device.imei}`
         });
 
         // Small delay to allow React to render the invisible template
         setTimeout(async () => {
             if (certificateRef.current) {
                 try {
-                    const canvas = await html2canvas(certificateRef.current, { scale: 3, useCORS: true });
-                    const imgData = canvas.toDataURL('image/png');
+                    const canvas = await html2canvas(certificateRef.current, {
+                        scale: 3,
+                        useCORS: true,
+                        backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png', 1.0);
 
                     const pdf = new jsPDF('p', 'mm', 'a4');
                     const pdfWidth = pdf.internal.pageSize.getWidth();
                     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                    pdf.save(`PTS_Certificate_${device.imei}.pdf`);
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+                    pdf.save(`PTS_CERTIFICATE_${device.brand}_${device.imei}.pdf`);
                 } catch (err) {
                     console.error('Failed to generate PDF:', err);
                     alert('An error occurred while generating the certificate.');
@@ -307,7 +329,7 @@ export default function ConsumerDashboard() {
             }
             setIsGeneratingPdf(null);
             setCertificateData(null);
-        }, 500);
+        }, 1000);
     };
 
     return (
@@ -423,8 +445,8 @@ export default function ConsumerDashboard() {
 
                                         <div className="flex gap-4 items-center mb-6 relative">
                                             <div className="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                {device.devicePhotoUrl ? (
-                                                    <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                {device.devicePhotos && device.devicePhotos.length > 0 ? (
+                                                    <img src={device.devicePhotos[0]} alt={device.model} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center">
                                                         <svg className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -608,9 +630,9 @@ export default function ConsumerDashboard() {
                                 </h3>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-300 mb-2">Device Photo (Mandatory) *</label>
-                                    <input type="file" accept="image/*" onChange={(e) => setDeviceFile(e.target.files?.[0] || null)} required className="w-full bg-slate-900/50 border border-slate-700 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20 transition-colors cursor-pointer" />
-                                    <p className="text-[10px] text-slate-500 mt-2">Clear photo of the device screen/body showing its condition.</p>
+                                    <label className="block text-xs font-bold text-slate-300 mb-2">Device Photos (Visual Identity — Max 3) *</label>
+                                    <input type="file" accept="image/*" multiple onChange={(e) => setDeviceFiles(Array.from(e.target.files || []).slice(0, 3))} required className="w-full bg-slate-900/50 border border-slate-700 border-dashed rounded-xl px-4 py-3 text-slate-400 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20 transition-colors cursor-pointer" />
+                                    <p className="text-[10px] text-slate-500 mt-2">Upload Front, Back, and Side views for forensic ID.</p>
                                 </div>
 
                                 <div>
@@ -655,31 +677,82 @@ export default function ConsumerDashboard() {
                                 </button>
                             </div>
 
+                            <div className="flex bg-slate-950/40 border-b border-slate-800 p-1 gap-1">
+                                <button onClick={() => setPassportTab('chain')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all ${passportTab === 'chain' ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-slate-300'}`}>Chain of Custody</button>
+                                <button onClick={() => setPassportTab('service')} className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest transition-all ${passportTab === 'service' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-slate-300'}`}>Service History</button>
+                            </div>
+
                             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                 {passportLoading ? (
                                     <div className="text-center py-10 text-slate-500 italic">Accessing Ledger Nodes...</div>
-                                ) : selectedPassport && selectedPassport.length > 0 ? (
-                                    <div className="relative pl-8 border-l-2 border-slate-800 space-y-8">
-                                        {selectedPassport.map((entry, idx) => (
-                                            <div key={entry.id} className="relative">
-                                                <div className={`absolute -left-[41px] top-0 w-5 h-5 rounded-full border-4 border-slate-900 ${entry.type === 'REGISTRATION' ? 'bg-emerald-500' :
-                                                    entry.type === 'TRANSFER' ? 'bg-blue-500' :
-                                                        entry.type === 'STATUS_CHANGE' ? 'bg-amber-500' : 'bg-slate-400'
-                                                    }`}></div>
-                                                <div className="text-[10px] text-slate-500 font-mono mb-1">{new Date(entry.createdAt).toLocaleString()}</div>
-                                                <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl">
-                                                    <div className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1 flex items-center gap-2">
-                                                        {entry.type}
-                                                        <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                                                        <span className="text-slate-500 lowercase font-normal">by {entry.actor?.companyName || entry.actor?.email || 'System'}</span>
+                                ) : passportTab === 'chain' ? (
+                                    selectedPassport && selectedPassport.length > 0 ? (
+                                        <div className="relative pl-8 border-l-2 border-slate-800 space-y-8">
+                                            {selectedPassport.map((entry, idx) => (
+                                                <div key={entry.id} className="relative">
+                                                    <div className={`absolute -left-[41px] top-0 w-5 h-5 rounded-full border-4 border-slate-900 ${entry.type === 'REGISTRATION' ? 'bg-emerald-500' :
+                                                        entry.type === 'TRANSFER' ? 'bg-blue-500' :
+                                                            entry.type === 'STATUS_CHANGE' ? 'bg-amber-500' : 'bg-slate-400'
+                                                        }`}></div>
+                                                    <div className="text-[10px] text-slate-500 font-mono mb-1">{new Date(entry.createdAt).toLocaleString()}</div>
+                                                    <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl">
+                                                        <div className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1 flex items-center gap-2">
+                                                            {entry.type}
+                                                            <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                                                            <span className="text-slate-500 lowercase font-normal">by {entry.actor?.companyName || entry.actor?.email || 'System'}</span>
+                                                        </div>
+                                                        <p className="text-sm text-white font-medium">{entry.description}</p>
                                                     </div>
-                                                    <p className="text-sm text-white font-medium">{entry.description}</p>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-center py-10 text-slate-500">No transaction logs found for this device.</p>
+                                    )
                                 ) : (
-                                    <p className="text-center py-10 text-slate-500">No transaction logs found for this device.</p>
+                                    selectedMaintenance && selectedMaintenance.length > 0 ? (
+                                        <div className="space-y-6">
+                                            {selectedMaintenance.map((record) => (
+                                                <div key={record.id} className="bg-slate-800/40 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                                                    <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-emerald-500/[0.03]">
+                                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">Verified Service</span>
+                                                        <span className="text-[10px] font-mono text-slate-500">{new Date(record.serviceDate).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <div className="p-5">
+                                                        <h4 className="text-white font-bold mb-1">{record.serviceType?.replace('_', ' ')}</h4>
+                                                        <p className="text-sm text-slate-400 mb-4">{record.description}</p>
+
+                                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800/50">
+                                                            <div>
+                                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Provider</p>
+                                                                <p className="text-xs text-white font-semibold truncate">{record.vendor.companyName || record.vendor.fullName}</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Tier / Trust</p>
+                                                                <p className={`text-xs font-bold ${record.vendor.vendorTier <= 2 ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                                                    {record.vendor.vendorTier === 1 ? '🥇 Master Certified' : record.vendor.vendorTier === 2 ? '🥈 Preferred' : '🥉 Authorized'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        {record.partsReplaced && (
+                                                            <div className="mt-4 p-3 bg-slate-950/50 rounded-xl border border-slate-800">
+                                                                <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Parts Catalogued</p>
+                                                                <p className="text-xs text-slate-300 italic">{record.partsReplaced}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-16">
+                                            <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+                                                <svg className="w-8 h-8 text-emerald-500/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                            </div>
+                                            <h4 className="text-white font-bold mb-2">No Service Records</h4>
+                                            <p className="text-xs text-slate-500 px-10">This device has no maintenance history logged by authorized service centers.</p>
+                                        </div>
+                                    )
                                 )}
                             </div>
 
@@ -763,86 +836,131 @@ export default function ConsumerDashboard() {
                 )}
             </main>
 
-            {/* Inivisble PDF Template Container */}
+            {/* Invisible PDF Template Container */}
             <div style={{ position: 'fixed', top: '0', left: '200%', pointerEvents: 'none' }}>
                 {certificateData && (
-                    <div ref={certificateRef} style={{ width: '794px', height: '1123px' }} className="bg-white text-slate-900 relative p-16 font-serif flex flex-col justify-between overflow-hidden shadow-2xl">
+                    <div ref={certificateRef} style={{ width: '794px', height: '1123px' }} className="bg-white text-slate-900 relative p-14 font-serif flex flex-col justify-between overflow-hidden shadow-2xl">
 
-                        {/* Background Watermarks */}
-                        <div className="absolute inset-0 z-0 opacity-[0.03] flex items-center justify-center pointer-events-none">
-                            <div className="w-[150%] h-[150%] border-[200px] border-emerald-900 rounded-full"></div>
+                        {/* Premium Border Design */}
+                        <div className="absolute inset-4 border-[1px] border-slate-300 pointer-events-none"></div>
+                        <div className="absolute inset-8 border-[4px] border-double border-slate-800 pointer-events-none"></div>
+
+                        {/* Corner Ornaments */}
+                        <div className="absolute top-8 left-8 w-16 h-16 border-t-4 border-l-4 border-slate-800"></div>
+                        <div className="absolute top-8 right-8 w-16 h-16 border-t-4 border-r-4 border-slate-800"></div>
+                        <div className="absolute bottom-8 left-8 w-16 h-16 border-b-4 border-l-4 border-slate-800"></div>
+                        <div className="absolute bottom-8 right-8 w-16 h-16 border-b-4 border-r-4 border-slate-800"></div>
+
+                        {/* Background GUI & Security Pattern */}
+                        <div className="absolute inset-0 z-0 opacity-[0.03] flex items-center justify-center pointer-events-none overflow-hidden">
+                            <div className="w-[120%] h-[120%] border-[150px] border-emerald-900 rounded-full rotate-45 scale-150"></div>
                         </div>
                         <div className="absolute inset-0 z-0 opacity-[0.02] flex flex-col justify-between items-center py-20 pointer-events-none">
-                            {Array.from({ length: 15 }).map((_, i) => (
-                                <p key={i} className="text-4xl font-mono uppercase tracking-[2em] whitespace-nowrap -rotate-12">AUTHENTIC • PTS REGISTRY • VERIFIED</p>
+                            {Array.from({ length: 20 }).map((_, i) => (
+                                <p key={i} className="text-3xl font-mono uppercase tracking-[2.5em] whitespace-nowrap -rotate-[25deg] transform">PTS REGISTRY • SECURED ASSET • VERIFIED</p>
                             ))}
                         </div>
 
-                        {/* Certificate Content (z-index 10) */}
-                        <div className="relative z-10 h-full flex flex-col border-4 border-double border-slate-800 p-12">
+                        {/* Certificate Content */}
+                        <div className="relative z-10 h-full flex flex-col p-16">
 
-                            <div className="text-center mb-16 border-b-2 border-slate-300 pb-10">
-                                <div className="w-24 h-24 mx-auto bg-emerald-700 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white mb-6">
-                                    <span className="text-4xl font-black font-sans">PTS</span>
+                            {/* Header Section */}
+                            <div className="text-center mb-12">
+                                <div className="inline-flex flex-col items-center mb-8">
+                                    <div className="w-24 h-24 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-2xl ring-4 ring-offset-4 ring-slate-800 mb-6 relative">
+                                        <span className="text-4xl font-black font-sans tracking-tighter">PTS</span>
+                                        <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.9L10 1.154l7.834 3.746v6.5c0 4.81-3.342 9.303-7.834 10.51a11.95 11.95 0 01-7.834-10.51v-6.5zm7.834 11.332a.75.75 0 01-.75-.75V8a.75.75 0 011.5 0v7.482a.75.75 0 01-.75.75z" clipRule="evenodd" /></svg>
+                                        </div>
+                                    </div>
+                                    <h1 className="text-6xl font-black tracking-tight text-slate-900 serif border-y-2 border-slate-900 py-4 px-10">
+                                        CERTIFICATE OF OWNERSHIP
+                                    </h1>
+                                    <p className="text-sm text-slate-500 uppercase tracking-[0.4em] mt-6 font-black font-sans">National Digital Asset Registry Terminal</p>
                                 </div>
-                                <h1 className="text-5xl font-black tracking-tight text-slate-900 uppercase">Certificate of Ownership</h1>
-                                <p className="text-lg text-slate-500 uppercase tracking-[0.2em] mt-4 font-bold">National Digital Asset Registry (UK)</p>
                             </div>
 
-                            <div className="flex-1 text-center">
-                                <p className="text-2xl text-slate-600 mb-4 italic text-serif">This document legally certifies that</p>
-                                <h2 className="text-4xl font-bold text-slate-900 mb-10 pb-4 border-b border-slate-200 inline-block px-10">Digital Vault Identity</h2>
+                            {/* Declaration */}
+                            <div className="flex-1 text-center mt-6">
+                                <p className="text-2xl text-slate-500 mb-6 italic leading-relaxed">This constitutes public and legal certification that</p>
 
-                                <p className="text-xl text-slate-600 mb-8 italic text-serif">is the formally registered owner of the following telecommunications equipment:</p>
+                                <div className="mb-12">
+                                    <h2 className="text-4xl font-black text-slate-900 px-12 py-3 border-b-2 border-slate-200 inline-block uppercase tracking-tight">
+                                        {certificateData.owner}
+                                    </h2>
+                                    <p className="text-xs font-bold text-slate-400 mt-3 tracking-widest uppercase italic">Designated Registered Device Owner</p>
+                                </div>
 
-                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-10 mx-10 text-left shadow-inner">
-                                    <div className="grid grid-cols-2 gap-y-6 gap-x-10">
+                                <p className="text-xl text-slate-500 mb-10 italic">retains documented title and legal possession of the following asset:</p>
+
+                                {/* Specification Box */}
+                                <div className="bg-slate-50/50 border border-slate-200 rounded-3xl p-10 mx-6 text-left shadow-md relative">
+                                    <div className="absolute top-0 right-10 -translate-y-1/2 bg-white px-4 py-1 border border-slate-200 rounded-full text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">Hardware Manifest</div>
+
+                                    <div className="grid grid-cols-2 gap-y-8 gap-x-12">
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Make / Brand</p>
-                                            <p className="text-2xl font-bold text-slate-900">{certificateData.brand}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1.5">Manufacturer / Brand</p>
+                                            <p className="text-2xl font-black text-slate-900">{certificateData.brand}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Model Name</p>
-                                            <p className="text-2xl font-bold text-slate-900">{certificateData.model}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1.5">Hardware Model</p>
+                                            <p className="text-2xl font-black text-slate-900">{certificateData.model}</p>
                                         </div>
-                                        <div className="col-span-2 pt-4 border-t border-slate-200">
-                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Int'l Mobile Equipment Identity (IMEI)</p>
-                                            <p className="text-3xl font-mono tracking-[0.1em] text-slate-900 bg-slate-200 py-2 px-4 rounded-lg inline-block">{certificateData.imei}</p>
+                                        <div className="col-span-2 pt-6 border-t border-slate-200">
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-2">IMEI Identity Number (Int'l Standard)</p>
+                                            <div className="flex items-center gap-4">
+                                                <p className="text-4xl font-mono font-black tracking-[0.25em] text-slate-900 bg-white border border-slate-300 py-3 px-6 rounded-xl shadow-sm">
+                                                    {certificateData.imei}
+                                                </p>
+                                            </div>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Hardware Serial NO.</p>
-                                            <p className="text-lg font-mono text-slate-700">{certificateData.serial}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1.5">Hardware Serial No.</p>
+                                            <p className="text-lg font-mono font-bold text-slate-600">{certificateData.serial}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-1">Registry Enrolment Date</p>
-                                            <p className="text-lg font-bold text-slate-700">{certificateData.date}</p>
+                                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black mb-1.5">Registry Enrolment Timestamp</p>
+                                            <p className="text-lg font-black text-slate-800 uppercase italic">{certificateData.date}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="mt-16 bg-slate-900 text-white rounded-xl p-8 flex items-center justify-between shadow-xl">
-                                <div>
-                                    <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Cryptographic DDOC Hash</p>
-                                    <p className="text-sm font-mono text-emerald-400 break-all bg-black/50 p-3 rounded-lg border border-slate-700">{certificateData.hash}</p>
-                                    <p className="text-xs text-slate-500 mt-4 leading-relaxed max-w-xl">This certificate is cryptographically verified on the PTS Network. Any transfer of ownership will automatically revoke this document digitally. For verification by Law Enforcement, scan the IMEI.</p>
-                                </div>
-                                <div className="ml-8 w-28 h-28 bg-white rounded-lg p-2 flex-shrink-0 flex items-center justify-center">
-                                    <div className="w-full h-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[10px] text-slate-500 text-center flex-col gap-1">
-                                        <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
-                                        <span>QR Not Found</span>
+                            {/* Verification Footer Section */}
+                            <div className="mt-16 bg-slate-900 text-white rounded-[2.5rem] p-10 flex items-center justify-between shadow-2xl border-b-[8px] border-emerald-600">
+                                <div className="flex-1 pr-12">
+                                    <p className="text-[10px] text-emerald-400 uppercase tracking-[0.3em] font-black mb-3">Cryptographic Blockchain Hash (SHA-256)</p>
+                                    <p className="text-xs font-mono text-slate-300 break-all bg-black/40 p-4 rounded-xl border border-slate-700 leading-relaxed shadow-inner font-bold tracking-tight">
+                                        {certificateData.hash}
+                                    </p>
+                                    <div className="mt-6 flex items-start gap-4">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                            <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 italic leading-relaxed">
+                                            This certificate is cryptographically anchored to the National PTS Registry. Any unauthorized resale or reported loss of this hardware will instantly invalidate this document. Security status: <span className="text-emerald-400 font-black">ACTIVE / NOMINAL</span>.
+                                        </p>
                                     </div>
+                                </div>
+                                <div className="ml-4 w-36 h-36 bg-white rounded-2xl p-3 flex-shrink-0 flex items-center justify-center shadow-xl ring-4 ring-slate-800 ring-offset-2 ring-offset-slate-900">
+                                    <img
+                                        src={certificateData.qrCode}
+                                        alt="Verification QR"
+                                        className="w-full h-full"
+                                        crossOrigin="anonymous"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-end mt-12 border-t border-slate-300 pt-8">
+                            {/* Signatures */}
+                            <div className="flex justify-between items-end mt-12 px-12 pb-4">
                                 <div>
-                                    <div className="w-48 border-b-2 border-slate-900 mb-2"></div>
-                                    <p className="text-sm font-bold uppercase tracking-wider text-slate-500">Authorized Signature</p>
+                                    <div className="w-56 border-b-4 border-slate-900 mb-3 opacity-80"></div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Registry Seal of Execution</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-lg font-bold text-slate-900 uppercase">PTS Digital Authority</p>
-                                    <p className="text-sm text-slate-500 italic">Issued via automated registry terminal</p>
+                                    <p className="text-xl font-black text-slate-900 uppercase tracking-tighter italic">PTS Digital Authority</p>
+                                    <p className="text-[10px] text-slate-400 font-bold tracking-widest italic uppercase mt-1">Issued via Terminal v4.0.1</p>
                                 </div>
                             </div>
                         </div>

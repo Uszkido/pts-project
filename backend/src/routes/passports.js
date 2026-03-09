@@ -36,6 +36,10 @@ router.get('/:imei', authenticateToken, async (req, res) => {
                 },
                 registeredOwner: {
                     select: { email: true, companyName: true, vendorTier: true }
+                },
+                maintenance: {
+                    orderBy: { serviceDate: 'desc' },
+                    include: { vendor: { select: { companyName: true, email: true, fullName: true, vendorTier: true } } }
                 }
             }
         });
@@ -65,7 +69,8 @@ router.get('/:imei', authenticateToken, async (req, res) => {
                 devicePhotoUrl: device.devicePhotoUrl,
                 currentOwner: device.registeredOwner
             },
-            passport: device.history
+            passport: device.history,
+            maintenance: device.maintenance
         });
 
     } catch (error) {

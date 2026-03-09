@@ -38,7 +38,7 @@ function TransferForm() {
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/transfers/initiate`, {
+            const res = await fetch(`${apiUrl}/transfers/initiate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -49,7 +49,9 @@ function TransferForm() {
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error);
-            setMessage(data.message);
+
+            // Highlight the handover code
+            setMessage(`TRANSFER SECURED. HANDOVER CODE: ${data.handoverCode}. Give this code to the buyer to complete the verification.`);
             setBuyerEmail('');
         } catch (err: any) {
             setError(err.message);

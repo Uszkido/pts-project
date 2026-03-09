@@ -23,7 +23,7 @@ const authenticateToken = (req, res, next) => {
 // Register a new device (Vendors only)
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { imei, serialNumber, brand, model, devicePhotoUrl, purchaseReceiptUrl, cartonPhotoUrl } = req.body;
+        const { imei, serialNumber, brand, model, devicePhotos, purchaseReceiptUrl, cartonPhotoUrl } = req.body;
 
         if (!imei || !brand || !model) {
             return res.status(400).json({ error: 'IMEI, brand, and model are required' });
@@ -42,7 +42,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 brand,
                 model,
                 registeredOwnerId: req.user.id,
-                devicePhotoUrl,
+                devicePhotos: devicePhotos || [],
                 purchaseReceiptUrl,
                 cartonPhotoUrl
             }
@@ -75,13 +75,28 @@ router.get('/verify/:imei', async (req, res) => {
             where: { imei },
             include: {
                 registeredOwner: {
-                    select: { companyName: true, email: true }
+                    select: { id: true, companyName: true, email: true }
                 }
             }
         });
 
         if (!device) {
             return res.status(404).json({ message: 'Device not found in registry. Status unknown.' });
+        }
+
+        // --- REAL-TIME SCAN ALERT ---
+        // Log this scan as a notification for the owner
+        try {
+            await prisma.message.create({
+                data: {
+                    senderId: device.registeredOwnerId, // System notification
+                    receiverId: device.registeredOwnerId,
+                    subject: '🚨 SECURITY SIGNAL: Registry Check',
+                    body: `Target device ${device.brand} ${device.model} (IMEI: ${device.imei}) was just processed by a verification terminal. Timestamp: ${new Date().toLocaleString()}. Locations: IP Trace logged.`,
+                }
+            });
+        } catch (msgErr) {
+            console.error('Failed to log scan alert Message:', msgErr);
         }
 
         // Dynamically calculate the Device's Trust Index

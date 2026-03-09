@@ -7,6 +7,7 @@ export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
     const [reports, setReports] = useState<any[]>([]);
     const [alerts, setAlerts] = useState<any[]>([]);
+    const [intel, setIntel] = useState<any[]>([]);
     const [metrics, setMetrics] = useState<any>(null);
     const [error, setError] = useState('');
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -26,7 +27,7 @@ export default function PoliceDashboard() {
     const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
 
     // UI Tabs
-    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'suspects' | 'messages'>('registry');
+    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'intel' | 'suspects' | 'messages'>('registry');
 
     // Messages
     const [messages, setMessages] = useState<any[]>([]);
@@ -55,22 +56,25 @@ export default function PoliceDashboard() {
             const devicesData = await devicesRes.json();
             setDevices(devicesData.devices || []);
 
-            const [incidentsRes, alertsRes, messagesRes, suspectsRes] = await Promise.all([
+            const [incidentsRes, alertsRes, messagesRes, suspectsRes, intelRes] = await Promise.all([
                 fetch(`${apiUrl}/police/incidents`, { headers }),
                 fetch(`${apiUrl}/police/vendor-alerts`, { headers }),
                 fetch(`${apiUrl}/police/messages`, { headers }),
-                fetch(`${apiUrl}/police/suspects`, { headers })
+                fetch(`${apiUrl}/police/suspects`, { headers }),
+                fetch(`${apiUrl}/police/intel-feed`, { headers })
             ]);
 
             const incidentsData = await incidentsRes.json();
             const alertsData = await alertsRes.json();
             const messagesData = await messagesRes.json();
             const suspectsData = await suspectsRes.json();
+            const intelData = await intelRes.json();
 
             setReports(incidentsData.incidents || []);
             setAlerts(alertsData.alerts || []);
             setMessages(messagesData.messages || []);
             setSuspects(suspectsData.suspects || []);
+            setIntel(intelData.feed || []);
 
         } catch (err: any) {
             setError(err.message);
@@ -166,6 +170,28 @@ export default function PoliceDashboard() {
             alert(err.message);
         } finally {
             setIsSubmittingSuspect(false);
+        }
+    };
+
+    const exportDossier = async (imei: string) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/export-evidence/${imei}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            // Simple JSON download for now (Phase 3 MVP)
+            const blob = new Blob([JSON.stringify(data.dossier, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `PTS_Dossier_${imei}.json`;
+            a.click();
+            setStatusMessage({ type: 'success', text: 'Forensic dossier exported successfully.' });
+        } catch (err: any) {
+            alert(err.message);
         }
     };
 
@@ -362,6 +388,10 @@ export default function PoliceDashboard() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                         Vendor Alerts {metrics?.openAlerts > 0 && <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{metrics.openAlerts}</span>}
                     </button>
+                    <button onClick={() => setActiveTab('intel')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'intel' ? 'bg-slate-800 text-emerald-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Intel Feed {intel.length > 0 && <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">Live</span>}
+                    </button>
                     <button onClick={() => setActiveTab('suspects')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'suspects' ? 'bg-slate-800 text-purple-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                         Suspect Registry ({suspects.length})
@@ -396,8 +426,8 @@ export default function PoliceDashboard() {
                             {/* Status Action Banner */}
                             {statusMessage && (
                                 <div className={`mx-4 mt-4 px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 border animate-in fade-in slide-in-from-top-2 duration-300 ${statusMessage.type === 'success'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/20'
                                     }`}>
                                     <span className="text-lg">{statusMessage.type === 'success' ? '✓' : '✗'}</span>
                                     <span>{statusMessage.text}</span>
@@ -461,9 +491,9 @@ export default function PoliceDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
-                                                            device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
-                                                                device.status === 'INVESTIGATING' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse' :
-                                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                        device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                                            device.status === 'INVESTIGATING' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse' :
+                                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                                                         }`}>
                                                         {device.status}
                                                     </span>
@@ -476,6 +506,13 @@ export default function PoliceDashboard() {
                                                         >
                                                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                                             Track Live
+                                                        </button>
+                                                        <button
+                                                            onClick={() => exportDossier(device.imei)}
+                                                            className="flex items-center gap-1.5 text-[10px] font-black text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-600 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:border-transparent transition-all uppercase tracking-wide"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                            Dossier
                                                         </button>
                                                         {device.status !== 'INVESTIGATING' && (
                                                             <button onClick={() => updateStatus(device.imei, 'INVESTIGATING')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wide">Investigate</button>
@@ -565,6 +602,64 @@ export default function PoliceDashboard() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    ) : activeTab === 'intel' ? (
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="text-xl font-black text-white uppercase tracking-tight">AI Intelligence Feed</h3>
+                                    <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Scanning for anomalies & behavioral threats</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <span className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-tighter">Engine V2 (ML-Lite)</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {intel.length === 0 ? (
+                                    <div className="col-span-full py-20 text-center text-slate-500 font-mono text-sm">&gt; NO CRITICAL ANOMALIES DETECTED IN LAST 24H.</div>
+                                ) : intel.map((item: any) => (
+                                    <div key={item.id} className="bg-slate-950 border border-slate-800 rounded-3xl p-6 hover:border-red-900/50 transition-all group relative overflow-hidden shadow-2xl">
+                                        <div className={`absolute top-0 right-0 w-24 h-24 opacity-10 blur-3xl rounded-full ${item.score < 40 ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="text-white font-bold text-lg leading-none">{item.brand} {item.model}</h4>
+                                                <p className="text-[10px] text-slate-500 font-mono mt-1.5 uppercase tracking-widest">{item.imei}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-slate-600 uppercase mb-1">Risk Pts</p>
+                                                <span className={`text-2xl font-black leading-none ${item.score < 40 ? 'text-red-500' : 'text-amber-500'}`}>{item.score}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4 mb-6">
+                                            <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                                                <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1">Detection Logic</p>
+                                                <p className="text-sm font-bold text-slate-300">{item.reason === 'LOW_TRUST_INDEX' ? '⚠️ High-Risk Behavioral Profile' : '🚨 Reported Incident Activity'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Last Seen Proximity</p>
+                                                <p className="text-sm text-slate-400 font-medium">{item.lastSeen}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Heuristic Signal</p>
+                                                <p className="text-xs text-slate-500 italic line-clamp-2">"{item.latestEvent}"</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setLiveTrackingImei(item.imei)} className="flex-1 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black py-3 rounded-xl uppercase tracking-widest transition-all">Intercept</button>
+                                            <button onClick={() => exportDossier(item.imei)} className="px-4 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition-all flex items-center justify-center">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ) : activeTab === 'alerts' ? (
                         <div className="overflow-x-auto">

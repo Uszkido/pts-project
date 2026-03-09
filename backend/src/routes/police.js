@@ -480,4 +480,108 @@ router.post('/alert-vendors', authenticatePolice, async (req, res) => {
     }
 });
 
+// ============ POLICE INTEL & EVIDENCE ============
+
+// Generate Forensic Evidence Report Data
+router.get('/export-evidence/:imei', authenticatePolice, async (req, res) => {
+    try {
+        const { imei } = req.params;
+        const device = await prisma.device.findUnique({
+            where: { imei },
+            include: {
+                registeredOwner: true,
+                history: { include: { actor: { select: { fullName: true, role: true, companyName: true } } }, orderBy: { createdAt: 'desc' } },
+                incidents: { include: { reporter: true } },
+                maintenance: { include: { vendor: true } },
+                transfersAsDevice: { include: { seller: true, buyer: true }, where: { status: 'COMPLETED' } },
+                proofsOfSale: { include: { vendor: true, buyer: true } }
+            }
+        });
+
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        // Compile Forensic Dossier
+        const dossier = {
+            reportId: `FOR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+            generatedAt: new Date(),
+            generatedBy: req.user.email,
+            asset: {
+                brand: device.brand,
+                model: device.model,
+                imei: device.imei,
+                serial: device.serialNumber,
+                status: device.status,
+                riskScore: device.riskScore,
+                photos: device.devicePhotos
+            },
+            ownership: {
+                current: device.registeredOwner.fullName || device.registeredOwner.companyName || device.registeredOwner.email,
+                chain: device.transfersAsDevice.map(t => ({
+                    date: t.transferDate,
+                    from: t.seller.email,
+                    to: t.buyer.email
+                }))
+            },
+            incidents: device.incidents.map(i => ({
+                date: i.createdAt,
+                type: i.type,
+                desc: i.description,
+                policeRef: i.policeReportNo
+            })),
+            maintenance: device.maintenance.map(m => ({
+                date: m.serviceDate,
+                provider: m.vendor.companyName || m.vendor.fullName,
+                type: m.serviceType
+            })),
+            ledger: device.history.map(h => ({
+                date: h.createdAt,
+                type: h.type,
+                actor: h.actor?.companyName || h.actor?.fullName || 'System',
+                details: h.description
+            }))
+        };
+
+        res.json({ dossier });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to generate evidence dossier' });
+    }
+});
+
+// AI Intelligence Feed (High-Risk Anomalies)
+router.get('/intel-feed', authenticatePolice, async (req, res) => {
+    try {
+        // Find devices with high risk scores or recent suspicious velocity
+        const anomalies = await prisma.device.findMany({
+            where: {
+                OR: [
+                    { riskScore: { lt: 40 } },
+                    { status: { in: ['STOLEN', 'LOST', 'INVESTIGATING'] } }
+                ]
+            },
+            include: {
+                history: { take: 5, orderBy: { createdAt: 'desc' } }
+            },
+            orderBy: { riskScore: 'asc' },
+            take: 15
+        });
+
+        const feed = anomalies.map(a => ({
+            id: a.id,
+            imei: a.imei,
+            brand: a.brand,
+            model: a.model,
+            reason: a.riskScore < 40 ? 'LOW_TRUST_INDEX' : 'REPORTED_CRIME',
+            score: a.riskScore,
+            lastSeen: a.lastKnownLocation || 'Unknown',
+            latestEvent: a.history[0]?.description || 'No recent activity'
+        }));
+
+        res.json({ feed });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch intel feed' });
+    }
+});
+
 module.exports = router;

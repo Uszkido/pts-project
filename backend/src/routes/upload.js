@@ -28,4 +28,17 @@ router.post('/evidence', authenticateToken, upload.single('evidence'), (req, res
     }
 });
 
+// Upload multiple device photos for Visual Identity
+router.post('/multi', authenticateToken, upload.array('files', 5), (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No files uploaded' });
+        }
+        const urls = req.files.map(f => f.path);
+        res.json({ message: 'Files uploaded successfully', urls });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

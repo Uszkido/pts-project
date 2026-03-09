@@ -38,6 +38,7 @@ model User {
   proofsOfSaleAsBuyer  ProofOfSale[] @relation("BuyerPurchases")
   sentMessages Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+  maintenanceRecords MaintenanceRecord[] @relation("MaintenanceVendor")
   createdAt   DateTime @default(now())
   phoneNumber String?
   address     String?
@@ -76,10 +77,11 @@ model Device {
   vendorAlerts     VendorSuspiciousAlert[]
   history          TransactionHistory[]
   proofsOfSale     ProofOfSale[]
-  devicePhotoUrl   String?
+  devicePhotos     String[]
   purchaseReceiptUrl String?
   cartonPhotoUrl   String?
   isLocationShared Boolean  @default(false)
+  maintenance      MaintenanceRecord[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -150,6 +152,8 @@ model OwnershipTransfer {
   seller      User     @relation("Sales", fields: [sellerId], references: [id])
   buyerId     String
   buyer       User     @relation("Purchases", fields: [buyerId], references: [id])
+  handoverCode String?  // The 2FA Handover Code (OTP)
+  expiresAt   DateTime?
   status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
   transferDate DateTime @default(now())
 }
@@ -218,5 +222,20 @@ model Message {
   subject     String
   body        String
   isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model MaintenanceRecord {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vendorId    String
+  vendor      User     @relation("MaintenanceVendor", fields: [vendorId], references: [id])
+  serviceType String?  // SCREEN_REPLACEMENT, BATTERY_CHANGE, SOFTWARE_UPDATE, MOTHERBOARD_REPAIR, GENERAL_CHECKUP, OTHER
+  description String
+  partsReplaced String?
+  cost        Float?
+  serviceDate DateTime @default(now())
+  evidenceUrl String?
   createdAt   DateTime @default(now())
 }

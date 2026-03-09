@@ -12,6 +12,8 @@ const registryRoutes = require('./routes/registry');
 const passportRoutes = require('./routes/passports');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
+const maintenanceRoutes = require('./routes/maintenance');
+const publicRoutes = require('./routes/public');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,6 +33,8 @@ app.use('/api/v1/registry', registryRoutes);
 app.use('/api/v1/passports', passportRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/maintenance', maintenanceRoutes);
+app.use('/api/v1/public', publicRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'PTS Backend is running' });

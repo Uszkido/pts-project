@@ -22,14 +22,24 @@ export default function Dashboard() {
     const [serial, setSerial] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [isDirectSale, setIsDirectSale] = useState(false);
-    const [devicePhoto, setDevicePhoto] = useState<File | null>(null);
+    const [devicePhotos, setDevicePhotos] = useState<File[]>([]);
     const [isRegistering, setIsRegistering] = useState(false);
 
     // UI State
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'register' | 'inventory' | 'sales' | 'messages'>('inventory');
+    const [activeTab, setActiveTab] = useState<'register' | 'inventory' | 'sales' | 'messages' | 'maintenance'>('inventory');
     const [loading, setLoading] = useState(true);
+
+    // Maintenance State
+    const [searchImei, setSearchImei] = useState('');
+    const [foundDevice, setFoundDevice] = useState<any | null>(null);
+    const [serviceType, setServiceType] = useState('GENERAL_REPAIR');
+    const [repairDesc, setRepairDesc] = useState('');
+    const [parts, setParts] = useState('');
+    const [repairCost, setRepairCost] = useState('');
+    const [isLoggingRepair, setIsLoggingRepair] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
 
     // Dashboard Data
     const [profile, setProfile] = useState<VendorProfile | null>(null);
@@ -84,19 +94,19 @@ export default function Dashboard() {
         setIsRegistering(true);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-            let devicePhotoUrl = null;
-
-            if (devicePhoto) {
+            let devicePhotoUrls: string[] = [];
+            if (devicePhotos.length > 0) {
                 const formData = new FormData();
-                formData.append('evidence', devicePhoto);
-                const uploadRes = await fetch(`${apiUrl}/upload/evidence`, {
+                devicePhotos.forEach(file => formData.append('files', file));
+
+                const uploadRes = await fetch(`${apiUrl}/upload/multi`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
                     body: formData
                 });
                 const uploadData = await uploadRes.json();
-                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload photo');
-                devicePhotoUrl = uploadData.url;
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload photos');
+                devicePhotoUrls = uploadData.urls;
             }
 
             const res = await fetch(`${apiUrl}/devices`, {
@@ -110,14 +120,14 @@ export default function Dashboard() {
                     brand,
                     model,
                     serialNumber: serial,
-                    devicePhotoUrl
+                    devicePhotos: devicePhotoUrls
                 })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
             setMessage(`Device registered securely. IMEI: ${data.device.imei}`);
-            setImei(''); setBrand(''); setModel(''); setSerial(''); setDevicePhoto(null);
+            setImei(''); setBrand(''); setModel(''); setSerial(''); setDevicePhotos([]);
 
             // If direct sale, initiate transfer
             if (isDirectSale && customerEmail) {
@@ -145,7 +155,8 @@ export default function Dashboard() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            setMessage(message + ' | Transfer initiated. Waiting for buyer action.');
+
+            setMessage(`TRANSFER INITIATED. Mandatory Handover Code: ${data.handoverCode}. Give this code to the customer to complete the 2FA transfer.`);
         } catch (err: any) {
             setError(`Failed to initiate sale: ${err.message}`);
         } finally {
@@ -157,6 +168,60 @@ export default function Dashboard() {
         const buyerEmail = prompt("Enter the customer's PTS registered email to transfer ownership: ");
         if (buyerEmail) {
             initiateSale(deviceId, buyerEmail);
+        }
+    };
+
+    const handleSearchDevice = async () => {
+        if (searchImei.length < 15) return;
+        setSearchLoading(true);
+        setError('');
+        setFoundDevice(null);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/passports/${searchImei}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Device not found in registry');
+            setFoundDevice(data.device);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    const handleLogRepair = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!foundDevice) return;
+        setIsLoggingRepair(true);
+        setMessage(''); setError('');
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/maintenance/log`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({
+                    imei: foundDevice.imei,
+                    serviceType,
+                    description: repairDesc,
+                    partsReplaced: parts,
+                    cost: repairCost
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setMessage(`Service record cryptographically signed and added to IMEI: ${foundDevice.imei}`);
+            setFoundDevice(null); setSearchImei(''); setRepairDesc(''); setParts(''); setRepairCost('');
+            setActiveTab('inventory');
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoggingRepair(false);
         }
     };
 
@@ -220,6 +285,10 @@ export default function Dashboard() {
                             {messages.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-slate-900"></span>}
                         </div>
                         Signals & Intel
+                    </button>
+                    <button onClick={() => setActiveTab('maintenance')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'maintenance' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Service & Repair
                     </button>
                     <button onClick={() => setActiveTab('register')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'register' ? 'border-blue-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Inventory
@@ -351,6 +420,152 @@ export default function Dashboard() {
                     </div>
                 )}
 
+                {/* Tab Content: Maintenance Logging */}
+                {activeTab === 'maintenance' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-xl animate-in fade-in zoom-in-95 duration-300">
+                        <div className="mb-10 text-center max-w-2xl mx-auto">
+                            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+                                <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-white uppercase tracking-tight">Verified Service Center</h2>
+                            <p className="text-slate-400 mt-2">Search for a device in the national registry to log a signed maintenance or repair record.</p>
+                        </div>
+
+                        {!foundDevice ? (
+                            <div className="max-w-xl mx-auto pb-10">
+                                <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">Target Device IMEI</label>
+                                <div className="flex gap-3">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="text"
+                                            value={searchImei}
+                                            onChange={e => setSearchImei(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                                            placeholder="Enter 15-digit IMEI..."
+                                            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-2xl px-5 py-4 text-white font-mono tracking-widest focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
+                                        />
+                                        {searchLoading && <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full"></div>}
+                                    </div>
+                                    <button
+                                        onClick={handleSearchDevice}
+                                        disabled={searchImei.length < 15 || searchLoading}
+                                        className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-8 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-widest text-xs"
+                                    >
+                                        Verify
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleLogRepair} className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 p-8 bg-slate-950/40 rounded-[2.5rem] border border-slate-800 shadow-2xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
+                                    <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.9L10 1.154l7.834 3.746v6.5c0 4.81-3.342 9.303-7.834 10.51a11.95 11.95 0 01-7.834-10.51v-6.5zm7.834 11.332a.75.75 0 01-.75-.75V8a.75.75 0 011.5 0v7.482a.75.75 0 01-.75.75z" clipRule="evenodd" /></svg>
+                                </div>
+
+                                {/* Found Device Info */}
+                                <div className="md:col-span-1 space-y-6">
+                                    <div className="p-6 bg-slate-900 rounded-3xl border border-slate-800 shadow-xl">
+                                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4">Device Identified</p>
+                                        <div className="flex items-center gap-4 mb-6">
+                                            <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
+                                                {foundDevice.devicePhotoUrl ? (
+                                                    <img src={foundDevice.devicePhotoUrl} alt="Device" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-slate-600"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-white leading-tight">{foundDevice.brand}</h3>
+                                                <p className="text-xs text-slate-400 font-medium">{foundDevice.model}</p>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-0.5">Registry Status</p>
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded ${foundDevice.status === 'CLEAN' ? 'orange-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                                    {foundDevice.status} DEVICE
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-0.5">IMEI Identity</p>
+                                                <p className="text-xs font-mono text-slate-300 tracking-tighter">{foundDevice.imei}</p>
+                                            </div>
+                                        </div>
+                                        <button type="button" onClick={() => setFoundDevice(null)} className="w-full mt-6 text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors py-2 border-t border-slate-800">Switch Device</button>
+                                    </div>
+                                </div>
+
+                                {/* Repair Form */}
+                                <div className="md:col-span-2 space-y-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Type of Service</label>
+                                            <select
+                                                value={serviceType}
+                                                onChange={e => setServiceType(e.target.value)}
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-all font-bold text-sm"
+                                            >
+                                                <option value="GENERAL_REPAIR">General Hardware Repair</option>
+                                                <option value="SCREEN_REPLACEMENT">Screen / Display Panel</option>
+                                                <option value="BATTERY_CHANGE">Battery Replacement</option>
+                                                <option value="SOFTWARE_RESTORE">Software Restore / Update</option>
+                                                <option value="MOTHERBOARD_REPAIR">Logical Board / CPU Repair</option>
+                                                <option value="CAMERA_REPAIR">Optical System / Camera</option>
+                                                <option value="CLEANUP">Diagnostic & Deep Clean</option>
+                                            </select>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Service Description</label>
+                                            <textarea
+                                                value={repairDesc}
+                                                onChange={e => setRepairDesc(e.target.value)}
+                                                required
+                                                placeholder="Explain work performed, diagnostic results, etc."
+                                                rows={3}
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-all text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Parts Catalogued</label>
+                                            <input
+                                                type="text"
+                                                value={parts}
+                                                onChange={e => setParts(e.target.value)}
+                                                placeholder="e.g. OEM Screen v4.2"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-all text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Recorded Cost (Opt)</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                                <input
+                                                    type="number"
+                                                    value={repairCost}
+                                                    onChange={e => setRepairCost(e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-all text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-6 border-t border-slate-800 flex justify-end">
+                                        <button
+                                            type="submit"
+                                            disabled={isLoggingRepair || !repairDesc}
+                                            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black py-4 px-10 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 uppercase tracking-widest text-xs flex items-center gap-3"
+                                        >
+                                            {isLoggingRepair ? (
+                                                <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div> Signing Ledger...</>
+                                            ) : (
+                                                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg> Log Official Service</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                )}
+
                 {/* Tab Content: Messages / Signals */}
                 {activeTab === 'messages' && (
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -390,13 +605,6 @@ export default function Dashboard() {
                                             <p className="text-sm text-slate-300 leading-relaxed font-medium">
                                                 {msg.body}
                                             </p>
-                                            {msg.subject.includes('LIVE TRACKING') && (
-                                                <div className="mt-4 flex gap-3">
-                                                    <button className="bg-purple-600 hover:bg-purple-500 text-[10px] text-white font-black px-6 py-2.5 rounded-xl uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-purple-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0">
-                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> Active Intercept Feed
-                                                    </button>
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 ))}
