@@ -589,6 +589,12 @@ export default function AdminDashboard() {
                                         <div>
                                             <h4 className="text-lg font-bold text-white">{vendor.companyName || vendor.email}</h4>
                                             <p className="text-sm text-slate-400">{vendor.email}</p>
+                                            {!vendor.isEmailConfirmed && vendor.emailVerificationOtp && (
+                                                <div className="mt-1 flex items-center gap-1.5">
+                                                    <span className="text-[10px] bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20 font-bold uppercase">Unconfirmed</span>
+                                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">OTP: {vendor.emailVerificationOtp}</span>
+                                                </div>
+                                            )}
                                             {vendor.fullName && <p className="text-xs text-slate-500">Contact: {vendor.fullName}</p>}
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${statusColor(vendor.vendorStatus)}`}>{vendor.vendorStatus}</span>

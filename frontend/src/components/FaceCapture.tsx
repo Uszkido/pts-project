@@ -14,6 +14,9 @@ export default function FaceCapture({ onCapture, label = "Facial Data (Live Capt
 
     const startCamera = async () => {
         try {
+            if (!navigator?.mediaDevices?.getUserMedia) {
+                throw new Error("Camera API is not supported in this browser, or you are not on a secure HTTPS connection.");
+            }
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
