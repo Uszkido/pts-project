@@ -101,25 +101,25 @@ export default function FaceCapture({ onCapture, label = "Facial Data (Live Capt
                     </div>
                 )}
 
-                {isStreaming && (
-                    <>
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-cover mirror"
-                            style={{ transform: 'scaleX(-1)' }}
-                        />
-                        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                            <button
-                                type="button"
-                                onClick={capturePhoto}
-                                className="w-14 h-14 rounded-full bg-white border-4 border-slate-300 shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
-                            >
-                                <div className="w-10 h-10 rounded-full bg-red-500 animate-pulse"></div>
-                            </button>
-                        </div>
-                    </>
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover mirror ${isStreaming && !capturedImage ? '' : 'hidden'}`}
+                    style={{ transform: 'scaleX(-1)' }}
+                />
+
+                {isStreaming && !capturedImage && (
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                        <button
+                            type="button"
+                            onClick={capturePhoto}
+                            className="w-14 h-14 rounded-full bg-white border-4 border-slate-300 shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-red-500 animate-pulse"></div>
+                        </button>
+                    </div>
                 )}
 
                 {capturedImage && (

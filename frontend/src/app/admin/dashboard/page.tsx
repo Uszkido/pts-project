@@ -1039,40 +1039,69 @@ export default function AdminDashboard() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800">
-                                {authRequests.length === 0 ? (
-                                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No password reset requests found.</td></tr>
-                                ) : authRequests.map(req => (
-                                    <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
-                                        <td className="px-6 py-4 text-xs text-slate-400">{new Date(req.createdAt).toLocaleString()}</td>
-                                        <td className="px-6 py-4 font-bold text-white">{req.user?.email}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(req.user?.role)}`}>
-                                                {req.user?.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                {req.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {req.otp ? (
-                                                <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{req.otp}</span>
-                                            ) : (
-                                                <span className="text-slate-600 italic text-xs">N/A</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {req.status === 'PENDING' && (
-                                                <div className="flex gap-2 justify-end">
-                                                    <button onClick={() => approveReset(req.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded transition-colors uppercase">Approve</button>
-                                                    <button onClick={() => rejectReset(req.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded transition-colors uppercase">Reject</button>
-                                                </div>
-                                            )}
-                                            {req.adminNotes && <p className="text-[10px] text-slate-500 mt-1 italic">Note: {req.adminNotes}</p>}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {authRequests.length === 0 && users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length === 0 ? (
+                                    <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No password reset or registration requests found.</td></tr>
+                                ) : (
+                                    <>
+                                        {/* New Account Registrations */}
+                                        {users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).map(user => (
+                                            <tr key={`reg-${user.id}`} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-6 py-4 text-xs text-slate-400">{new Date(user.createdAt).toLocaleString()}</td>
+                                                <td className="px-6 py-4 font-bold text-white"><span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20 mr-2 uppercase">New Reg</span>{user.email}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(user.role)}`}>
+                                                        {user.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                                        PENDING OTP
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{user.emailVerificationOtp}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-xs text-slate-500 italic">
+                                                    Waiting for User
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {/* Password Resets */}
+                                        {authRequests.map(req => (
+                                            <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-6 py-4 text-xs text-slate-400">{new Date(req.createdAt).toLocaleString()}</td>
+                                                <td className="px-6 py-4 font-bold text-white">{req.user?.email}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(req.user?.role)}`}>
+                                                        {req.user?.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                        {req.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {req.otp ? (
+                                                        <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{req.otp}</span>
+                                                    ) : (
+                                                        <span className="text-slate-600 italic text-xs">N/A</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {req.status === 'PENDING' && (
+                                                        <div className="flex gap-2 justify-end">
+                                                            <button onClick={() => approveReset(req.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded transition-colors uppercase">Approve</button>
+                                                            <button onClick={() => rejectReset(req.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded transition-colors uppercase">Reject</button>
+                                                        </div>
+                                                    )}
+                                                    {req.adminNotes && <p className="text-[10px] text-slate-500 mt-1 italic">Note: {req.adminNotes}</p>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
+                                )}
                             </tbody>
                         </table>
                     </div>
