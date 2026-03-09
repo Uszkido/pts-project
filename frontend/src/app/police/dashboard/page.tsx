@@ -9,6 +9,7 @@ export default function PoliceDashboard() {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [metrics, setMetrics] = useState<any>(null);
     const [error, setError] = useState('');
+    const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [filter, setFilter] = useState('STOLEN,LOST'); // Default to incident devices only
     const [loading, setLoading] = useState(true);
 
@@ -196,6 +197,11 @@ export default function PoliceDashboard() {
     }, [filter]);
 
     const updateStatus = async (imei: string, newStatus: string) => {
+        // Optimistically update the device in the list for immediate feedback
+        setDevices(prev => prev.map(d => d.imei === imei ? { ...d, status: newStatus } : d));
+        const actionLabel = newStatus === 'INVESTIGATING' ? 'Marked as INVESTIGATING' : newStatus === 'CLEAN' ? 'Cleared — Device restored to CLEAN status' : `Status changed to ${newStatus}`;
+        setStatusMessage({ type: 'success', text: `✓ ${actionLabel} for IMEI: ${imei}` });
+        setTimeout(() => setStatusMessage(null), 4000);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
             const res = await fetch(`${apiUrl}/police/devices/${imei}/status`, {
@@ -210,9 +216,13 @@ export default function PoliceDashboard() {
                 const data = await res.json();
                 throw new Error(data.error);
             }
-            fetchData(); // refresh
+            // Refresh in background to sync with server
+            fetchData();
         } catch (err: any) {
-            alert(err.message);
+            setStatusMessage({ type: 'error', text: `✗ Failed: ${err.message}` });
+            setTimeout(() => setStatusMessage(null), 5000);
+            // Revert optimistic update
+            fetchData();
         }
     };
 
@@ -383,6 +393,17 @@ export default function PoliceDashboard() {
                                     <option value="INVESTIGATING">INVESTIGATING</option>
                                 </select>
                             </div>
+                            {/* Status Action Banner */}
+                            {statusMessage && (
+                                <div className={`mx-4 mt-4 px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 border animate-in fade-in slide-in-from-top-2 duration-300 ${statusMessage.type === 'success'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    }`}>
+                                    <span className="text-lg">{statusMessage.type === 'success' ? '✓' : '✗'}</span>
+                                    <span>{statusMessage.text}</span>
+                                    <button onClick={() => setStatusMessage(null)} className="ml-auto text-slate-500 hover:text-white transition-colors">✕</button>
+                                </div>
+                            )}
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left text-slate-400">
                                     <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
@@ -440,8 +461,9 @@ export default function PoliceDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
-                                                        device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
-                                                            'bg-amber-800/20 text-amber-600 border border-amber-700/20'
+                                                            device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                                                device.status === 'INVESTIGATING' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse' :
+                                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                                                         }`}>
                                                         {device.status}
                                                     </span>
