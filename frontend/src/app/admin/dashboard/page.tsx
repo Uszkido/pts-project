@@ -48,6 +48,10 @@ export default function AdminDashboard() {
     const [isDeviceDetailsModalOpen, setIsDeviceDetailsModalOpen] = useState(false);
     const [deviceLoading, setDeviceLoading] = useState(false);
 
+    // Inline Risk Score Editing
+    const [editingRiskId, setEditingRiskId] = useState<string | null>(null);
+    const [editingRiskValue, setEditingRiskValue] = useState<number>(0);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
@@ -293,6 +297,25 @@ export default function AdminDashboard() {
             fetchData();
         } catch (err: any) { alert(err.message); }
     };
+
+    const updateDeviceRisk = async (deviceId: string, riskScore: number) => {
+        setEditingRiskId(null);
+        const score = Math.min(100, Math.max(0, Math.round(riskScore)));
+        // Optimistically update the list
+        setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, riskScore: score } : d));
+        try {
+            const res = await fetch(`${apiUrl}/admin/devices/${deviceId}/risk-score`, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ riskScore: score })
+            });
+            if (!res.ok) throw new Error('Failed to update risk score');
+        } catch (err: any) {
+            alert(err.message);
+            fetchData(); // revert on failure
+        }
+    };
+
 
     const transferDevice = async (deviceId: string) => {
         const email = prompt('Enter new owner email:');
@@ -660,7 +683,37 @@ export default function AdminDashboard() {
                                             </td>
                                             <td className="px-6 py-4 text-xs text-slate-400">{d.registeredOwner?.email}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`font-bold ${d.riskScore >= 70 ? 'text-emerald-400' : d.riskScore >= 40 ? 'text-amber-400' : 'text-red-500'}`}>{d.riskScore}</span>
+                                                {editingRiskId === d.id ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            max={100}
+                                                            value={editingRiskValue}
+                                                            onChange={e => setEditingRiskValue(Number(e.target.value))}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') updateDeviceRisk(d.id, editingRiskValue);
+                                                                if (e.key === 'Escape') setEditingRiskId(null);
+                                                            }}
+                                                            onBlur={() => updateDeviceRisk(d.id, editingRiskValue)}
+                                                            autoFocus
+                                                            className="w-16 bg-slate-950 border border-blue-500/50 rounded-lg px-2 py-1 text-sm text-white text-center focus:outline-none focus:border-blue-400"
+                                                        />
+                                                        <span className="text-slate-500 text-xs">/100</span>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => { setEditingRiskId(d.id); setEditingRiskValue(d.riskScore); }}
+                                                        title="Click to edit risk score"
+                                                        className={`font-bold text-sm px-3 py-1 rounded-lg border transition-all group ${d.riskScore >= 70 ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10' :
+                                                            d.riskScore >= 40 ? 'text-amber-400 border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10' :
+                                                                'text-red-500 border-red-500/20 bg-red-500/5 hover:bg-red-500/10'
+                                                            }`}
+                                                    >
+                                                        {d.riskScore}
+                                                        <span className="ml-1 text-[9px] text-slate-500 group-hover:text-white transition-colors">✎</span>
+                                                    </button>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex gap-2 justify-end">

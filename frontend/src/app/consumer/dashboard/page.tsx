@@ -498,7 +498,7 @@ export default function ConsumerDashboard() {
                                                         Actions Locked due to {device.status} status.
                                                     </div>
 
-                                                    {device.incidents && device.incidents.length > 0 && device.incidents[0].locationSharedWithOwner && (
+                                                    {((device.isLocationShared) || (device.incidents && device.incidents.length > 0 && device.incidents[0].locationSharedWithOwner)) && (
                                                         <div className="p-4 rounded-xl bg-purple-900/20 border border-purple-500/30 relative overflow-hidden">
                                                             <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl animate-pulse"></div>
                                                             <div className="flex items-center gap-2 mb-2">

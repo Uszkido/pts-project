@@ -125,4 +125,25 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
     }
 });
 
+router.get('/messages', authenticateToken, verifyVendorRole, async (req, res) => {
+    try {
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { receiverId: req.user.id },
+                    { receiverRole: 'VENDOR' },
+                    { receiverRole: 'ALL' }
+                ]
+            },
+            include: { sender: { select: { email: true, fullName: true, role: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 20
+        });
+        res.json({ messages });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error while fetching messages' });
+    }
+});
+
 module.exports = router;

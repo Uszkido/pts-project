@@ -28,7 +28,7 @@ export default function Dashboard() {
     // UI State
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'register' | 'inventory' | 'sales'>('inventory');
+    const [activeTab, setActiveTab] = useState<'register' | 'inventory' | 'sales' | 'messages'>('inventory');
     const [loading, setLoading] = useState(true);
 
     // Dashboard Data
@@ -36,23 +36,29 @@ export default function Dashboard() {
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [inventory, setInventory] = useState<any[]>([]);
     const [sales, setSales] = useState<any[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-            const res = await fetch(`${apiUrl}/vendors/dashboard`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to fetch dashboard data');
+            const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
+
+            const [dashRes, msgRes] = await Promise.all([
+                fetch(`${apiUrl}/vendors/dashboard`, { headers }),
+                fetch(`${apiUrl}/vendors/messages`, { headers })
+            ]);
+
+            const data = await dashRes.json();
+            if (!dashRes.ok) throw new Error(data.error || 'Failed to fetch dashboard data');
+
+            const msgData = await msgRes.json();
 
             setProfile(data.profile);
             setMetrics(data.metrics);
             setInventory(data.inventory);
             setSales(data.sales);
+            setMessages(msgData.messages || []);
         } catch (err: any) {
             setError(err.message);
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -208,6 +214,13 @@ export default function Dashboard() {
                 <div className="flex border-b border-slate-800 mb-8 overflow-x-auto hide-scrollbar">
                     <button onClick={() => setActiveTab('inventory')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 ${activeTab === 'inventory' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>My Store Inventory</button>
                     <button onClick={() => setActiveTab('sales')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 ${activeTab === 'sales' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Sales Ledger</button>
+                    <button onClick={() => setActiveTab('messages')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'messages' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
+                        <div className="relative">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            {messages.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-slate-900"></span>}
+                        </div>
+                        Signals & Intel
+                    </button>
                     <button onClick={() => setActiveTab('register')} className={`pb-4 px-6 text-sm font-bold tracking-wide break-keep whitespace-nowrap transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'register' ? 'border-blue-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Inventory
                     </button>
@@ -333,6 +346,60 @@ export default function Dashboard() {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Tab Content: Messages / Signals */}
+                {activeTab === 'messages' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold text-white uppercase tracking-tight">Security Signals & Alerts</h2>
+                                <p className="text-slate-400 text-[10px] mt-1 uppercase tracking-widest font-mono font-bold">Encrypted Communication Uplink</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 px-3 py-1 rounded-full">
+                                <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                                <span className="text-[10px] font-black text-purple-400 uppercase">Secure Link Active</span>
+                            </div>
+                        </div>
+                        {messages.length === 0 ? (
+                            <div className="p-20 text-center">
+                                <svg className="w-16 h-16 text-slate-700 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                <h3 className="text-lg font-bold text-slate-400 uppercase tracking-widest">No Active Signals</h3>
+                                <p className="text-slate-600 text-sm mt-1">Authorities have not transmitted any alerts to your vendor ID yet.</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-slate-800">
+                                {messages.map((msg, i) => (
+                                    <div key={i} className="p-6 hover:bg-slate-800/30 transition-all group relative border-l-4 border-l-transparent hover:border-l-purple-500">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs shadow-inner ${msg.sender.role === 'ADMIN' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-red-600/20 text-red-400 border border-red-500/30'}`}>
+                                                    {msg.sender.role === 'ADMIN' ? 'SYS' : 'LE'}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-white group-hover:text-purple-400 transition-colors uppercase tracking-tight">{msg.subject}</h4>
+                                                    <p className="text-[10px] text-slate-500 font-mono font-bold">{new Date(msg.createdAt).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest bg-slate-950 px-2 py-1 rounded-md border border-slate-800">UPLINK_ID: {msg.id.slice(-8)}</span>
+                                        </div>
+                                        <div className="pl-13 ml-[52px]">
+                                            <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                                                {msg.body}
+                                            </p>
+                                            {msg.subject.includes('LIVE TRACKING') && (
+                                                <div className="mt-4 flex gap-3">
+                                                    <button className="bg-purple-600 hover:bg-purple-500 text-[10px] text-white font-black px-6 py-2.5 rounded-xl uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-purple-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0">
+                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> Active Intercept Feed
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>

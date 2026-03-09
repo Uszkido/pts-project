@@ -81,6 +81,39 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         }
     };
 
+    const handleToggleShare = async () => {
+        setActionLoading('share');
+        setMessage(null);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+            };
+
+            // Check if we are in admin or police context (heuristic)
+            const isAdmin = window.location.pathname.includes('/admin');
+            const url = isAdmin
+                ? `${apiUrl}/admin/devices/${trackingData?.id}/share-location`
+                : `${apiUrl}/police/devices/${imei}/share-location`;
+
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({ shared: !trackingData?.isLocationShared })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            setTrackingData({ ...trackingData, isLocationShared: !trackingData?.isLocationShared });
+            setMessage({ type: 'success', text: data.message });
+        } catch (err: any) {
+            setMessage({ type: 'error', text: err.message });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     useEffect(() => {
         fetchTracking();
         const interval = setInterval(fetchTracking, 10000); // Poll every 10s
@@ -164,6 +197,16 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
                                     className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-black px-8 py-4 rounded-2xl border border-slate-700 transition-all uppercase tracking-widest text-xs flex items-center gap-2"
                                 >
                                     {actionLoading === 'alert' ? 'Broadcasting...' : 'Alert Nearby Vendors'}
+                                </button>
+                                <button
+                                    onClick={handleToggleShare}
+                                    disabled={actionLoading !== null}
+                                    className={`font-black px-8 py-4 rounded-2xl border transition-all uppercase tracking-widest text-xs flex items-center gap-2 ${trackingData?.isLocationShared
+                                        ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-500 shadow-xl shadow-purple-500/20'
+                                        : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'}`}
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                    {actionLoading === 'share' ? 'Updating...' : trackingData?.isLocationShared ? 'Sharing Active' : 'Share with Owner'}
                                 </button>
                             </div>
                         </div>

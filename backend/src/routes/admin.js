@@ -296,6 +296,29 @@ router.put('/devices/:id/status', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Admin manually edits device risk score
+router.put('/devices/:id/risk-score', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { riskScore } = req.body;
+
+        if (typeof riskScore !== 'number' || riskScore < 0 || riskScore > 100) {
+            return res.status(400).json({ error: 'riskScore must be a number between 0 and 100' });
+        }
+
+        const device = await prisma.device.update({
+            where: { id },
+            data: { riskScore: Math.round(riskScore) }
+        });
+
+        res.json({ message: `Device risk score updated to ${device.riskScore}`, device: { id: device.id, imei: device.imei, riskScore: device.riskScore } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
 // Admin transfers device ownership
 router.put('/devices/:id/owner', authenticateAdmin, async (req, res) => {
     try {
@@ -305,6 +328,39 @@ router.put('/devices/:id/owner', authenticateAdmin, async (req, res) => {
         if (!newOwner) return res.status(404).json({ error: 'New owner not found by email' });
         const device = await prisma.device.update({ where: { id }, data: { registeredOwnerId: newOwner.id } });
         res.json({ message: `Device ownership transferred to ${newOwnerEmail}`, device: { id: device.id, imei: device.imei } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Toggle location sharing globally for a device
+router.put('/devices/:id/share-location', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { shared } = req.body; // boolean
+
+        const device = await prisma.device.update({
+            where: { id },
+            data: { isLocationShared: !!shared },
+            include: { registeredOwner: true }
+        });
+
+        // Send notification to owner
+        if (device.registeredOwnerId) {
+            await prisma.message.create({
+                data: {
+                    senderId: req.user.id,
+                    receiverId: device.registeredOwnerId,
+                    subject: `📍 SYSTEM TRACKING: ${device.brand} ${device.model}`,
+                    body: shared
+                        ? `The System Administrator has authorized live location sharing for your device (${device.imei}) with your account. Access is now active on your dashboard.`
+                        : `Live tracking access for your device (${device.imei}) has been deactivated by the Administrator.`
+                }
+            });
+        }
+
+        res.json({ message: `Location sharing ${shared ? 'enabled' : 'disabled'} for this device`, shared: device.isLocationShared });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

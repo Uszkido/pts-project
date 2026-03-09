@@ -9,7 +9,7 @@ export default function PoliceDashboard() {
     const [alerts, setAlerts] = useState<any[]>([]);
     const [metrics, setMetrics] = useState<any>(null);
     const [error, setError] = useState('');
-    const [filter, setFilter] = useState(''); // '' means all, 'STOLEN', etc.
+    const [filter, setFilter] = useState('STOLEN,LOST'); // Default to incident devices only
     const [loading, setLoading] = useState(true);
 
     // Search
@@ -46,8 +46,10 @@ export default function PoliceDashboard() {
             const metricsData = await metricsRes.json();
             setMetrics(metricsData.metrics);
 
-            // Fetch devices
-            const devicesUrl = filter ? `${apiUrl}/police/devices?status=${filter}` : `${apiUrl}/police/devices`;
+            // Fetch devices — police only see actionable (STOLEN/LOST/INVESTIGATING) devices
+            const devicesUrl = filter
+                ? `${apiUrl}/police/devices?status=${filter}`
+                : `${apiUrl}/police/devices?status=STOLEN,LOST`;
             const devicesRes = await fetch(devicesUrl, { headers });
             const devicesData = await devicesRes.json();
             setDevices(devicesData.devices || []);
@@ -274,7 +276,7 @@ export default function PoliceDashboard() {
                             ) : (
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {searchResults.map((device: any) => (
-                                        <a key={device.id} href={`/police/forensics`} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
+                                        <div key={device.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
                                             <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
                                                 {device.devicePhotoUrl ? (
                                                     <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
@@ -288,11 +290,19 @@ export default function PoliceDashboard() {
                                                 <p className="font-bold text-white group-hover:text-red-400 transition-colors truncate">{device.brand} {device.model}</p>
                                                 <p className="text-xs font-mono text-slate-500 tracking-widest truncate">{device.imei}</p>
                                             </div>
-                                            <div className="text-right">
+                                            <div className="flex items-center gap-3">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400' : device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>{device.status}</span>
-                                                <p className="text-xs text-slate-500 mt-1">{device.registeredOwner?.email}</p>
+                                                {(device.status === 'STOLEN' || device.status === 'LOST' || device.status === 'INVESTIGATING') && (
+                                                    <button
+                                                        onClick={() => { setLiveTrackingImei(device.imei); setShowSearch(false); }}
+                                                        className="flex items-center gap-1.5 text-[9px] font-black text-red-400 hover:text-white bg-red-500/10 hover:bg-red-600 px-2.5 py-1.5 rounded-lg border border-red-500/20 hover:border-transparent transition-all uppercase tracking-wide"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                        Track
+                                                    </button>
+                                                )}
                                             </div>
-                                        </a>
+                                        </div>
                                     ))}
                                 </div>
                             )}
@@ -329,9 +339,10 @@ export default function PoliceDashboard() {
 
                 {/* Tabs */}
                 <div className="flex border-b border-slate-800 mb-6 bg-slate-900/50 p-2 rounded-xl inline-flex">
-                    <button onClick={() => setActiveTab('registry')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'registry' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                        Global Registry
+                    <button onClick={() => setActiveTab('registry')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'registry' ? 'bg-red-900/30 text-red-300 shadow-lg border border-red-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        Stolen / Lost Devices
+                        <span className="ml-1 bg-red-500/20 text-red-400 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-red-500/20">{devices.length}</span>
                     </button>
                     <button onClick={() => setActiveTab('incidents')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'incidents' ? 'bg-slate-800 text-red-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -360,12 +371,15 @@ export default function PoliceDashboard() {
                         </div>
                     ) : activeTab === 'registry' ? (
                         <>
-                            <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-end">
+                            <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                    <p className="text-xs font-bold text-red-400 uppercase tracking-widest">Active Incident Devices — Restricted Access Feed</p>
+                                </div>
                                 <select value={filter} onChange={(e) => setFilter(e.target.value)} className="bg-slate-950 border border-slate-700 text-white text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block p-2 outline-none shadow-inner">
-                                    <option value="">Filter: All Statuses</option>
-                                    <option value="CLEAN">CLEAN</option>
-                                    <option value="STOLEN">STOLEN</option>
-                                    <option value="LOST">LOST</option>
+                                    <option value="STOLEN,LOST">STOLEN + LOST</option>
+                                    <option value="STOLEN">STOLEN Only</option>
+                                    <option value="LOST">LOST Only</option>
                                     <option value="INVESTIGATING">INVESTIGATING</option>
                                 </select>
                             </div>
@@ -374,17 +388,24 @@ export default function PoliceDashboard() {
                                     <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800">
                                         <tr>
                                             <th className="px-6 py-4 font-semibold tracking-wider">IMEI Serial</th>
-                                            <th className="px-6 py-4 font-semibold tracking-wider">Device Hardware</th>
-                                            <th className="px-6 py-4 font-semibold tracking-wider">Registered Entity</th>
-                                            <th className="px-6 py-4 font-semibold tracking-wider">National Status</th>
-                                            <th className="px-6 py-4 font-semibold tracking-wider text-right">Overrides</th>
+                                            <th className="px-6 py-4 font-semibold tracking-wider">Device</th>
+                                            <th className="px-6 py-4 font-semibold tracking-wider">Registered Owner</th>
+                                            <th className="px-6 py-4 font-semibold tracking-wider">Last Location</th>
+                                            <th className="px-6 py-4 font-semibold tracking-wider">Status</th>
+                                            <th className="px-6 py-4 font-semibold tracking-wider text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {devices.length === 0 ? (
-                                            <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No registry entries found.</td></tr>
+                                            <tr><td colSpan={6} className="px-6 py-16 text-center">
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <svg className="w-12 h-12 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                    <p className="text-slate-500 font-semibold">No active stolen or lost device reports.</p>
+                                                    <p className="text-slate-600 text-xs">The national registry is clear for this filter.</p>
+                                                </div>
+                                            </td></tr>
                                         ) : devices.map((device: any) => (
-                                            <tr key={device.id} className="hover:bg-slate-800/30 transition-colors">
+                                            <tr key={device.id} className="hover:bg-red-900/10 transition-colors border-l-2 border-l-transparent hover:border-l-red-500">
                                                 <td className="px-6 py-4 font-mono font-bold text-white tracking-widest">{device.imei}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
@@ -408,23 +429,39 @@ export default function PoliceDashboard() {
                                                     <div className="text-xs text-slate-500">{device.registeredOwner.email}</div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                                        device.status === 'INVESTIGATING' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
-                                                            'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                                                    {device.lastKnownLocation ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></div>
+                                                            <span className="text-emerald-400 text-xs font-mono font-bold">{device.lastKnownLocation}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs font-mono">No ping yet</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
+                                                        device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                                            'bg-amber-800/20 text-amber-600 border border-amber-700/20'
                                                         }`}>
                                                         {device.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 text-right space-x-3">
-                                                    {device.status !== 'INVESTIGATING' && (
-                                                        <button onClick={() => updateStatus(device.imei, 'INVESTIGATING')} className="text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wide">Investigate</button>
-                                                    )}
-                                                    {device.status !== 'CLEAN' && (
-                                                        <button onClick={() => updateStatus(device.imei, 'CLEAN')} className="text-xs font-bold text-emerald-500 hover:text-emerald-400 transition-colors uppercase tracking-wide">Clear</button>
-                                                    )}
-                                                    {device.status !== 'STOLEN' && (
-                                                        <button onClick={() => updateStatus(device.imei, 'STOLEN')} className="text-xs font-bold text-red-500 hover:text-red-400 transition-colors uppercase tracking-wide">Mark Stolen</button>
-                                                    )}
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            onClick={() => setLiveTrackingImei(device.imei)}
+                                                            className="flex items-center gap-1.5 text-[10px] font-black text-red-400 hover:text-white bg-red-500/10 hover:bg-red-600 px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-transparent transition-all uppercase tracking-wide shadow-lg hover:shadow-red-500/20"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                            Track Live
+                                                        </button>
+                                                        {device.status !== 'INVESTIGATING' && (
+                                                            <button onClick={() => updateStatus(device.imei, 'INVESTIGATING')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wide">Investigate</button>
+                                                        )}
+                                                        {device.status !== 'CLEAN' && (
+                                                            <button onClick={() => updateStatus(device.imei, 'CLEAN')} className="text-[10px] font-bold text-emerald-500 hover:text-emerald-400 transition-colors uppercase tracking-wide">Clear</button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

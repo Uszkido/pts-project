@@ -23,18 +23,19 @@ const authenticatePolice = (req, res, next) => {
     });
 };
 
-// Get all devices or filter by status
+// Get devices filtered by status — defaults to STOLEN,LOST for law enforcement
 router.get('/devices', authenticatePolice, async (req, res) => {
     try {
         const { status } = req.query;
-        let query = {};
 
-        if (status) {
-            query.status = status;
-        }
+        // Default to STOLEN,LOST if not specified (law enforcement only sees actionable devices)
+        const rawStatus = status || 'STOLEN,LOST';
+        const statusList = rawStatus.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 
         const devices = await prisma.device.findMany({
-            where: query,
+            where: {
+                status: { in: statusList }
+            },
             include: {
                 registeredOwner: {
                     select: { email: true, companyName: true }
@@ -301,6 +302,77 @@ router.put('/incidents/:id/share-location', authenticatePolice, async (req, res)
         });
 
         res.json({ message: 'Device location is now shared with the victim account', report });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Toggle location sharing globally for a device
+router.put('/devices/:imei/share-location', authenticatePolice, async (req, res) => {
+    try {
+        const { imei } = req.params;
+        const { shared } = req.body; // boolean
+
+        const device = await prisma.device.update({
+            where: { imei },
+            data: { isLocationShared: !!shared },
+            include: { registeredOwner: true }
+        });
+
+        // Send notification to owner
+        if (device.registeredOwnerId) {
+            await prisma.message.create({
+                data: {
+                    senderId: req.user.id,
+                    receiverId: device.registeredOwnerId,
+                    subject: `📍 LIVE TRACKING: ${device.brand} ${device.model}`,
+                    body: shared
+                        ? `Law Enforcement has shared the live location of your device (${imei}) with your account. You can now view its real-time movement on your dashboard.`
+                        : `Access to live tracking for your device (${imei}) has been revoked by Law Enforcement.`
+                }
+            });
+        }
+
+        res.json({ message: `Location sharing ${shared ? 'enabled' : 'disabled'} for this device`, shared: device.isLocationShared });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Multi-method Triangulation Simulation
+router.post('/triangulate', authenticatePolice, async (req, res) => {
+    try {
+        const { method } = req.body;
+        const activeDevices = await prisma.device.findMany({
+            where: {
+                status: { in: ['STOLEN', 'LOST', 'INVESTIGATING'] }
+            }
+        });
+
+        const updates = [];
+        for (const device of activeDevices) {
+            // Generate a slightly different location to simulate movement/tracking
+            const newLoc = device.lastKnownLocation || "Unknown Area, Nigeria";
+            const log = await prisma.deviceTrackingLog.create({
+                data: {
+                    deviceImei: device.imei,
+                    method,
+                    location: `${newLoc.split(' (')[0]} (${method} Node ${Math.floor(Math.random() * 999)})`,
+                    accuracy: method === 'GPS' ? 'High' : 'Medium',
+                    loggedById: req.user.id
+                }
+            });
+
+            await prisma.device.update({
+                where: { id: device.id },
+                data: { lastKnownLocation: log.location, lastLocationUpdate: new Date() }
+            });
+            updates.push({ imei: device.imei, location: log.location });
+        }
+
+        res.json({ message: `Network-wide ${method} triangulation sequence complete.`, updates });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });

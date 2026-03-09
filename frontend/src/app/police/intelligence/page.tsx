@@ -23,6 +23,7 @@ export default function PoliceIntelligence() {
     const [isSubmittingTracking, setIsSubmittingTracking] = useState(false);
     const [trackingLogs, setTrackingLogs] = useState<any[]>([]);
     const [showLogs, setShowLogs] = useState(false);
+    const [isTriangulating, setIsTriangulating] = useState<string | null>(null);
 
     const fetchIntelligence = async () => {
         setLoading(true);
@@ -138,6 +139,29 @@ export default function PoliceIntelligence() {
         }
     };
 
+    const handleTriangulation = async (method: string) => {
+        setIsTriangulating(method);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/triangulate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ method })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            fetchIntelligence();
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsTriangulating(null);
+        }
+    };
+
     const methodColors: Record<string, string> = {
         GPS: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
         WIFI: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
@@ -186,8 +210,20 @@ export default function PoliceIntelligence() {
                             </div>
                         </div>
                         <div className="flex gap-1">
-                            {['GPS', 'WIFI', 'IP', 'CELLULAR', 'MANUAL'].map(m => (
-                                <span key={m} className={`px-2 py-1 rounded-md text-[9px] font-bold border ${methodColors[m]}`}>{m}</span>
+                            {['GPS', 'WIFI', 'IP', 'CELLULAR'].map(m => (
+                                <button
+                                    key={m}
+                                    onClick={() => handleTriangulation(m)}
+                                    disabled={isTriangulating !== null}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2 ${methodColors[m]}`}
+                                >
+                                    {isTriangulating === m ? (
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    ) : (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
+                                    )}
+                                    {m} SCAN
+                                </button>
                             ))}
                         </div>
                     </div>
