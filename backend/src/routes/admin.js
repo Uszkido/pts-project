@@ -258,6 +258,28 @@ router.get('/devices', authenticateAdmin, async (req, res) => {
     }
 });
 
+router.get('/devices/:id/details', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const device = await prisma.device.findUnique({
+            where: { id },
+            include: {
+                registeredOwner: { select: { id: true, email: true, fullName: true, companyName: true, phoneNumber: true, address: true } },
+                certificates: { orderBy: { issueDate: 'desc' } },
+                incidents: { orderBy: { createdAt: 'desc' }, include: { reporter: { select: { email: true } } } },
+                history: { orderBy: { createdAt: 'desc' }, include: { actor: { select: { email: true, role: true } } } }
+            }
+        });
+
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        res.json({ device });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // Admin updates device status
 router.put('/devices/:id/status', authenticateAdmin, async (req, res) => {
     try {

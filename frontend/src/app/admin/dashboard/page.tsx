@@ -43,6 +43,11 @@ export default function AdminDashboard() {
     // Live Tracking
     const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
 
+    // Device Details Modal
+    const [selectedDevice, setSelectedDevice] = useState<any>(null);
+    const [isDeviceDetailsModalOpen, setIsDeviceDetailsModalOpen] = useState(false);
+    const [deviceLoading, setDeviceLoading] = useState(false);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
@@ -232,6 +237,18 @@ export default function AdminDashboard() {
             setResetPassword('');
             setIsDetailsModalOpen(true);
         } catch (err: any) { alert(err.message); }
+    };
+
+    const fetchDeviceDetails = async (deviceId: string) => {
+        setDeviceLoading(true);
+        try {
+            const res = await fetch(`${apiUrl}/admin/devices/${deviceId}/details`, { headers });
+            if (!res.ok) throw new Error('Failed to fetch device details');
+            const data = await res.json();
+            setSelectedDevice(data.device);
+            setIsDeviceDetailsModalOpen(true);
+        } catch (err: any) { alert(err.message); }
+        finally { setDeviceLoading(false); }
     };
 
     const saveUserDetails = async () => {
@@ -647,6 +664,7 @@ export default function AdminDashboard() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => fetchDeviceDetails(d.id)} className="text-xs text-emerald-400 hover:text-emerald-300 font-bold">Details</button>
                                                     <button onClick={() => transferDevice(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Transfer</button>
                                                     <button onClick={() => setLiveTrackingImei(d.imei)} className="text-xs text-red-500 hover:text-red-400 font-bold">Track</button>
                                                     <button onClick={() => deleteDevice(d.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
@@ -1142,6 +1160,187 @@ export default function AdminDashboard() {
                 }
             </main>
             {liveTrackingImei && <LiveView imei={liveTrackingImei as string} onClose={() => setLiveTrackingImei(null)} />}
+
+            {/* Device Details Modal */}
+            {isDeviceDetailsModalOpen && selectedDevice && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden relative my-8 flex flex-col max-h-[90vh]">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 backdrop-blur-md">
+                            <div className="flex items-center gap-5">
+                                <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 relative group">
+                                    {selectedDevice.devicePhotoUrl ? (
+                                        <img src={selectedDevice.devicePhotoUrl} alt="Device" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-white">{selectedDevice.brand} {selectedDevice.model}</h2>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">IMEI: {selectedDevice.imei}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedDevice.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>{selectedDevice.status}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-800 transition-all">✕</button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            {/* Left: Metadata & Documents (4 cols) */}
+                            <div className="lg:col-span-4 space-y-6">
+                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Ownership Information</h3>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Registered Owner</p>
+                                            <p className="text-sm font-bold text-white">{selectedDevice.registeredOwner?.fullName || 'Anonymous'}</p>
+                                            <p className="text-xs text-slate-400">{selectedDevice.registeredOwner?.email}</p>
+                                        </div>
+                                        {selectedDevice.registeredOwner?.phoneNumber && (
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Phone</p>
+                                                <p className="text-sm text-white font-mono">{selectedDevice.registeredOwner.phoneNumber}</p>
+                                            </div>
+                                        )}
+                                        {selectedDevice.registeredOwner?.address && (
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Home Address</p>
+                                                <p className="text-xs text-slate-300 leading-relaxed">{selectedDevice.registeredOwner.address}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+
+                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Evidence & Documents</h3>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {[
+                                            { label: 'Device Photo', url: selectedDevice.devicePhotoUrl, icon: '🖼️' },
+                                            { label: 'Purchase Receipt', url: selectedDevice.purchaseReceiptUrl, icon: '🧾' },
+                                            { label: 'Packaging/Carton', url: selectedDevice.cartonPhotoUrl, icon: '📦' }
+                                        ].map(doc => (
+                                            doc.url ? (
+                                                <a key={doc.label} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition-all group">
+                                                    <span className="text-xs font-bold text-slate-300 flex items-center gap-2"><span>{doc.icon}</span> {doc.label}</span>
+                                                    <svg className="w-4 h-4 text-slate-600 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                </a>
+                                            ) : (
+                                                <div key={doc.label} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-dashed border-slate-800 opacity-50">
+                                                    <span className="text-xs font-medium text-slate-600">{doc.label} (Not Provided)</span>
+                                                </div>
+                                            )
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">System Metrics</h3>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-xs text-slate-400">Trust Score</span>
+                                        <span className={`text-sm font-black ${selectedDevice.riskScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>{selectedDevice.riskScore}/100</span>
+                                    </div>
+                                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${selectedDevice.riskScore >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${selectedDevice.riskScore}%` }}></div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Center/Right: Tabs for History, Certificates, Incidents (8 cols) */}
+                            <div className="lg:col-span-8 flex flex-col h-full gap-6">
+                                {/* Digital Certificates Section */}
+                                <section className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col">
+                                    <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex justify-between items-center">
+                                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Digital Property Certificates</h3>
+                                        <span className="bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full">{selectedDevice.certificates?.length || 0} ISSUED</span>
+                                    </div>
+                                    <div className="p-4 space-y-3 max-h-[200px] overflow-y-auto">
+                                        {(!selectedDevice.certificates || selectedDevice.certificates.length === 0) ? (
+                                            <p className="text-xs text-slate-600 italic text-center py-4">No digital certificates have been generated for this device yet.</p>
+                                        ) : selectedDevice.certificates.map((cert: any) => (
+                                            <div key={cert.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
+                                                        {/* Placeholder for QR - usually we'd render the cert hash */}
+                                                        <div className="grid grid-cols-2 gap-0.5 w-full h-full opacity-30">
+                                                            <div className="bg-black"></div><div className="bg-black"></div><div className="bg-black"></div><div className="bg-gray-400"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-white">Cert ID: {cert.id.split('-')[0].toUpperCase()}</p>
+                                                        <p className="text-[10px] text-slate-500 font-mono tracking-tight">{cert.qrHash.substring(0, 32)}...</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(cert.issueDate).toLocaleDateString()}</p>
+                                                    <span className={`text-[9px] font-black ${cert.isActive ? 'text-emerald-500' : 'text-slate-500'}`}>{cert.isActive ? 'ACTIVE' : 'REVOKED'}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* Activity & Forensics Logs */}
+                                <section className="bg-slate-950 rounded-2xl border border-slate-800 flex-1 flex flex-col min-h-0 overflow-hidden">
+                                    <div className="p-4 bg-slate-900/50 border-b border-slate-800">
+                                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Forensic Activity Log</h3>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                        {/* Incident Reports Merge */}
+                                        {selectedDevice.incidents?.map((inc: any) => (
+                                            <div key={inc.id} className="relative pl-6 border-l-2 border-red-500/30 pb-4">
+                                                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-950 border-2 border-red-500 flex items-center justify-center">
+                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></div>
+                                                </div>
+                                                <div className="bg-red-500/5 rounded-xl p-3 border border-red-500/10">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">INCIDENT REPORTED: {inc.type}</span>
+                                                        <span className="text-[10px] text-slate-500 font-bold">{new Date(inc.createdAt).toLocaleString()}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-300 font-medium">{inc.description}</p>
+                                                    <div className="mt-2 flex justify-between items-center">
+                                                        <span className="text-[9px] text-slate-500 italic">Reporter: {inc.reporter?.email}</span>
+                                                        <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">{inc.status}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Transaction History */}
+                                        {selectedDevice.history?.map((hist: any) => (
+                                            <div key={hist.id} className="relative pl-6 border-l-2 border-slate-800 pb-4">
+                                                <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-slate-700"></div>
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{hist.type}</p>
+                                                        <p className="text-xs text-white mt-1">{hist.description}</p>
+                                                        {hist.actor && <p className="text-[9px] text-slate-600 mt-1 uppercase font-bold italic">Signed By: {hist.actor.email} ({hist.actor.role})</p>}
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 font-bold">{new Date(hist.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {(!selectedDevice.history?.length && !selectedDevice.incidents?.length) && (
+                                            <p className="text-xs text-slate-600 italic text-center py-10">No physical or digital logs recorded for this device.</p>
+                                        )}
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+                            <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="px-5 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors">Close Console</button>
+                            <button onClick={() => { setIsDeviceDetailsModalOpen(false); setLiveTrackingImei(selectedDevice.imei); }} className="px-5 py-2 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-500 text-white transition-all shadow-lg shadow-red-600/20 flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                Engage Live Tracking
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
