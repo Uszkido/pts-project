@@ -19,9 +19,20 @@ export default function FaceCapture({ onCapture, label = "Facial Data (Live Capt
                 videoRef.current.srcObject = stream;
                 setIsStreaming(true);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error accessing camera:", err);
-            alert("Could not access camera. Please ensure you have given permission.");
+            let errorMessage = "Could not access camera. Please ensure you have given permission.";
+
+            // Helpful message for local network testing without HTTPS
+            if (err.name === 'NotAllowedError' || err.message.includes('permission denied')) {
+                errorMessage = "Camera access denied. Please allow permissions in your browser settings.";
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                errorMessage = "No camera found on this device.";
+            } else if (!window.isSecureContext) {
+                errorMessage = "Camera access requires a secure connection (HTTPS) or localhost. If you are testing on a local network (e.g. 192.168.x.x), the browser will block the camera.";
+            }
+
+            alert(errorMessage);
         }
     };
 
