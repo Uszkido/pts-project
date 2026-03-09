@@ -22,7 +22,7 @@ const authenticateToken = (req, res, next) => {
 // Dual Registration Endpoint (Vendor-First or Consumer-Direct)
 router.post('/register', authenticateToken, async (req, res) => {
     try {
-        const { imei, serialNumber, brand, model, customerEmail } = req.body;
+        const { imei, serialNumber, brand, model, customerEmail, devicePhotos, purchaseReceiptUrl, cartonPhotoUrl } = req.body;
 
         if (!imei || !brand || !model) {
             return res.status(400).json({ error: 'IMEI, brand, and model are required' });
@@ -68,7 +68,10 @@ router.post('/register', authenticateToken, async (req, res) => {
                     brand,
                     model,
                     status: initialStatus,
-                    registeredOwnerId: ownerId
+                    registeredOwnerId: ownerId,
+                    devicePhotos: devicePhotos || [],
+                    purchaseReceiptUrl,
+                    cartonPhotoUrl
                 }
             });
 

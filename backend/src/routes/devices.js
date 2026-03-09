@@ -110,7 +110,8 @@ router.get('/verify/:imei', async (req, res) => {
                 model: device.model,
                 status: device.status,
                 riskScore,
-                registeredBy: device.registeredOwner.companyName || 'Private Owner'
+                registeredBy: device.registeredOwner.companyName || 'Private Owner',
+                devicePhotos: device.devicePhotos
             }
         });
     } catch (error) {
@@ -145,7 +146,8 @@ router.post('/:imei/report', authenticateToken, async (req, res) => {
 
         res.json({ message: `Device marked as ${status}`, device: updatedDevice });
     } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Forensic Status Update Failure:', error);
+        res.status(500).json({ error: 'Internal server error while updating forensic status' });
     }
 });
 

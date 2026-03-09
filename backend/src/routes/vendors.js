@@ -89,6 +89,7 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
                 model: true,
                 status: true,
                 riskScore: true,
+                devicePhotos: true,
                 createdAt: true
             },
             orderBy: { createdAt: 'desc' }
@@ -99,7 +100,7 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
             where: { sellerId: vendorId, status: 'COMPLETED' },
             include: {
                 device: {
-                    select: { imei: true, brand: true, model: true }
+                    select: { imei: true, brand: true, model: true, devicePhotos: true }
                 },
                 buyer: {
                     select: { email: true }

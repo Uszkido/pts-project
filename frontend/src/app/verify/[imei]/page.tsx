@@ -1,6 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function VerificationPage() {
     const { imei } = useParams();
@@ -34,6 +36,34 @@ export default function VerificationPage() {
     const [safeContactContact, setSafeContactContact] = useState('');
     const [scLoading, setScLoading] = useState(false);
     const [scSuccess, setScSuccess] = useState(false);
+
+    const certificateRef = useRef<HTMLDivElement>(null);
+    const [isPrinting, setIsPrinting] = useState(false);
+
+    const printVerification = async () => {
+        setIsPrinting(true);
+        try {
+            if (certificateRef.current) {
+                const canvas = await html2canvas(certificateRef.current, {
+                    scale: 3,
+                    useCORS: true,
+                    backgroundColor: '#000000'
+                });
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+                pdf.save(`PTS_VERIFICATION_${status.imei}.pdf`);
+            }
+        } catch (err) {
+            console.error('Print failed:', err);
+            alert('Failed to generate printable document.');
+        } finally {
+            setIsPrinting(false);
+        }
+    };
 
     const handleSafeContact = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -98,7 +128,7 @@ export default function VerificationPage() {
                     </span>
                 </div>
 
-                <div className={`overflow-hidden rounded-[3rem] border transition-all duration-700 shadow-2xl shadow-black ${isClean ? 'bg-slate-950 border-emerald-900/50' : 'bg-slate-950 border-red-900/50'}`}>
+                <div ref={certificateRef} className={`overflow-hidden rounded-[3rem] border transition-all duration-700 shadow-2xl shadow-black ${isClean ? 'bg-slate-950 border-emerald-900/50' : 'bg-slate-950 border-red-900/50'}`}>
                     {/* Status Banner */}
                     <div className={`py-12 text-center relative overflow-hidden ${isClean ? 'bg-emerald-500/5' : 'bg-red-500/5'}`}>
                         {/* Animated scan line */}
@@ -215,7 +245,7 @@ export default function VerificationPage() {
                                 </div>
                                 <div className="text-sm">
                                     <p className="font-black uppercase tracking-wide mb-1">PTS Official Directive</p>
-                                    <p className="opacity-70 leading-relaxed">
+                                    <p className="opacity-70 leading-relaxed text-[10px]">
                                         {isClean
                                             ? "This device is verified as CLEAN and available for legitimate ownership transfer. Ensure 2FA Handover Code is used for physical delivery."
                                             : "This device is flagged in the National Tracking System. Acquisition of this property is highly illegal and will trigger an immediate geolocation signal to local authorities."
@@ -224,6 +254,20 @@ export default function VerificationPage() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Export Passport Button */}
+                        <button
+                            onClick={printVerification}
+                            disabled={isPrinting}
+                            className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 shadow-xl ${isClean ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-500/20'}`}
+                        >
+                            {isPrinting ? (
+                                <svg className="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            )}
+                            {isPrinting ? 'Authenticating...' : 'Export Official Passport'}
+                        </button>
                     </div>
                 </div>
 

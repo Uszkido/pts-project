@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import LiveView from '@/components/LiveView';
 
 export default function PoliceDashboard() {
@@ -10,9 +12,14 @@ export default function PoliceDashboard() {
     const [intel, setIntel] = useState<any[]>([]);
     const [metrics, setMetrics] = useState<any>(null);
     const [error, setError] = useState('');
-    const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [filter, setFilter] = useState('STOLEN,LOST'); // Default to incident devices only
     const [loading, setLoading] = useState(true);
+    const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    // Forensic Dossier Generation State
+    const [isGeneratingDossier, setIsGeneratingDossier] = useState<string | null>(null);
+    const [dossierData, setDossierData] = useState<any>(null);
+    const dossierRef = useRef<HTMLDivElement>(null);
+    const [filter, setFilter] = useState('STOLEN,LOST'); // Default to incident devices only
 
     // Search
     const [searchQuery, setSearchQuery] = useState('');
@@ -174,6 +181,7 @@ export default function PoliceDashboard() {
     };
 
     const exportDossier = async (imei: string) => {
+        setIsGeneratingDossier(imei);
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
             const res = await fetch(`${apiUrl}/police/export-evidence/${imei}`, {
@@ -182,16 +190,39 @@ export default function PoliceDashboard() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            // Simple JSON download for now (Phase 3 MVP)
-            const blob = new Blob([JSON.stringify(data.dossier, null, 2)], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `PTS_Dossier_${imei}.json`;
-            a.click();
-            setStatusMessage({ type: 'success', text: 'Forensic dossier exported successfully.' });
+            // Set the dossier data for the hidden template to render
+            setDossierData(data.dossier);
+
+            // Use a timeout to ensure the DOM is ready for capture
+            setTimeout(async () => {
+                if (dossierRef.current) {
+                    try {
+                        const canvas = await html2canvas(dossierRef.current, {
+                            scale: 2.5,
+                            useCORS: true,
+                            backgroundColor: '#ffffff'
+                        });
+                        const imgData = canvas.toDataURL('image/png', 1.0);
+                        const pdf = new jsPDF('p', 'mm', 'a4');
+                        const pdfWidth = pdf.internal.pageSize.getWidth();
+                        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+                        pdf.save(`PTS_FORENSIC_DOSSIER_${imei}.pdf`);
+                        setStatusMessage({ type: 'success', text: 'Forensic dossier PDF generated and downloaded.' });
+                    } catch (err) {
+                        console.error('PDF generation failed:', err);
+                        alert('Could not render PDF document. Try again or check browser permissions.');
+                    } finally {
+                        setIsGeneratingDossier(null);
+                        setDossierData(null);
+                    }
+                }
+            }, 800);
+
         } catch (err: any) {
             alert(err.message);
+            setIsGeneratingDossier(null);
         }
     };
 
@@ -314,8 +345,8 @@ export default function PoliceDashboard() {
                                     {searchResults.map((device: any) => (
                                         <div key={device.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
                                             <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
-                                                {device.devicePhotoUrl ? (
-                                                    <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                {device.devicePhotos && device.devicePhotos.length > 0 ? (
+                                                    <img src={device.devicePhotos[0]} alt={device.model} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-slate-700">
                                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -461,11 +492,11 @@ export default function PoliceDashboard() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
-                                                            {device.devicePhotoUrl ? (
-                                                                <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                            {device.devicePhotos && device.devicePhotos.length > 0 ? (
+                                                                <img src={device.devicePhotos[0]} alt={device.model} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
-                                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -509,10 +540,15 @@ export default function PoliceDashboard() {
                                                         </button>
                                                         <button
                                                             onClick={() => exportDossier(device.imei)}
-                                                            className="flex items-center gap-1.5 text-[10px] font-black text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-600 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:border-transparent transition-all uppercase tracking-wide"
+                                                            disabled={isGeneratingDossier === device.imei}
+                                                            className={`flex items-center gap-1.5 text-[10px] font-black hover:text-white px-3 py-1.5 rounded-lg border transition-all uppercase tracking-wide ${isGeneratingDossier === device.imei ? 'bg-blue-600/30 text-blue-300 border-blue-500/30 cursor-wait' : 'bg-blue-500/10 text-blue-400 hover:bg-blue-600 border-blue-500/20 hover:border-transparent'}`}
                                                         >
-                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                                            Dossier
+                                                            {isGeneratingDossier === device.imei ? (
+                                                                <svg className="animate-spin h-3.5 w-3.5 text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                            ) : (
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                            )}
+                                                            {isGeneratingDossier === device.imei ? 'Compiling...' : 'Dossier'}
                                                         </button>
                                                         {device.status !== 'INVESTIGATING' && (
                                                             <button onClick={() => updateStatus(device.imei, 'INVESTIGATING')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wide">Investigate</button>
@@ -551,8 +587,8 @@ export default function PoliceDashboard() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0 shadow-inner">
-                                                        {report.device.devicePhotoUrl ? (
-                                                            <img src={report.device.devicePhotoUrl} alt={report.device.model} className="w-full h-full object-cover" />
+                                                        {report.device.devicePhotos && report.device.devicePhotos.length > 0 ? (
+                                                            <img src={report.device.devicePhotos[0]} alt={report.device.model} className="w-full h-full object-cover" />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-slate-700">
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -597,6 +633,9 @@ export default function PoliceDashboard() {
                                                         Track Live
                                                     </button>
                                                 )}
+                                                <button onClick={() => exportDossier(report.device.imei)} className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg border border-blue-500/20 transition-colors uppercase tracking-wide">
+                                                    Dossier
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -685,8 +724,8 @@ export default function PoliceDashboard() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
-                                                        {alert.device.devicePhotoUrl ? (
-                                                            <img src={alert.device.devicePhotoUrl} alt={alert.device.model} className="w-full h-full object-cover" />
+                                                        {alert.device.devicePhotos && alert.device.devicePhotos.length > 0 ? (
+                                                            <img src={alert.device.devicePhotos[0]} alt={alert.device.model} className="w-full h-full object-cover" />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-slate-700">
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -875,6 +914,171 @@ export default function PoliceDashboard() {
                 </div>
             )}
             {liveTrackingImei && <LiveView imei={liveTrackingImei} onClose={() => setLiveTrackingImei(null)} />}
+
+            {/* Hidden High-Fidelity Forensic Dossier Template for PDF Generation */}
+            <div style={{ position: 'fixed', top: '0', left: '200%', pointerEvents: 'none' }}>
+                {dossierData && (
+                    <div ref={dossierRef} style={{ width: '842px', minHeight: '1191px' }} className="bg-white text-slate-900 p-12 font-sans relative flex flex-col overflow-hidden">
+                        {/* Dossier Header & Branding */}
+                        <div className="border-b-[6px] border-red-600 pb-8 mb-8 flex justify-between items-start">
+                            <div>
+                                <h1 className="text-4xl font-black tracking-tighter text-slate-900 uppercase italic mb-1">Forensic Asset Dossier</h1>
+                                <p className="text-xs font-mono font-bold text-red-600 bg-red-600/10 px-2 py-1 inline-block rounded tracking-widest">{dossierData.reportId}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-black text-slate-900 tracking-tightest">PTS LAW ENFORCEMENT</div>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">National Device Registry • Phase 4</p>
+                            </div>
+                        </div>
+
+                        {/* Metadata Header */}
+                        <div className="grid grid-cols-3 gap-6 mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Generated Date</p>
+                                <p className="text-sm font-bold text-slate-800">{new Date(dossierData.generatedAt).toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Authorizing Official</p>
+                                <p className="text-sm font-bold text-slate-800 truncate">{dossierData.generatedBy}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Security Clearance</p>
+                                <p className="text-sm font-bold text-red-600">CONFIDENTIAL / RESTRICTED</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-8 flex-1">
+                            {/* Left Panel: Subject Data */}
+                            <div className="col-span-2 space-y-8">
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Asset Manifest</h3>
+                                    <div className="space-y-4">
+                                        <div className="w-full aspect-square bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden shadow-inner flex items-center justify-center">
+                                            {dossierData.asset.photos && dossierData.asset.photos.length > 0 ? (
+                                                <img src={dossierData.asset.photos[0]} alt="Primary Evidence" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg className="w-20 h-20 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                            )}
+                                        </div>
+                                        <div className="bg-slate-950 text-white p-5 rounded-2xl space-y-3 font-mono">
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Brand / Model</p>
+                                                <p className="text-sm font-bold">{dossierData.asset.brand} {dossierData.asset.model}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">IMEI Identity</p>
+                                                <p className="text-sm font-bold tracking-widest">{dossierData.asset.imei}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Serial Identity</p>
+                                                <p className="text-sm font-bold">{dossierData.asset.serial || 'NOT_LOGGED'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Active Status</h3>
+                                    <div className="p-4 rounded-xl border-2 border-red-600 bg-red-600/[0.03]">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Network Status</span>
+                                            <span className="text-xs font-black text-red-600 uppercase tracking-wider">{dossierData.asset.status}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Risk Index</span>
+                                            <span className="text-xs font-black text-slate-900">{dossierData.asset.riskScore}/100</span>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Current Custodian</h3>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <p className="text-sm font-bold text-slate-900 mb-1">{dossierData.ownership.current}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase italic">Verified Legal Registrant</p>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Right Panel: Timeline & Logs */}
+                            <div className="col-span-3 space-y-8">
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Ownership Chain-of-Custody</h3>
+                                    <div className="space-y-4">
+                                        {dossierData.ownership.chain.map((link: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4 items-start bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shrink-0">{idx + 1}</div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800">Transfer from {link.from} to {link.to}</p>
+                                                    <p className="text-[10px] text-slate-500 mt-1 font-mono uppercase font-bold">{new Date(link.date).toLocaleDateString()} • TS-VERIFIED</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {dossierData.ownership.chain.length === 0 && <p className="text-xs text-slate-400 italic">No historical ownership transfers recorded in PTS Ledger.</p>}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Forensic Transaction Ledger</h3>
+                                    <div className="bg-slate-950 text-slate-300 p-6 rounded-2xl space-y-6 font-mono border-t-[4px] border-emerald-500">
+                                        {dossierData.ledger.slice(0, 8).map((entry: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4">
+                                                <div className="text-[10px] font-black text-slate-600 shrink-0 border-r border-slate-800 pr-3 w-16 leading-tight">
+                                                    {new Date(entry.date).toLocaleDateString()}<br />
+                                                    {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-emerald-400 leading-none mb-1">{entry.type}</p>
+                                                    <p className="text-[11px] font-bold text-slate-200 mb-1 leading-tight">{entry.details}</p>
+                                                    <p className="text-[9px] text-slate-600 font-black italic">SGN: {entry.actor}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Service & Technical Log</h3>
+                                    <div className="space-y-3">
+                                        {dossierData.maintenance.map((m: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-800 uppercase leading-none mb-1">{m.type}</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold">{m.provider}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-mono text-slate-900 font-black">{new Date(m.date).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {dossierData.maintenance.length === 0 && <p className="text-xs text-slate-400 italic">No technical service history available for this asset.</p>}
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
+                        {/* Dossier Footer */}
+                        <div className="mt-auto pt-10 border-t border-slate-200 flex justify-between items-end">
+                            <div className="flex gap-6 items-center">
+                                <div className="w-20 h-20 bg-slate-900 p-2 rounded-lg flex items-center justify-center">
+                                    {/* Placeholder QR for dossier verification */}
+                                    <div className="w-full h-full bg-slate-800 rounded flex items-center justify-center text-[8px] text-slate-500 text-center uppercase tracking-tightest leading-none">PTS<br />FORENSIC<br />SEAL</div>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-2 underline">Confidentiality Notice</p>
+                                    <p className="text-[9px] text-slate-400 italic max-w-xs leading-relaxed">
+                                        This document is an immutable record from the National Property Tracking System. Unauthorized use or dissemination is punishable under Cybersecurity Act 2026. Data integrity is guaranteed via cryptographical hash verification.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-mono font-black text-slate-900 uppercase">DIGITAL SIGNATURE VERIFIED</p>
+                                <p className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">Core v4.0.1-FORENSIC</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

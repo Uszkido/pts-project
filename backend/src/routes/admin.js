@@ -473,7 +473,7 @@ router.get('/search', authenticateAdmin, async (req, res) => {
                         { model: { contains: q, mode: 'insensitive' } }
                     ]
                 },
-                select: { id: true, imei: true, brand: true, model: true, status: true, devicePhotoUrl: true },
+                select: { id: true, imei: true, brand: true, model: true, status: true, devicePhotos: true },
                 take: 10
             })
         ]);
@@ -491,10 +491,10 @@ router.get('/documents', authenticateAdmin, async (req, res) => {
         const usersWithDocs = await prisma.user.findMany({
             where: {
                 OR: [
-                    { cacCertificateUrl: { not: null } },
-                    { shopPhotoUrl: { not: null } },
-                    { facialDataUrl: { not: null } },
-                    { biodataUrl: { not: null } }
+                    { NOT: { cacCertificateUrl: null } },
+                    { NOT: { shopPhotoUrl: null } },
+                    { NOT: { facialDataUrl: null } },
+                    { NOT: { biodataUrl: null } }
                 ]
             },
             select: {
@@ -507,23 +507,26 @@ router.get('/documents', authenticateAdmin, async (req, res) => {
         const devicesWithDocs = await prisma.device.findMany({
             where: {
                 OR: [
-                    { devicePhotoUrl: { not: null } },
-                    { purchaseReceiptUrl: { not: null } },
-                    { cartonPhotoUrl: { not: null } }
+                    { NOT: { devicePhotos: { equals: [] } } },
+                    { NOT: { purchaseReceiptUrl: null } },
+                    { NOT: { cartonPhotoUrl: null } }
                 ]
             },
             select: {
                 id: true, imei: true, brand: true, model: true,
-                devicePhotoUrl: true, purchaseReceiptUrl: true, cartonPhotoUrl: true,
+                devicePhotos: true, purchaseReceiptUrl: true, cartonPhotoUrl: true,
                 registeredOwner: { select: { email: true, fullName: true } }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        res.json({ userDocuments: usersWithDocs, deviceDocuments: devicesWithDocs });
+        res.json({
+            userDocuments: usersWithDocs || [],
+            deviceDocuments: devicesWithDocs || []
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Document Retrieval Error:', error);
+        res.status(500).json({ error: 'Internal server error while retrieving document registry' });
     }
 });
 

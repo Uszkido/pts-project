@@ -287,8 +287,8 @@ export default function PoliceIntelligence() {
                                 </div>
                                 <div className="flex gap-4 items-center mb-4 relative z-10">
                                     <div className="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 shadow-inner">
-                                        {report.device.devicePhotoUrl ? (
-                                            <img src={report.device.devicePhotoUrl} alt={report.device.model} className="w-full h-full object-cover" />
+                                        {report.device.devicePhotos && report.device.devicePhotos.length > 0 ? (
+                                            <img src={report.device.devicePhotos[0]} alt={report.device.model} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-600">
                                                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -359,8 +359,8 @@ export default function PoliceIntelligence() {
                                 </div>
                                 <div className="flex gap-4 items-center mb-4">
                                     <div className="w-16 h-16 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 shadow-inner">
-                                        {alert.device.devicePhotoUrl ? (
-                                            <img src={alert.device.devicePhotoUrl} alt={alert.device.model} className="w-full h-full object-cover" />
+                                        {alert.device.devicePhotos && alert.device.devicePhotos.length > 0 ? (
+                                            <img src={alert.device.devicePhotos[0]} alt={alert.device.model} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-600">
                                                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>

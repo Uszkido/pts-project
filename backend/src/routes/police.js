@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
@@ -79,7 +80,7 @@ router.get('/incidents', authenticatePolice, async (req, res) => {
     try {
         const reports = await prisma.incidentReport.findMany({
             include: {
-                device: { select: { imei: true, brand: true, model: true, lastKnownLocation: true, devicePhotoUrl: true } },
+                device: { select: { imei: true, brand: true, model: true, lastKnownLocation: true, devicePhotos: true } },
                 reporter: { select: { email: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -96,7 +97,7 @@ router.get('/vendor-alerts', authenticatePolice, async (req, res) => {
     try {
         const alerts = await prisma.vendorSuspiciousAlert.findMany({
             include: {
-                device: { select: { imei: true, brand: true, model: true, devicePhotoUrl: true } },
+                device: { select: { imei: true, brand: true, model: true, devicePhotos: true } },
                 vendor: { select: { email: true, companyName: true } }
             },
             orderBy: { createdAt: 'desc' }
@@ -504,7 +505,7 @@ router.get('/export-evidence/:imei', authenticatePolice, async (req, res) => {
         const dossier = {
             reportId: `FOR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
             generatedAt: new Date(),
-            generatedBy: req.user.email,
+            generatedBy: req.user.email || req.user.id || 'Unknown Official',
             asset: {
                 brand: device.brand,
                 model: device.model,
@@ -512,31 +513,31 @@ router.get('/export-evidence/:imei', authenticatePolice, async (req, res) => {
                 serial: device.serialNumber,
                 status: device.status,
                 riskScore: device.riskScore,
-                photos: device.devicePhotos
+                photos: device.devicePhotos || []
             },
             ownership: {
-                current: device.registeredOwner.fullName || device.registeredOwner.companyName || device.registeredOwner.email,
-                chain: device.transfersAsDevice.map(t => ({
+                current: device.registeredOwner?.fullName || device.registeredOwner?.companyName || device.registeredOwner?.email || 'N/A',
+                chain: (device.transfersAsDevice || []).map(t => ({
                     date: t.transferDate,
-                    from: t.seller.email,
-                    to: t.buyer.email
+                    from: t.seller?.email || 'Unknown',
+                    to: t.buyer?.email || 'Unknown'
                 }))
             },
-            incidents: device.incidents.map(i => ({
+            incidents: (device.incidents || []).map(i => ({
                 date: i.createdAt,
-                type: i.type,
-                desc: i.description,
-                policeRef: i.policeReportNo
+                type: i.type || 'STOLEN', // Fallback as 'type' might be missing in schema
+                desc: i.description || 'No description provided',
+                policeRef: i.policeReportNo || 'Pending'
             })),
-            maintenance: device.maintenance.map(m => ({
+            maintenance: (device.maintenance || []).map(m => ({
                 date: m.serviceDate,
-                provider: m.vendor.companyName || m.vendor.fullName,
-                type: m.serviceType
+                provider: m.vendor?.companyName || m.vendor?.fullName || 'Unknown Vendor',
+                type: m.serviceType || 'General Service'
             })),
-            ledger: device.history.map(h => ({
+            ledger: (device.history || []).map(h => ({
                 date: h.createdAt,
                 type: h.type,
-                actor: h.actor?.companyName || h.actor?.fullName || 'System',
+                actor: h.actor?.companyName || h.actor?.fullName || h.actor?.role || 'System',
                 details: h.description
             }))
         };

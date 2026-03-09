@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import LiveView from '@/components/LiveView';
+import { usePDF } from 'react-to-pdf';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
@@ -43,6 +46,11 @@ export default function AdminDashboard() {
     // Live Tracking
     const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
 
+    // Forensic Dossier states
+    const [isGeneratingDossier, setIsGeneratingDossier] = useState<string | null>(null);
+    const [dossierData, setDossierData] = useState<any>(null);
+    const dossierRef = useRef<HTMLDivElement>(null);
+
     // Device Details Modal
     const [selectedDevice, setSelectedDevice] = useState<any>(null);
     const [isDeviceDetailsModalOpen, setIsDeviceDetailsModalOpen] = useState(false);
@@ -58,46 +66,51 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [dashRes, usersRes, devicesRes, incidentsRes, docsRes, msgsRes] = await Promise.all([
+            // High-performance parallel synchronization
+            const [dashRes, usersRes, devicesRes, incidentsRes, docsRes, msgsRes, suspectRes, authRes] = await Promise.all([
                 fetch(`${apiUrl}/admin/dashboard`, { headers }),
                 fetch(`${apiUrl}/admin/users`, { headers }),
                 fetch(`${apiUrl}/admin/devices`, { headers }),
                 fetch(`${apiUrl}/admin/incidents`, { headers }),
                 fetch(`${apiUrl}/admin/documents`, { headers }),
                 fetch(`${apiUrl}/admin/messages`, { headers }),
+                fetch(`${apiUrl}/admin/suspects`, { headers }),
                 fetch(`${apiUrl}/admin/password-reset-requests`, { headers })
             ]);
 
-            if (!dashRes.ok) throw new Error('Access denied. Admin privileges required.');
-            if (!usersRes.ok) throw new Error(`Users API failed with status ${usersRes.status}`);
-            if (!devicesRes.ok) throw new Error(`Devices API failed with status ${devicesRes.status}`);
-            if (!incidentsRes.ok) throw new Error(`Incidents API failed with status ${incidentsRes.status}`);
-            if (!docsRes.ok) throw new Error(`Documents API failed with status ${docsRes.status}`);
-            if (!msgsRes.ok) throw new Error(`Messages API failed with status ${msgsRes.status}`);
+            // Handle cascading errors with precision
+            if (dashRes.status === 401 || dashRes.status === 403) {
+                window.location.href = '/admin/login';
+                return;
+            }
 
-            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData, authRes, suspectsRes] = await Promise.all([
-                dashRes.json(), usersRes.json(), devicesRes.json(), incidentsRes.json(), docsRes.json(), msgsRes.json(),
-                fetch(`${apiUrl}/admin/password-reset-requests`, { headers }),
-                fetch(`${apiUrl}/admin/suspects`, { headers })
+            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData, suspectsData, authData] = await Promise.all([
+                dashRes.ok ? dashRes.json() : Promise.resolve(null),
+                usersRes.ok ? usersRes.json() : Promise.resolve({ users: [] }),
+                devicesRes.ok ? devicesRes.json() : Promise.resolve({ devices: [] }),
+                incidentsRes.ok ? incidentsRes.json() : Promise.resolve({ incidents: [] }),
+                docsRes.ok ? docsRes.json() : Promise.resolve({ userDocuments: [], deviceDocuments: [] }),
+                msgsRes.ok ? msgsRes.json() : Promise.resolve({ messages: [] }),
+                suspectRes.ok ? suspectRes.json() : Promise.resolve({ suspects: [] }),
+                authRes.ok ? authRes.json() : Promise.resolve({ requests: [] })
             ]);
 
-            const suspectsData = suspectsRes.ok ? await suspectsRes.json() : { suspects: [] };
-
-            setStats(dashData);
+            // Fail-safe State Population
+            if (dashData) setStats(dashData);
             setUsers(usersData.users || []);
             setDevices(devicesData.devices || []);
             setIncidents(incidentsData.incidents || []);
             setDocuments(docsData || { userDocuments: [], deviceDocuments: [] });
             setMessages(msgsData.messages || []);
             setSuspects(suspectsData.suspects || []);
-            const authData = authRes.ok ? await authRes.json() : { requests: [] };
             setAuthRequests(authData.requests || []);
+
+            // Specific error warning if non-critical routes fail
+            if (!docsRes.ok) console.warn('Administrative Intelligence document registry failed to sync.');
+
         } catch (err: any) {
-            console.error(err);
-            setError(err.message);
-            if (err.message.includes('401') || err.message.includes('403')) {
-                window.location.href = '/admin/login';
-            }
+            console.error('Telemetric Sync Failure:', err);
+            setError(`Critical failure in Command Center synchronization: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -298,6 +311,40 @@ export default function AdminDashboard() {
         } catch (err: any) { alert(err.message); }
     };
 
+    const exportDossier = async (imei: string) => {
+        setIsGeneratingDossier(imei);
+        try {
+            const res = await fetch(`${apiUrl}/police/export-evidence/${imei}`, { headers });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to fetch forensic data');
+
+            setDossierData(data.dossier);
+
+            setTimeout(async () => {
+                if (dossierRef.current) {
+                    try {
+                        const canvas = await html2canvas(dossierRef.current, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff' });
+                        const imgData = canvas.toDataURL('image/png', 1.0);
+                        const pdf = new jsPDF('p', 'mm', 'a4');
+                        const pdfWidth = pdf.internal.pageSize.getWidth();
+                        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+                        pdf.save(`PTS_FORENSIC_DOSSIER_${imei}.pdf`);
+                    } catch (err) {
+                        console.error('PDF generation error:', err);
+                        alert('Error assembling PDF. Ensure images are accessible.');
+                    } finally {
+                        setIsGeneratingDossier(null);
+                        setDossierData(null);
+                    }
+                }
+            }, 800);
+        } catch (err: any) {
+            alert(err.message);
+            setIsGeneratingDossier(null);
+        }
+    };
+
     const updateDeviceRisk = async (deviceId: string, riskScore: number) => {
         setEditingRiskId(null);
         const score = Math.min(100, Math.max(0, Math.round(riskScore)));
@@ -442,8 +489,8 @@ export default function AdminDashboard() {
                                 {searchResults.devices.map(d => (
                                     <div key={d.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500 flex items-center gap-3">
                                         <div className="w-8 h-8 rounded bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                            {d.devicePhotoUrl ? (
-                                                <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                            {d.devicePhotos && d.devicePhotos.length > 0 ? (
+                                                <img src={d.devicePhotos[0]} alt={d.model} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-slate-600">
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -664,8 +711,8 @@ export default function AdminDashboard() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                        {d.devicePhotoUrl ? (
-                                                            <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                                        {d.devicePhotos && d.devicePhotos.length > 0 ? (
+                                                            <img src={d.devicePhotos[0]} alt={d.model} className="w-full h-full object-cover" />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center text-slate-600">
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -863,8 +910,8 @@ export default function AdminDashboard() {
                                     {documents.deviceDocuments.map(d => (
                                         <div key={d.id} className="bg-slate-950 border border-slate-800 p-4 rounded-xl shadow-md flex gap-4">
                                             <div className="w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
-                                                {d.devicePhotoUrl ? (
-                                                    <img src={d.devicePhotoUrl} alt={d.model} className="w-full h-full object-cover" />
+                                                {d.devicePhotos && d.devicePhotos.length > 0 ? (
+                                                    <img src={d.devicePhotos[0]} alt={d.model} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-slate-700">
                                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -878,9 +925,12 @@ export default function AdminDashboard() {
                                                     <p className="text-xs font-medium text-slate-500 mt-0.5 truncate">Owner: {d.registeredOwner?.fullName || d.registeredOwner?.email}</p>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {d.devicePhotoUrl && <a href={d.devicePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
+                                                    {d.devicePhotos && d.devicePhotos.length > 0 && <a href={d.devicePhotos[0]} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-blue-500/20">📱 Photo</a>}
                                                     {d.purchaseReceiptUrl && <a href={d.purchaseReceiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-emerald-500/20">🧾 Receipt</a>}
                                                     {d.cartonPhotoUrl && <a href={d.cartonPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-amber-500/20">📦 Carton</a>}
+                                                    <button onClick={() => exportDossier(d.imei)} disabled={isGeneratingDossier === d.imei} className="text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-1 rounded inline-flex items-center gap-1 hover:bg-red-500/20 disabled:opacity-50">
+                                                        {isGeneratingDossier === d.imei ? '⌛' : '📜'} Forensic Dossier
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1222,8 +1272,8 @@ export default function AdminDashboard() {
                         <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 backdrop-blur-md">
                             <div className="flex items-center gap-5">
                                 <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 relative group">
-                                    {selectedDevice.devicePhotoUrl ? (
-                                        <img src={selectedDevice.devicePhotoUrl} alt="Device" className="w-full h-full object-cover" />
+                                    {selectedDevice.devicePhotos && selectedDevice.devicePhotos.length > 0 ? (
+                                        <img src={selectedDevice.devicePhotos[0]} alt="Device" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-slate-600">
                                             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -1271,7 +1321,7 @@ export default function AdminDashboard() {
                                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Evidence & Documents</h3>
                                     <div className="grid grid-cols-1 gap-2">
                                         {[
-                                            { label: 'Device Photo', url: selectedDevice.devicePhotoUrl, icon: '🖼️' },
+                                            { label: 'Device Photo', url: selectedDevice.devicePhotos?.[0], icon: '🖼️' },
                                             { label: 'Purchase Receipt', url: selectedDevice.purchaseReceiptUrl, icon: '🧾' },
                                             { label: 'Packaging/Carton', url: selectedDevice.cartonPhotoUrl, icon: '📦' }
                                         ].map(doc => (
@@ -1394,6 +1444,173 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* HIDDEN DOSSIER TEMPLATE FOR PDF GENERATION */}
+            <div className="fixed -left-[4000px] top-0 pointer-events-none">
+                {dossierData && (
+                    <div ref={dossierRef} className="w-[800px] p-12 bg-white text-slate-900 font-sans shadow-2xl flex flex-col min-h-[1123px]">
+                        {/* Dossier Header */}
+                        <div className="flex justify-between items-start border-b-[6px] border-slate-900 pb-8 mb-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-slate-200">PTS</div>
+                                <div>
+                                    <h1 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">Forensic Asset Dossier</h1>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">National Device Registry • Forensic Intelligence Division</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-none mb-1">Dossier ID</p>
+                                <p className="text-sm font-mono font-black text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{dossierData.reportId}</p>
+                            </div>
+                        </div>
+
+                        {/* Metadata Header */}
+                        <div className="grid grid-cols-3 gap-6 mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Generated Date</p>
+                                <p className="text-sm font-bold text-slate-800">{new Date(dossierData.generatedAt).toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Authorizing Official</p>
+                                <p className="text-sm font-bold text-slate-800 truncate">{dossierData.generatedBy}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Security Clearance</p>
+                                <p className="text-sm font-bold text-red-600">CENTRAL ADMIN / RESTRICTED</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-8 flex-1">
+                            {/* Left Panel: Subject Data */}
+                            <div className="col-span-2 space-y-8">
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Asset Manifest</h3>
+                                    <div className="space-y-4">
+                                        <div className="w-full aspect-square bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden shadow-inner flex items-center justify-center">
+                                            {dossierData.asset.photos && dossierData.asset.photos.length > 0 ? (
+                                                <img src={dossierData.asset.photos[0]} alt="Primary Evidence" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg className="w-20 h-20 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                            )}
+                                        </div>
+                                        <div className="bg-slate-950 text-white p-5 rounded-2xl space-y-3 font-mono">
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Brand / Model</p>
+                                                <p className="text-sm font-bold">{dossierData.asset.brand} {dossierData.asset.model}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">IMEI Identity</p>
+                                                <p className="text-sm font-bold tracking-widest">{dossierData.asset.imei}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Serial Identity</p>
+                                                <p className="text-sm font-bold">{dossierData.asset.serial || 'NOT_LOGGED'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Active Status</h3>
+                                    <div className="p-4 rounded-xl border-2 border-red-600 bg-red-600/[0.03]">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Network Status</span>
+                                            <span className="text-xs font-black text-red-600 uppercase tracking-wider">{dossierData.asset.status}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Risk Index</span>
+                                            <span className="text-xs font-black text-slate-900">{dossierData.asset.riskScore}/100</span>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Current Custodian</h3>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <p className="text-sm font-bold text-slate-900 mb-1">{dossierData.ownership.current}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase italic">Verified Legal Registrant</p>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* Right Panel: Timeline & Logs */}
+                            <div className="col-span-3 space-y-8">
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Ownership Chain-of-Custody</h3>
+                                    <div className="space-y-4">
+                                        {dossierData.ownership.chain.map((link: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4 items-start bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shrink-0">{idx + 1}</div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800">Transfer from {link.from} to {link.to}</p>
+                                                    <p className="text-[10px] text-slate-500 mt-1 font-mono uppercase font-bold">{new Date(link.date).toLocaleDateString()} • TS-VERIFIED</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {dossierData.ownership.chain.length === 0 && <p className="text-xs text-slate-400 italic">No historical ownership transfers recorded in PTS Ledger.</p>}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Forensic Transaction Ledger</h3>
+                                    <div className="bg-slate-950 text-slate-300 p-6 rounded-2xl space-y-6 font-mono border-t-[4px] border-emerald-500">
+                                        {(dossierData.ledger || []).slice(0, 8).map((entry: any, idx: number) => (
+                                            <div key={idx} className="flex gap-4">
+                                                <div className="text-[10px] font-black text-slate-600 shrink-0 border-r border-slate-800 pr-3 w-16 leading-tight">
+                                                    {new Date(entry.date).toLocaleDateString()}<br />
+                                                    {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-emerald-400 leading-none mb-1">{entry.type}</p>
+                                                    <p className="text-[11px] font-bold text-slate-200 mb-1 leading-tight">{entry.details}</p>
+                                                    <p className="text-[9px] text-slate-600 font-black italic">SGN: {entry.actor}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Service & Technical Log</h3>
+                                    <div className="space-y-3">
+                                        {(dossierData.maintenance || []).map((m: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-800 uppercase leading-none mb-1">{m.type}</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold">{m.provider}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-mono text-slate-900 font-black">{new Date(m.date).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {(!dossierData.maintenance || dossierData.maintenance.length === 0) && <p className="text-xs text-slate-400 italic">No technical service history available for this asset.</p>}
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+
+                        {/* Dossier Footer */}
+                        <div className="mt-auto pt-10 border-t border-slate-200 flex justify-between items-end">
+                            <div className="flex gap-6 items-center">
+                                <div className="w-20 h-20 bg-slate-900 p-2 rounded-lg flex items-center justify-center">
+                                    <div className="w-full h-full bg-slate-800 rounded flex items-center justify-center text-[8px] text-slate-500 text-center uppercase tracking-tightest leading-none">PTS<br />FORENSIC<br />SEAL</div>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-2 underline">Confidentiality Notice</p>
+                                    <p className="text-[9px] text-slate-400 italic max-w-xs leading-relaxed">
+                                        This document is an immutable record from the National Property Tracking System. Data integrity is guaranteed via cryptographical hash verification for central administration.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right border-l-2 border-slate-900 pl-4">
+                                <p className="text-[10px] font-mono font-black text-slate-900 uppercase">ADMINISTRATIVE CLEARANCE VERIFIED</p>
+                                <p className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">PTS GLOBAL COMMAND • CORE v4.1</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

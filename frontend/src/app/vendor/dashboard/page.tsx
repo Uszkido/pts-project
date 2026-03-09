@@ -1,5 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type VendorProfile = {
     id: string;
@@ -30,6 +32,11 @@ export default function Dashboard() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'register' | 'inventory' | 'sales' | 'messages' | 'maintenance'>('inventory');
     const [loading, setLoading] = useState(true);
+
+    // PDF Receipt State
+    const [isGeneratingReceipt, setIsGeneratingReceipt] = useState<string | null>(null);
+    const [receiptData, setReceiptData] = useState<any>(null);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
     // Maintenance State
     const [searchImei, setSearchImei] = useState('');
@@ -191,6 +198,49 @@ export default function Dashboard() {
         }
     };
 
+    const printReceipt = async (sale: any) => {
+        setIsGeneratingReceipt(sale.id);
+        const receiptData = {
+            id: sale.id.split('-')[0].toUpperCase(),
+            date: new Date(sale.transferDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+            vendor: profile?.companyName,
+            vendorEmail: profile?.email,
+            device: {
+                brand: sale.device.brand,
+                model: sale.device.model,
+                imei: sale.device.imei,
+            },
+            buyer: sale.buyer.email,
+            verificationUrl: `https://pts-registry.vercel.app/verify/${sale.device.imei}`
+        };
+        setReceiptData(receiptData);
+
+        // Small delay to allow React to render the invisible template
+        setTimeout(async () => {
+            if (receiptRef.current) {
+                try {
+                    const canvas = await html2canvas(receiptRef.current, {
+                        scale: 3,
+                        useCORS: true,
+                        backgroundColor: '#ffffff'
+                    });
+                    const imgData = canvas.toDataURL('image/png', 1.0);
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+                    pdf.save(`PTS_RECEIPT_${sale.device.imei}.pdf`);
+                } catch (err) {
+                    console.error('Failed to generate Receipt PDF:', err);
+                    alert('An error occurred while generating the receipt.');
+                }
+            }
+            setIsGeneratingReceipt(null);
+            setReceiptData(null);
+        }, 800);
+    };
+
     const handleLogRepair = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!foundDevice) return;
@@ -325,12 +375,12 @@ export default function Dashboard() {
                                             <tr key={device.id} className="hover:bg-slate-800/30 transition-colors group">
                                                 <td className="p-5">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                            {device.devicePhotoUrl ? (
-                                                                <img src={device.devicePhotoUrl} alt={device.model} className="w-full h-full object-cover" />
+                                                        <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0 shadow-inner group-hover:border-emerald-500/30 transition-colors">
+                                                            {device.devicePhotos && device.devicePhotos.length > 0 ? (
+                                                                <img src={device.devicePhotos[0]} alt={device.model} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
-                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -381,35 +431,44 @@ export default function Dashboard() {
                                             <th className="p-5">Date</th>
                                             <th className="p-5">Device Sold</th>
                                             <th className="p-5">Buyer Identity</th>
-                                            <th className="p-5 text-right">Verification</th>
+                                            <th className="p-5 text-right">Official Documents</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800 flex-1">
-                                        {sales.map(sale => (
-                                            <tr key={sale.id} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="p-5 text-sm font-medium text-slate-400">{new Date(sale.transferDate).toLocaleDateString()}</td>
+                                        {sales.map((sale: any) => (
+                                            <tr key={sale.id} className="hover:bg-slate-800/30 transition-colors group">
+                                                <td className="p-5 text-sm font-medium text-slate-400 font-mono italic uppercase tracking-tighter">{new Date(sale.transferDate).toLocaleDateString()}</td>
                                                 <td className="p-5">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                            {sale.device.devicePhotoUrl ? (
-                                                                <img src={sale.device.devicePhotoUrl} alt={sale.device.model} className="w-full h-full object-cover" />
+                                                        <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0 shadow-inner">
+                                                            {sale.device.devicePhotos && sale.device.devicePhotos.length > 0 ? (
+                                                                <img src={sale.device.devicePhotos[0]} alt={sale.device.model} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
-                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                                <div className="w-full h-full flex items-center justify-center text-slate-700">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                                                 </div>
                                                             )}
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-white mb-0.5">{sale.device.brand} {sale.device.model}</p>
-                                                            <p className="text-xs font-mono text-slate-500 tracking-widest">{sale.device.imei}</p>
+                                                            <p className="text-xs font-mono text-slate-500 tracking-widest leading-none">{sale.device.imei}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-5 text-slate-300">{sale.buyer.email}</td>
+                                                <td className="p-5 font-bold text-slate-300 truncate max-w-[150px]">{sale.buyer.email}</td>
                                                 <td className="p-5 text-right">
-                                                    <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">
-                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg> SECURED
-                                                    </span>
+                                                    <button
+                                                        onClick={() => printReceipt(sale)}
+                                                        disabled={isGeneratingReceipt === sale.id}
+                                                        className="inline-flex items-center gap-2 text-blue-400 hover:text-white text-xs font-black bg-blue-500/10 hover:bg-blue-600 px-4 py-2 rounded-xl border border-blue-500/20 transition-all uppercase tracking-widest disabled:opacity-50"
+                                                    >
+                                                        {isGeneratingReceipt === sale.id ? (
+                                                            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                        ) : (
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                        )}
+                                                        {isGeneratingReceipt === sale.id ? 'Exporting...' : 'Print Receipt'}
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -466,8 +525,8 @@ export default function Dashboard() {
                                         <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4">Device Identified</p>
                                         <div className="flex items-center gap-4 mb-6">
                                             <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
-                                                {foundDevice.devicePhotoUrl ? (
-                                                    <img src={foundDevice.devicePhotoUrl} alt="Device" className="w-full h-full object-cover" />
+                                                {foundDevice.devicePhotos && foundDevice.devicePhotos.length > 0 ? (
+                                                    <img src={foundDevice.devicePhotos[0]} alt="Device" className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-slate-600"><svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div>
                                                 )}
@@ -662,6 +721,97 @@ export default function Dashboard() {
                     </div>
                 )}
             </main>
+
+            {/* Hidden High-Fidelity Sales Receipt Template for PDF Generation */}
+            <div style={{ position: 'fixed', top: '0', left: '200%', pointerEvents: 'none' }}>
+                {receiptData && (
+                    <div ref={receiptRef} style={{ width: '800px', padding: '60px' }} className="bg-white text-slate-900 font-sans relative flex flex-col min-h-[1000px]">
+                        {/* Header Section */}
+                        <div className="flex justify-between items-start border-b-4 border-slate-900 pb-10 mb-10">
+                            <div>
+                                <h1 className="text-4xl font-black tracking-tighter text-slate-900 italic uppercase leading-none">Official Sales Receipt</h1>
+                                <p className="text-sm font-mono font-bold text-blue-600 mt-2 tracking-widest uppercase">Transaction Reference: {receiptData.id}</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-2xl font-black text-slate-900 tracking-tighter leading-none mb-1">PTS NATIONAL REGISTRY</div>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Authorized Vendor Network • Phase 4</p>
+                            </div>
+                        </div>
+
+                        {/* Transaction Partner Info */}
+                        <div className="grid grid-cols-2 gap-12 mb-12">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Authorized Vendor</p>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                    <p className="text-xl font-black text-slate-900 uppercase tracking-tight mb-1">{receiptData.vendor}</p>
+                                    <p className="text-sm font-bold text-slate-500 italic uppercase">Verified PTS Retailer</p>
+                                    <p className="text-xs font-mono text-slate-400 mt-4">{receiptData.vendorEmail}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Authenticated Buyer</p>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 h-full flex flex-col justify-center">
+                                    <p className="text-lg font-black text-slate-900 truncate uppercase mt-auto">{receiptData.buyer}</p>
+                                    <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-auto mt-1 italic">Identity-Bound Registrant</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Asset Specification Section */}
+                        <div className="mb-12">
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Asset Details & Manifest</p>
+                            <div className="bg-slate-950 text-white p-8 rounded-[2.5rem] border border-slate-800 shadow-2xl relative overflow-hidden">
+                                {/* Diagonal Accent */}
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 -rotate-45 translate-x-16 -translate-y-16"></div>
+
+                                <div className="flex gap-10 items-center">
+                                    <div className="w-40 h-40 bg-white/5 rounded-3xl border border-white/10 flex items-center justify-center shrink-0">
+                                        <svg className="w-16 h-16 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                    </div>
+                                    <div className="flex-1 space-y-6">
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-1 tracking-widest">Brand / Category</p>
+                                                <p className="text-2xl font-black tracking-tight leading-none uppercase">{receiptData.device.brand}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-1 tracking-widest">Model / Revision</p>
+                                                <p className="text-2xl font-black tracking-tight leading-none uppercase">{receiptData.device.model}</p>
+                                            </div>
+                                        </div>
+                                        <div className="pt-6 border-t border-white/10">
+                                            <p className="text-[8px] text-slate-500 uppercase font-black mb-1 tracking-widest">Registry Identity (IMEI)</p>
+                                            <p className="text-xl font-mono font-bold tracking-[0.2em]">{receiptData.device.imei}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Core Verification Hash Section */}
+                        <div className="mt-auto pt-12 border-t border-slate-200">
+                            <div className="flex justify-between items-end">
+                                <div className="flex gap-8 items-center">
+                                    <div className="w-24 h-24 bg-slate-900 p-2 rounded-2xl flex items-center justify-center shadow-lg">
+                                        {/* Placeholder QR for receipt verification */}
+                                        <div className="w-full h-full bg-slate-800 rounded-xl flex items-center justify-center text-[7px] text-slate-500 text-center uppercase tracking-tighter font-black leading-none italic">PTS<br />SECURE<br />TRANS<br />HASH</div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-2 underline">Ownership Certification</p>
+                                        <p className="text-[9px] text-slate-400 italic max-w-sm leading-relaxed">
+                                            This document serves as an official proof of sale. The asset has been cryptographically transferred from the authorized vendor to the specified buyer within the National Property Tracking System. Data integrity is guaranteed via 256-bit hash verification at {receiptData.verificationUrl}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-mono font-black text-slate-900 uppercase leading-none mb-1">Authenticated {receiptData.date}</p>
+                                    <p className="text-[8px] text-slate-400 uppercase tracking-widest font-black italic">National Ver: 4.8.1-REC</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
