@@ -5,6 +5,8 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
     const [trackingData, setTrackingData] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const fetchTracking = async () => {
         try {
@@ -26,6 +28,57 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
             }
         } catch (err) { console.error(err); }
         finally { setLoading(false); }
+    };
+
+    const handleDeployTeam = async () => {
+        setActionLoading('deploy');
+        setMessage(null);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/deploy-team`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ imei, location: trackingData?.lastKnownLocation })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            setMessage({ type: 'success', text: data.message });
+        } catch (err: any) {
+            setMessage({ type: 'error', text: err.message });
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleAlertVendors = async () => {
+        setActionLoading('alert');
+        setMessage(null);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/alert-vendors`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({
+                    imei,
+                    brand: trackingData?.brand,
+                    model: trackingData?.model,
+                    location: trackingData?.lastKnownLocation
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            setMessage({ type: 'success', text: data.message });
+        } catch (err: any) {
+            setMessage({ type: 'error', text: err.message });
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     useEffect(() => {
@@ -91,9 +144,28 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
                                 <p className="text-sm font-black text-white truncate">{trackingData?.brand} {trackingData?.model}</p>
                             </div>
                         </div>
-                        <div className="flex gap-4">
-                            <button className="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-blue-500/20 transition-all uppercase tracking-widest text-xs">Deploy Response Team</button>
-                            <button className="bg-slate-800 hover:bg-slate-700 text-white font-black px-8 py-4 rounded-2xl border border-slate-700 transition-all uppercase tracking-widest text-xs">Alert Nearby Vendors</button>
+                        <div className="flex flex-col gap-3">
+                            {message && (
+                                <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-center border animate-in fade-in slide-in-from-bottom-2 ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                    {message.text}
+                                </div>
+                            )}
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={handleDeployTeam}
+                                    disabled={actionLoading !== null}
+                                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-blue-500/20 transition-all uppercase tracking-widest text-xs flex items-center gap-2"
+                                >
+                                    {actionLoading === 'deploy' ? 'Deploying...' : 'Deploy Response Team'}
+                                </button>
+                                <button
+                                    onClick={handleAlertVendors}
+                                    disabled={actionLoading !== null}
+                                    className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-black px-8 py-4 rounded-2xl border border-slate-700 transition-all uppercase tracking-widest text-xs flex items-center gap-2"
+                                >
+                                    {actionLoading === 'alert' ? 'Broadcasting...' : 'Alert Nearby Vendors'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

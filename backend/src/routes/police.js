@@ -348,4 +348,64 @@ router.post('/messages', authenticatePolice, async (req, res) => {
     }
 });
 
+// ============ LIVE ACTIONS ============
+router.post('/deploy-team', authenticatePolice, async (req, res) => {
+    try {
+        const { imei, location } = req.body;
+        if (!imei) return res.status(400).json({ error: 'IMEI is required' });
+
+        const device = await prisma.device.findUnique({ where: { imei } });
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        // Record the deployment in transaction history
+        await prisma.transactionHistory.create({
+            data: {
+                deviceId: device.id,
+                actorId: req.user.id,
+                type: 'TEAM_DEPLOYED',
+                description: `Rapid Response Team deployed to last known location: ${location || device.lastKnownLocation || 'Unknown'}`,
+                metadata: JSON.stringify({ timestamp: new Date(), location })
+            }
+        });
+
+        // Update device status to INVESTIGATING if it's not already something more serious
+        if (device.status === 'STOLEN' || device.status === 'LOST' || device.status === 'CLEAN') {
+            await prisma.device.update({
+                where: { imei },
+                data: { status: 'INVESTIGATING' }
+            });
+        }
+
+        res.json({ message: 'Rapid Response Team has been dispatched and logged.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/alert-vendors', authenticatePolice, async (req, res) => {
+    try {
+        const { imei, brand, model, location } = req.body;
+        if (!imei) return res.status(400).json({ error: 'IMEI is required' });
+
+        const subject = `🚨 STOLEN DEVICE ALERT: ${brand} ${model}`;
+        const body = `Attention all vendors: A device with IMEI ${imei} (${brand} ${model}) was recently tracked near ${location || 'your area'}. DO NOT attempt to purchase or service this device. Contact law enforcement immediately if it appears in your shop.`;
+
+        // Broadcast message to all vendors
+        await prisma.message.create({
+            data: {
+                senderId: req.user.id,
+                receiverRole: 'VENDOR',
+                subject,
+                body
+            }
+        });
+
+        res.json({ message: 'Alert broadcasted to all registered vendors in the network.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;
