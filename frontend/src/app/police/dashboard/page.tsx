@@ -43,6 +43,46 @@ export default function PoliceDashboard() {
     // Live Tracking
     const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
 
+    const handleBrick = async (imei: string, reason: string) => {
+        if (!window.confirm(`⚠️ WARNING: You are about to BRICK this device (${imei}) permanentely. This will disable all hardware functionality via the National Kill-Switch API. Proceed?`)) return;
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/devices/${imei}/brick`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Bricking failed');
+            setStatusMessage({ type: 'success', text: `Kill-Switch Activated for ${imei}` });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
+    const handleUnbrick = async (imei: string) => {
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/police/devices/${imei}/unbrick`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Unbricking failed');
+            setStatusMessage({ type: 'success', text: `Kill-Switch Deactivated for ${imei}` });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
     const fetchData = async () => {
         setLoading(true);
         try {
@@ -512,22 +552,37 @@ export default function PoliceDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     {device.lastKnownLocation ? (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></div>
-                                                            <span className="text-emerald-400 text-xs font-mono font-bold">{device.lastKnownLocation}</span>
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></div>
+                                                                <span className="text-emerald-400 text-xs font-mono font-bold">{device.lastKnownLocation}</span>
+                                                            </div>
+                                                            {device.lastObservationDate && (
+                                                                <div className="flex items-center gap-1.5 opacity-60">
+                                                                    <svg className="w-3 h-3 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                                                                    <span className="text-[10px] text-blue-300 font-bold uppercase">Mesh Sig: {device.lastBluetoothSig || device.lastWifiSig || 'Guardian Node'}</span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <span className="text-slate-600 text-xs font-mono">No ping yet</span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
-                                                        device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
-                                                            device.status === 'INVESTIGATING' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse' :
-                                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                                        }`}>
-                                                        {device.status}
-                                                    </span>
+                                                    <div className="flex flex-col gap-2">
+                                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center ${device.status === 'STOLEN' ? 'bg-red-500/10 text-red-500 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]' :
+                                                            device.status === 'LOST' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                                                device.status === 'INVESTIGATING' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse' :
+                                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                            }`}>
+                                                            {device.status}
+                                                        </span>
+                                                        {device.isBricked && (
+                                                            <span className="px-2.5 py-1 rounded-full bg-black text-red-600 border border-red-900/50 text-[9px] font-black uppercase tracking-tighter text-center">
+                                                                ⚠️ HARDWARE BRICKED ⚠️
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
@@ -550,6 +605,22 @@ export default function PoliceDashboard() {
                                                             )}
                                                             {isGeneratingDossier === device.imei ? 'Compiling...' : 'Dossier'}
                                                         </button>
+                                                        {device.status === 'STOLEN' && !device.isBricked && (
+                                                            <button
+                                                                onClick={() => handleBrick(device.imei, 'Theft Reported')}
+                                                                className="text-[10px] font-black text-red-600 hover:text-white bg-red-600/10 hover:bg-black px-2.5 py-1.5 rounded-lg border border-red-600/30 hover:border-red-600 transition-all uppercase tracking-tighter shadow-inner"
+                                                            >
+                                                                Kill-Switch
+                                                            </button>
+                                                        )}
+                                                        {device.isBricked && (
+                                                            <button
+                                                                onClick={() => handleUnbrick(device.imei)}
+                                                                className="text-[10px] font-black text-emerald-500 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 transition-all uppercase tracking-tighter font-mono"
+                                                            >
+                                                                Restore HW
+                                                            </button>
+                                                        )}
                                                         {device.status !== 'INVESTIGATING' && (
                                                             <button onClick={() => updateStatus(device.imei, 'INVESTIGATING')} className="text-[10px] font-bold text-amber-500 hover:text-amber-400 transition-colors uppercase tracking-wide">Investigate</button>
                                                         )}

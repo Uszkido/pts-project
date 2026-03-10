@@ -20,7 +20,7 @@ const authenticateToken = (req, res, next) => {
 // Initiate an ownership transfer
 router.post('/initiate', authenticateToken, async (req, res) => {
     try {
-        const { deviceId, buyerEmail, price } = req.body;
+        const { deviceId, buyerEmail, price, useEscrow, escrowAmount } = req.body;
 
         // Ensure device belongs to the sender
         const device = await prisma.device.findUnique({ where: { id: deviceId } });
@@ -48,12 +48,17 @@ router.post('/initiate', authenticateToken, async (req, res) => {
                 handoverCode,
                 expiresAt,
                 status: 'PENDING',
-                price
+                price,
+                isEscrowEnabled: !!useEscrow,
+                escrowStatus: useEscrow ? 'LOCKED' : 'NONE',
+                escrowAmount: useEscrow ? parseFloat(escrowAmount) || 0 : null
             }
         });
 
         res.json({
-            message: 'Transfer initiated. Give this Handover Code to the buyer: ' + handoverCode,
+            message: useEscrow
+                ? 'Transfer initiated with P2P Escrow. Funds are SECURED. Give this Handover Code to the buyer: ' + handoverCode
+                : 'Transfer initiated. Give this Handover Code to the buyer: ' + handoverCode,
             handoverCode,
             transfer
         });
@@ -113,10 +118,13 @@ router.post('/accept/:transferId', authenticateToken, async (req, res) => {
                 throw new Error('Transfer request has expired. Seller must re-initiate.');
             }
 
-            // 1. Mark transfer as completed
+            // 1. Mark transfer as completed (and release escrow if enabled)
             await tx.ownershipTransfer.update({
                 where: { id: transferId },
-                data: { status: 'COMPLETED' }
+                data: {
+                    status: 'COMPLETED',
+                    escrowStatus: transfer.isEscrowEnabled ? 'RELEASED' : 'NONE'
+                }
             });
 
             // 2. Update device owner
@@ -149,8 +157,15 @@ router.post('/accept/:transferId', authenticateToken, async (req, res) => {
                     deviceId: transfer.deviceId,
                     actorId: req.user.id,
                     type: 'TRANSFER',
-                    description: `Ownership transferred from ${transfer.sellerId} to ${req.user.email}`,
-                    metadata: JSON.stringify({ transferId: transfer.id, sellerId: transfer.sellerId })
+                    description: transfer.isEscrowEnabled
+                        ? `Ownership transferred and ESCROW FUNDS RELEASED to seller. Secure handover complete.`
+                        : `Ownership transferred from ${transfer.sellerId} to ${req.user.email}`,
+                    metadata: JSON.stringify({
+                        transferId: transfer.id,
+                        sellerId: transfer.sellerId,
+                        escrowEnabled: transfer.isEscrowEnabled,
+                        escrowAmount: transfer.escrowAmount
+                    })
                 }
             });
 

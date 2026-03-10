@@ -12,6 +12,8 @@ function TransferForm() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const [useEscrow, setUseEscrow] = useState(false);
+    const [escrowAmount, setEscrowAmount] = useState('');
 
     useEffect(() => {
         const fetchDevices = async () => {
@@ -44,7 +46,13 @@ function TransferForm() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
                 },
-                body: JSON.stringify({ deviceId: selectedDevice, buyerEmail })
+                body: JSON.stringify({
+                    deviceId: selectedDevice,
+                    buyerEmail,
+                    price: 0,
+                    useEscrow,
+                    escrowAmount: useEscrow ? parseFloat(escrowAmount) : 0
+                })
             });
             const data = await res.json();
 
@@ -103,6 +111,40 @@ function TransferForm() {
                             required
                         />
                         <p className="text-xs text-slate-500 mt-2">The buyer must have a verified PTS consumer identity.</p>
+                    </div>
+
+                    <div className="bg-slate-950/50 p-6 rounded-2xl border border-blue-500/10 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="text-sm font-bold text-blue-400">PTS P2P Escrow</h4>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">National Safe-Trade Safeguard</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setUseEscrow(!useEscrow)}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors ${useEscrow ? 'bg-blue-600' : 'bg-slate-800 border border-slate-700'}`}
+                            >
+                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${useEscrow ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                            </button>
+                        </div>
+
+                        {useEscrow && (
+                            <div className="animate-in slide-in-from-top-2 duration-300">
+                                <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Escrow Amount (₦)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₦</span>
+                                    <input
+                                        type="number"
+                                        value={escrowAmount}
+                                        onChange={e => setEscrowAmount(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all font-mono"
+                                        required={useEscrow}
+                                    />
+                                </div>
+                                <p className="text-[9px] text-slate-500 mt-2 italic">Funds will be held in National Escrow and released ONLY when the buyer inputs the Handover Code. 2% service fee applies.</p>
+                            </div>
+                        )}
                     </div>
 
                     <button disabled={loading} type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl pt-4 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 mt-4">

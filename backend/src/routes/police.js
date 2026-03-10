@@ -585,4 +585,67 @@ router.get('/intel-feed', authenticatePolice, async (req, res) => {
     }
 });
 
+// ============ NATIONAL KILL-SWITCH (BRICK/UNBRICK) ============
+router.post('/devices/:imei/brick', authenticatePolice, async (req, res) => {
+    try {
+        const { imei } = req.params;
+        const { reason } = req.body;
+
+        const device = await prisma.device.findUnique({ where: { imei } });
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        await prisma.device.update({
+            where: { imei },
+            data: {
+                isBricked: true,
+                status: 'STOLEN' // Force status to STOLEN if bricked
+            }
+        });
+
+        await prisma.transactionHistory.create({
+            data: {
+                deviceId: device.id,
+                actorId: req.user.id,
+                type: 'HARDWARE_BRICKED',
+                description: `DEVICE KILL-SWITCH ACTIVATED. Reason: ${reason || 'Reported Stolen/Malicious activity'}`,
+                metadata: JSON.stringify({ timestamp: new Date(), officialId: req.user.id })
+            }
+        });
+
+        res.json({ message: 'Kill-switch activated. Device hardware is now marked as BRICKED globally.', imei });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+router.post('/devices/:imei/unbrick', authenticatePolice, async (req, res) => {
+    try {
+        const { imei } = req.params;
+
+        const device = await prisma.device.findUnique({ where: { imei } });
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+
+        await prisma.device.update({
+            where: { imei },
+            data: { isBricked: false }
+        });
+
+        await prisma.transactionHistory.create({
+            data: {
+                deviceId: device.id,
+                actorId: req.user.id,
+                type: 'HARDWARE_RESTORED',
+                description: 'Kill-switch deactivated. Device hardware functionality restored.',
+                metadata: JSON.stringify({ timestamp: new Date(), officialId: req.user.id })
+            }
+        });
+
+        res.json({ message: 'Kill-switch deactivated. Device hardware has been restored.', imei });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

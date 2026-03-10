@@ -50,6 +50,14 @@ export default function ConsumerDashboard() {
     const certificateRef = useRef<HTMLDivElement>(null);
     const [certificateData, setCertificateData] = useState<any>(null);
 
+    // Escrow & Transfer Extensions
+    const [useEscrow, setUseEscrow] = useState(false);
+    const [escrowAmount, setEscrowAmount] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
+    const [transferTarget, setTransferTarget] = useState<any>(null);
+    const [buyerEmail, setBuyerEmail] = useState('');
+    const [transferError, setTransferError] = useState('');
+
     const fetchDashboardAndMessages = async () => {
         setLoading(true);
         try {
@@ -112,6 +120,44 @@ export default function ConsumerDashboard() {
             fetchDashboardAndMessages();
         } catch (err: any) {
             alert(err.message);
+        }
+    };
+
+    const initiateTransfer = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsTransferring(true);
+        setTransferError('');
+
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const res = await fetch(`${apiUrl}/transfers/initiate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                },
+                body: JSON.stringify({
+                    deviceId: transferTarget.id,
+                    buyerEmail,
+                    price: 0,
+                    useEscrow,
+                    escrowAmount: useEscrow ? parseFloat(escrowAmount) : 0
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            alert(data.message);
+            setTransferTarget(null);
+            setBuyerEmail('');
+            setUseEscrow(false);
+            setEscrowAmount('');
+            fetchDashboardAndMessages();
+        } catch (err: any) {
+            setTransferError(err.message);
+        } finally {
+            setIsTransferring(false);
         }
     };
 
@@ -440,8 +486,15 @@ export default function ConsumerDashboard() {
                                         <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl transition-colors ${device.status === 'CLEAN' ? 'bg-emerald-500/5 group-hover:bg-emerald-500/10' : 'bg-red-500/10 group-hover:bg-red-500/20'}`}></div>
 
                                         <div className="flex justify-between items-start mb-6 relative">
-                                            <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-                                                {device.status}
+                                            <div className="flex items-center gap-2">
+                                                <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${device.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                                                    {device.status}
+                                                </div>
+                                                {device.isBricked && (
+                                                    <div className="px-2.5 py-1 rounded-full bg-black text-red-600 border border-red-900/50 text-[9px] font-black uppercase tracking-tighter shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse">
+                                                        ⚠️ BRICKED
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="text-right">
                                                 <div className="text-[10px] text-slate-500 font-bold uppercase">Trust Score</div>
