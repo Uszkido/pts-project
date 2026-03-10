@@ -27,6 +27,12 @@ export default function Dashboard() {
     const [devicePhotos, setDevicePhotos] = useState<File[]>([]);
     const [isRegistering, setIsRegistering] = useState(false);
 
+    // Hardware DNA Serial Numbers
+    const [screenSerial, setScreenSerial] = useState('');
+    const [batterySerial, setBatterySerial] = useState('');
+    const [motherboardSerial, setMotherboardSerial] = useState('');
+    const [cameraSerial, setCameraSerial] = useState('');
+
     // UI State
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -135,7 +141,11 @@ export default function Dashboard() {
                     brand,
                     model,
                     serialNumber: serial,
-                    devicePhotos: devicePhotoUrls
+                    devicePhotos: devicePhotoUrls,
+                    screenSerialNumber: screenSerial,
+                    batterySerialNumber: batterySerial,
+                    motherboardSerialNumber: motherboardSerial,
+                    cameraSerialNumber: cameraSerial
                 })
             });
             const data = await res.json();
@@ -143,6 +153,7 @@ export default function Dashboard() {
 
             setMessage(`Device registered securely. IMEI: ${data.device.imei}`);
             setImei(''); setBrand(''); setModel(''); setSerial(''); setDevicePhotos([]);
+            setScreenSerial(''); setBatterySerial(''); setMotherboardSerial(''); setCameraSerial('');
 
             // If direct sale, initiate transfer
             if (isDirectSale && customerEmail) {
@@ -842,6 +853,56 @@ export default function Dashboard() {
                                         <input type="text" value={imei} onChange={e => setImei(e.target.value.replace(/\D/g, '').slice(0, 15))} required placeholder="e.g. 359123456789012" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl pl-12 pr-4 py-3 text-white font-mono tracking-wider focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
                                     </div>
                                 </div>
+
+                                <div className="pt-6 border-t border-slate-800">
+                                    <h3 className="text-sm font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04M12 2.944V21m0-18.056L3.382 7.056M12 2.944l8.618 4.112M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        Hardware DNA Registry (Forensics)
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Screen Serial No.</label>
+                                            <input
+                                                type="text"
+                                                value={screenSerial}
+                                                onChange={e => setScreenSerial(e.target.value)}
+                                                placeholder="Part ID: SCR-XXXX"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all text-sm font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Battery Serial No.</label>
+                                            <input
+                                                type="text"
+                                                value={batterySerial}
+                                                onChange={e => setBatterySerial(e.target.value)}
+                                                placeholder="Part ID: BAT-XXXX"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all text-sm font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Logic Board (Motherboard)</label>
+                                            <input
+                                                type="text"
+                                                value={motherboardSerial}
+                                                onChange={e => setMotherboardSerial(e.target.value)}
+                                                placeholder="Part ID: MOB-XXXX"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all text-sm font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Camera Module</label>
+                                            <input
+                                                type="text"
+                                                value={cameraSerial}
+                                                onChange={e => setCameraSerial(e.target.value)}
+                                                placeholder="Part ID: CAM-XXXX"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all text-sm font-mono"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-400 mb-2 uppercase tracking-wide">Device Brand <span className="text-red-500">*</span></label>
                                     <input type="text" value={brand} onChange={e => setBrand(e.target.value)} required placeholder="e.g. Apple" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />

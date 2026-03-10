@@ -5,25 +5,25 @@
 
 const BASE_PRICES = {
     'Apple': {
-        'iPhone 15 Pro Max': 1200,
-        'iPhone 15 Pro': 1000,
-        'iPhone 15': 800,
-        'iPhone 14': 600,
-        'iPhone 13': 500
+        'iPhone 15 Pro Max': 1800000,
+        'iPhone 15 Pro': 1500000,
+        'iPhone 15': 1200000,
+        'iPhone 14': 950000,
+        'iPhone 13': 800000
     },
     'Samsung': {
-        'Galaxy S24 Ultra': 1300,
-        'Galaxy S24': 800,
-        'Galaxy S23': 600,
-        'Galaxy Z Fold 5': 1800
+        'Galaxy S24 Ultra': 1750000,
+        'Galaxy S24': 1100000,
+        'Galaxy S23': 850000,
+        'Galaxy Z Fold 5': 2200000
     },
     'Google': {
-        'Pixel 8 Pro': 1000,
-        'Pixel 8': 700
+        'Pixel 8 Pro': 1200000,
+        'Pixel 8': 850000
     }
 };
 
-const DEFAULT_BASE = 400;
+const DEFAULT_BASE = 450000;
 
 function calculateValuation(device) {
     let brandPrices = BASE_PRICES[device.brand] || {};

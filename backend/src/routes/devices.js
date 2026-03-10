@@ -24,7 +24,10 @@ const authenticateToken = (req, res, next) => {
 // Register a new device (Vendors only)
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { imei, serialNumber, brand, model, devicePhotos, purchaseReceiptUrl, cartonPhotoUrl } = req.body;
+        const {
+            imei, serialNumber, brand, model, devicePhotos, purchaseReceiptUrl, cartonPhotoUrl,
+            screenSerialNumber, batterySerialNumber, motherboardSerialNumber, cameraSerialNumber
+        } = req.body;
 
         if (!imei || !brand || !model) {
             return res.status(400).json({ error: 'IMEI, brand, and model are required' });
@@ -45,7 +48,11 @@ router.post('/', authenticateToken, async (req, res) => {
                 registeredOwnerId: req.user.id,
                 devicePhotos: devicePhotos || [],
                 purchaseReceiptUrl,
-                cartonPhotoUrl
+                cartonPhotoUrl,
+                screenSerialNumber,
+                batterySerialNumber,
+                motherboardSerialNumber,
+                cameraSerialNumber
             }
         });
 

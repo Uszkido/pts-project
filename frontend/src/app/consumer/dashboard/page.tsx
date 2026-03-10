@@ -32,7 +32,10 @@ export default function ConsumerDashboard() {
     const [reportError, setReportError] = useState('');
 
     // Device Registration State
-    const [registrationForm, setRegistrationForm] = useState({ brand: '', model: '', imei: '', serialNumber: '' });
+    const [registrationForm, setRegistrationForm] = useState({
+        brand: '', model: '', imei: '', serialNumber: '',
+        screenSerialNumber: '', batterySerialNumber: '', motherboardSerialNumber: '', cameraSerialNumber: ''
+    });
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
     const [cartonFile, setCartonFile] = useState<File | null>(null);
     const [deviceFiles, setDeviceFiles] = useState<File[]>([]);
@@ -620,6 +623,55 @@ export default function ConsumerDashboard() {
                                 <div>
                                     <label className="block text-sm font-bold text-slate-300 mb-2">Hardware Serial No (Opt)</label>
                                     <input type="text" value={registrationForm.serialNumber} onChange={e => setRegistrationForm({ ...registrationForm, serialNumber: e.target.value })} placeholder="Found in Settings/About" className="w-full bg-slate-950/50 border border-slate-700/80 rounded-xl px-4 py-3.5 text-white font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner" />
+                                </div>
+                            </div>
+
+                            <div className="p-5 bg-blue-950/20 border border-blue-900/30 rounded-2xl space-y-5">
+                                <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2 uppercase tracking-widest">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04M12 2.944V21m0-18.056L3.382 7.056M12 2.944l8.618 4.112M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Hardware DNA Registry (Forensics)
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Screen Serial</label>
+                                        <input
+                                            type="text"
+                                            value={registrationForm.screenSerialNumber}
+                                            onChange={e => setRegistrationForm({ ...registrationForm, screenSerialNumber: e.target.value })}
+                                            placeholder="Part ID: SCR-XXXX"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Battery Serial</label>
+                                        <input
+                                            type="text"
+                                            value={registrationForm.batterySerialNumber}
+                                            onChange={e => setRegistrationForm({ ...registrationForm, batterySerialNumber: e.target.value })}
+                                            placeholder="Part ID: BAT-XXXX"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Motherboard ID</label>
+                                        <input
+                                            type="text"
+                                            value={registrationForm.motherboardSerialNumber}
+                                            onChange={e => setRegistrationForm({ ...registrationForm, motherboardSerialNumber: e.target.value })}
+                                            placeholder="Part ID: MOB-XXXX"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Camera Module</label>
+                                        <input
+                                            type="text"
+                                            value={registrationForm.cameraSerialNumber}
+                                            onChange={e => setRegistrationForm({ ...registrationForm, cameraSerialNumber: e.target.value })}
+                                            placeholder="Part ID: CAM-XXXX"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all text-xs font-mono"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
