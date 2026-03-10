@@ -159,12 +159,12 @@ export default function VerificationPage() {
                                 <p className="text-sm text-slate-400">{status.model}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">Trust Score</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">Asset Market Valuation</p>
                                 <div className="flex items-end justify-end gap-1">
-                                    <span className={`text-4xl font-black leading-none ${status.riskScore >= 80 ? 'text-emerald-400' : status.riskScore >= 50 ? 'text-amber-400' : 'text-red-500'}`}>
-                                        {status.riskScore}
+                                    <span className={`text-4xl font-black leading-none text-white`}>
+                                        ${status.estimatedValue?.toLocaleString()}
                                     </span>
-                                    <span className="text-sm font-bold text-slate-600 mb-1">/100</span>
+                                    <span className="text-sm font-bold text-slate-600 mb-1">USD</span>
                                 </div>
                             </div>
                         </div>
@@ -180,6 +180,10 @@ export default function VerificationPage() {
                                 <span className="text-sm font-bold text-white">{status.registeredBy}</span>
                             </div>
                             <div className="flex justify-between items-center bg-slate-900/30 p-4 rounded-2xl border border-slate-800">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Trust Index</span>
+                                <span className={`text-sm font-black ${status.riskScore >= 80 ? 'text-emerald-400' : status.riskScore >= 50 ? 'text-amber-400' : 'text-red-500'}`}>{status.riskScore}/100</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-slate-900/30 p-4 rounded-2xl border border-slate-800">
                                 <span className="text-xs font-bold text-slate-500 uppercase">Registry Ver</span>
                                 <span className="text-[10px] font-mono font-black text-slate-600 uppercase tracking-tighter flex items-center gap-2">
                                     <div className={`w-1.5 h-1.5 rounded-full ${isClean ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
@@ -187,6 +191,32 @@ export default function VerificationPage() {
                                 </span>
                             </div>
                         </div>
+
+                        {/* Provenance History */}
+                        {status.maintenance && status.maintenance.length > 0 && (
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">Authentic Repair Chronology</p>
+                                <div className="space-y-3">
+                                    {status.maintenance.map((m: any) => (
+                                        <div key={m.id} className="relative p-5 bg-slate-950 border border-slate-900 rounded-3xl overflow-hidden">
+                                            {m.isOfficialService && (
+                                                <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-500 text-black text-[8px] font-black uppercase tracking-tighter rounded-bl-xl shadow-lg">
+                                                    Authentic Provenance Certified
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-4 mb-2">
+                                                <div className={`w-1 h-8 rounded-full ${m.isOfficialService ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-white uppercase tracking-tight">{m.serviceType?.replace('_', ' ')}</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">{m.vendorName} • {new Date(m.serviceDate).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-400 leading-relaxed pl-5">{m.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Safe Contact Form for LOST devices */}
                         {status.status === 'LOST' && !scSuccess && (
@@ -198,6 +228,12 @@ export default function VerificationPage() {
                                     <div>
                                         <h3 className="text-white font-bold">Secure Recovery Channel</h3>
                                         <p className="text-xs text-amber-500/70 font-bold uppercase tracking-widest">Found this device? Notify the owner.</p>
+                                        {status.activeBounty && (
+                                            <div className="mt-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-black font-black text-xs">$</div>
+                                                <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Recovery Bounty Active: ${status.activeBounty}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <form onSubmit={handleSafeContact} className="space-y-4">
