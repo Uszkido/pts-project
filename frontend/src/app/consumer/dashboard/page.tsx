@@ -274,7 +274,10 @@ export default function ConsumerDashboard() {
             if (!res.ok) throw new Error(data.error || 'Registration failed');
 
             alert('Device successfully registered to your account.');
-            setRegistrationForm({ brand: '', model: '', imei: '', serialNumber: '' });
+            setRegistrationForm({
+                brand: '', model: '', imei: '', serialNumber: '',
+                screenSerialNumber: '', batterySerialNumber: '', motherboardSerialNumber: '', cameraSerialNumber: ''
+            });
             setReceiptFile(null);
             setCartonFile(null);
             setDeviceFiles([]);
