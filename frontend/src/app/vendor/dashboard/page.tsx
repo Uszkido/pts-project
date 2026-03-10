@@ -146,7 +146,7 @@ export default function Dashboard() {
 
             // If direct sale, initiate transfer
             if (isDirectSale && customerEmail) {
-                const price = prompt("Enter the selling price for this device ($) (or leave empty): ");
+                const price = prompt("Enter the selling price for this device (₦) (or leave empty): ");
                 await initiateSale(data.device.id, customerEmail, price || '0');
             } else {
                 fetchDashboardData(); // Refresh inventory
@@ -217,7 +217,7 @@ export default function Dashboard() {
     const runTransferPrompt = (deviceId: string) => {
         const buyerEmail = prompt("Enter the customer's PTS registered email to transfer ownership: ");
         if (buyerEmail) {
-            const price = prompt("Enter the selling price for this device ($) (or leave empty): ");
+            const price = prompt("Enter the selling price for this device (₦) (or leave empty): ");
             initiateSale(deviceId, buyerEmail, price || '0');
         }
     };
@@ -528,8 +528,8 @@ export default function Dashboard() {
                                                     <td className="p-5 font-bold text-slate-300">{device.riskScore}</td>
                                                     <td className="p-5">
                                                         <div className="text-sm font-black text-white">
-                                                            ${device.estimatedValue?.toLocaleString()}
-                                                            <span className="ml-1 text-[10px] text-slate-500 font-normal uppercase tracking-tighter">USD</span>
+                                                            ₦{device.estimatedValue?.toLocaleString()}
+                                                            <span className="ml-1 text-[10px] text-slate-500 font-normal uppercase tracking-tighter">NGN</span>
                                                         </div>
                                                     </td>
                                                     <td className="p-5 text-right transition-all">
@@ -749,7 +749,7 @@ export default function Dashboard() {
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">Recorded Cost (Opt)</label>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₦</span>
                                                 <input
                                                     type="number"
                                                     value={repairCost}

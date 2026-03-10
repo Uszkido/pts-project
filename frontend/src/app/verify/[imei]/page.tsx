@@ -162,9 +162,9 @@ export default function VerificationPage() {
                                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1.5">Asset Market Valuation</p>
                                 <div className="flex items-end justify-end gap-1">
                                     <span className={`text-4xl font-black leading-none text-white`}>
-                                        ${status.estimatedValue?.toLocaleString()}
+                                        ₦{status.estimatedValue?.toLocaleString()}
                                     </span>
-                                    <span className="text-sm font-bold text-slate-600 mb-1">USD</span>
+                                    <span className="text-sm font-bold text-slate-600 mb-1">NGN</span>
                                 </div>
                             </div>
                         </div>
@@ -230,8 +230,8 @@ export default function VerificationPage() {
                                         <p className="text-xs text-amber-500/70 font-bold uppercase tracking-widest">Found this device? Notify the owner.</p>
                                         {status.activeBounty && (
                                             <div className="mt-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-black font-black text-xs">$</div>
-                                                <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Recovery Bounty Active: ${status.activeBounty}</p>
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-black font-black text-xs">₦</div>
+                                                <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Recovery Bounty Active: ₦{status.activeBounty}</p>
                                             </div>
                                         )}
                                     </div>
