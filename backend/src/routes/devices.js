@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
+const { calculateValuation } = require('../utils/valuation');
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 // Middleware to verify JWT
@@ -76,6 +77,18 @@ router.get('/verify/:imei', async (req, res) => {
             include: {
                 registeredOwner: {
                     select: { id: true, companyName: true, email: true }
+                },
+                maintenance: {
+                    include: {
+                        vendor: {
+                            select: { vendorTier: true, companyName: true }
+                        }
+                    },
+                    orderBy: { serviceDate: 'desc' }
+                },
+                incidents: {
+                    where: { status: 'OPEN' },
+                    select: { bounty: true, type: true }
                 }
             }
         });
@@ -111,7 +124,14 @@ router.get('/verify/:imei', async (req, res) => {
                 status: device.status,
                 riskScore,
                 registeredBy: device.registeredOwner.companyName || 'Private Owner',
-                devicePhotos: device.devicePhotos
+                devicePhotos: device.devicePhotos,
+                estimatedValue: calculateValuation({ ...device, riskScore }),
+                maintenance: device.maintenance.map(m => ({
+                    ...m,
+                    isOfficialService: m.vendor.vendorTier <= 2,
+                    vendorName: m.vendor.companyName
+                })),
+                activeBounty: device.incidents.find(i => i.bounty > 0)?.bounty || null
             }
         });
     } catch (error) {

@@ -119,6 +119,7 @@ model IncidentReport {
   locationSharedWithOwner Boolean @default(false)
   suspectId   String?
   suspect     Suspect? @relation(fields: [suspectId], references: [id])
+  bounty      Float?   // Digital bounty for recovery
   createdAt   DateTime @default(now())
 }
 
@@ -156,6 +157,7 @@ model OwnershipTransfer {
   expiresAt   DateTime?
   status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
   transferDate DateTime @default(now())
+  price       String?   // Device price at the time of sale
 }
 
 model TransactionHistory {

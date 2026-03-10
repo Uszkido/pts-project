@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
+const { calculateValuation } = require('../utils/valuation');
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 const authenticateToken = (req, res, next) => {
@@ -56,6 +57,56 @@ router.post('/suspicious-alert', authenticateToken, verifyVendorRole, async (req
     }
 });
 
+// Vendor triggers a Priority 1 Emergency Alert (Direct Police Contact)
+router.post('/emergency-alert', authenticateToken, verifyVendorRole, async (req, res) => {
+    try {
+        const { imei, description, location } = req.body;
+
+        const device = await prisma.device.findUnique({ where: { imei } });
+
+        // 1. Create the alert record
+        const alert = await prisma.vendorSuspiciousAlert.create({
+            data: {
+                deviceId: device ? device.id : undefined, // Might be an unregistered device
+                vendorId: req.user.id,
+                description: `🚨 EMERGENCY POLICE REQUEST: ${description} @ ${location}`,
+            }
+        });
+
+        // 2. Send HIGH PRIORITY message to all Police
+        await prisma.message.create({
+            data: {
+                senderId: req.user.id,
+                receiverRole: 'POLICE',
+                subject: `🚨 PRIORITY 1: Vendor Assistance Required`,
+                body: `Vendor "${req.user.companyName}" (ID: ${req.user.id}) has triggered a RAPID INTERVENTION alert.\n\nLocation: ${location}\nDevice IMEI: ${imei || 'N/A'}\nSituation: ${description}\n\nPlease dispatch the nearest unit.`,
+            }
+        });
+
+        // 3. Log the deployment request
+        if (device) {
+            await prisma.transactionHistory.create({
+                data: {
+                    deviceId: device.id,
+                    actorId: req.user.id,
+                    type: 'TEAM_DEPLOYED',
+                    description: `Vendor requested immediate law enforcement intervention at their shop location.`,
+                    metadata: JSON.stringify({ location, vendor: req.user.companyName })
+                }
+            });
+        }
+
+        res.status(201).json({
+            message: 'EMERGENCY SIGNAL TRANSMITTED. Stay calm. Law enforcement has been notified of your location.',
+            alertId: alert.id
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to transmit emergency signal.' });
+    }
+});
+
 // Vendor Dashboard Analytics & Data
 router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) => {
     try {
@@ -90,10 +141,17 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
                 status: true,
                 riskScore: true,
                 devicePhotos: true,
+                maintenance: true,
                 createdAt: true
             },
             orderBy: { createdAt: 'desc' }
         });
+
+        // Calculate valuations for each item
+        const inventoryWithValuation = inventory.map(device => ({
+            ...device,
+            estimatedValue: calculateValuation(device)
+        }));
 
         // 3. Fetch Sales History (Ownership Transfers where vendor is seller)
         const sales = await prisma.ownershipTransfer.findMany({
@@ -106,6 +164,19 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
                     select: { email: true }
                 }
             },
+        });
+
+        // 4. Fetch Pending Transfers (Devices being sent to the vendor)
+        const pendingTransfers = await prisma.ownershipTransfer.findMany({
+            where: { buyerId: vendorId, status: 'PENDING' },
+            include: {
+                device: {
+                    select: { imei: true, brand: true, model: true }
+                },
+                seller: {
+                    select: { email: true, companyName: true }
+                }
+            },
             orderBy: { transferDate: 'desc' }
         });
 
@@ -116,8 +187,9 @@ router.get('/dashboard', authenticateToken, verifyVendorRole, async (req, res) =
                 totalSales: sales.length,
                 trustScore: profile.trustScore?.score || 100
             },
-            inventory,
-            sales
+            inventory: inventoryWithValuation,
+            sales,
+            pendingTransfers
         });
 
     } catch (error) {

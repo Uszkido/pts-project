@@ -20,7 +20,7 @@ const authenticateToken = (req, res, next) => {
 // Initiate an ownership transfer
 router.post('/initiate', authenticateToken, async (req, res) => {
     try {
-        const { deviceId, buyerEmail } = req.body;
+        const { deviceId, buyerEmail, price } = req.body;
 
         // Ensure device belongs to the sender
         const device = await prisma.device.findUnique({ where: { id: deviceId } });
@@ -47,7 +47,8 @@ router.post('/initiate', authenticateToken, async (req, res) => {
                 buyerId: buyer.id,
                 handoverCode,
                 expiresAt,
-                status: 'PENDING'
+                status: 'PENDING',
+                price
             }
         });
 

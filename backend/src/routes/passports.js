@@ -49,11 +49,12 @@ router.get('/:imei', authenticateToken, async (req, res) => {
         }
 
         // Authorization check: Only relevant parties or Police/Admin can see the full passport
-        // For prototype, we allow owner, police, and registrant vendor.
+        // For prototype, we allow owner, police, admin, and all verified vendors (for repairs).
         const isAuthorized =
             device.registeredOwnerId === req.user.id ||
             req.user.role === 'POLICE' ||
-            req.user.role === 'ADMIN';
+            req.user.role === 'ADMIN' ||
+            req.user.role === 'VENDOR';
 
         if (!isAuthorized) {
             return res.status(403).json({ error: 'Unauthorized to view full device passport history' });

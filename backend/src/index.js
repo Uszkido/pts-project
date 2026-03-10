@@ -14,6 +14,7 @@ const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
 const maintenanceRoutes = require('./routes/maintenance');
 const publicRoutes = require('./routes/public');
+const swapRoutes = require('./routes/swap');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +36,7 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/maintenance', maintenanceRoutes);
 app.use('/api/v1/public', publicRoutes);
+app.use('/api/v1/swap', swapRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'PTS Backend is running' });
