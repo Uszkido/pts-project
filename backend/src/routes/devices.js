@@ -89,6 +89,13 @@ router.get('/verify/:imei', async (req, res) => {
                 incidents: {
                     where: { status: 'OPEN' },
                     select: { bounty: true, type: true }
+                },
+                transfersAsDevice: {
+                    include: {
+                        seller: { select: { id: true, companyName: true, email: true, role: true, fullName: true } },
+                        buyer: { select: { id: true, companyName: true, email: true, role: true, fullName: true } }
+                    },
+                    orderBy: { transferDate: 'asc' }
                 }
             }
         });
@@ -130,6 +137,12 @@ router.get('/verify/:imei', async (req, res) => {
                     ...m,
                     isOfficialService: m.vendor.vendorTier <= 2,
                     vendorName: m.vendor.companyName
+                })),
+                provenance: device.transfersAsDevice.map(t => ({
+                    date: t.transferDate,
+                    from: t.seller?.companyName || t.seller?.fullName || t.seller?.email,
+                    to: t.buyer?.companyName || t.buyer?.fullName || t.buyer?.email,
+                    type: t.seller?.role === 'VENDOR' ? 'RETAIL_SALE' : 'P2P_TRANSFER'
                 })),
                 activeBounty: device.incidents.find(i => i.bounty > 0)?.bounty || null
             }
