@@ -89,7 +89,7 @@ async function sendWhatsAppMessage(phoneNumberId, to, text) {
     }
 
     try {
-        const response = await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+        const response = await fetch(`https://graph.facebook.com/v18.0/${numId}/messages`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
