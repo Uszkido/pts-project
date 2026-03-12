@@ -5,6 +5,8 @@ const { generateLocalizedOracleResponse } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
+const { uploadFromUrl } = require('./imageUploader');
+const { registerUser } = require('./userService');
 
 let telegramBotInstance = null;
 
@@ -108,7 +110,75 @@ const initTelegramOracle = () => {
             return;
         }
 
-        // == END CONVERSATIONAL REGISTRATION FLOW ==
+        // == REGISTRATION FLOW ==
+        if (text.toLowerCase() === 'register') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_ROLE');
+            bot.sendMessage(chatId, "Great! Let's get you registered in the National Registry.\n\nPlease select your *Account Type*:", {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '👤 Device Owner (Consumer)', callback_data: 'REG_ROLE_CONSUMER' }],
+                        [{ text: '🏪 Shop Owner (Vendor)', callback_data: 'REG_ROLE_VENDOR' }]
+                    ]
+                }
+            });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_NAME') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_EMAIL', { fullName: text });
+            bot.sendMessage(chatId, "Thank you. Now, please enter your *Email Address* (this will be your username).", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_EMAIL') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_PASS', { email: text });
+            bot.sendMessage(chatId, "Next, set a secure *Password* for your account.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_PASS') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_NIN', { password: text });
+            bot.sendMessage(chatId, "Almost there! Please enter your *National ID Number (NIN)*.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_NIN') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_PHONE', { nationalId: text });
+            bot.sendMessage(chatId, "Please enter your *Phone Number* (starting with 234...).", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_PHONE') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_ADDRESS', { phoneNumber: text });
+            bot.sendMessage(chatId, "Please enter your *Physical Residential Address*.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_ADDRESS') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_PHOTO', { address: text });
+            bot.sendMessage(chatId, "Verification Step: Please send a *Live Selfie (Photo)* of yourself for biometric identity verification.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // Vendor Specific Fields
+        if (session.state === 'AWAITING_REG_BIZ_NAME') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_BIZ_ADDR', { companyName: text });
+            bot.sendMessage(chatId, "What is the *Physical Address* of your shop?", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_BIZ_ADDR') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_BIZ_REG', { businessAddress: text });
+            bot.sendMessage(chatId, "Please enter your *CAC Registration Number* (if available).", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REG_BIZ_REG') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_SHOP_PHOTO', { businessRegNo: text });
+            bot.sendMessage(chatId, "Verification: Please send a *Photo of your Shop Front*.", { parse_mode: 'Markdown' });
+            return;
+        }
 
         // ORIGINAL LOGIC: RegEx to find any standalone 15-digit number
         const imeiMatch = text.match(/\b\d{15}\b/);
@@ -168,6 +238,88 @@ const initTelegramOracle = () => {
         } catch (error) {
             console.error('Telegram Oracle Flow Error: ', error);
             bot.sendMessage(chatId, "Oh no! 😟 I'm having a little trouble connecting to the PTS server right now. Connections can be tricky sometimes.\n\nTuba, don Allah a sake jarrabawa an jima (Please give it another try a bit later).");
+        }
+    });
+
+    // Handle Photos separately
+    bot.on('photo', async (msg) => {
+        const chatId = msg.chat.id;
+        const session = getSession('TELEGRAM', chatId);
+        if (session.state === 'IDLE') return;
+
+        const photo = msg.photo[msg.photo.length - 1]; // Get highest res
+        const fileId = photo.file_id;
+
+        try {
+            const fileUrl = await bot.getFileLink(fileId);
+            const cloudinaryUrl = await uploadFromUrl(fileUrl);
+
+            if (!cloudinaryUrl) throw new Error("Upload failed");
+
+            // == CONSUMER SELFIE ==
+            if (session.state === 'AWAITING_REG_PHOTO') {
+                if (session.data.role === 'CONSUMER') {
+                    // Finalize Consumer Registration
+                    bot.sendMessage(chatId, "⏳ Processing your registration. Please wait...");
+                    try {
+                        const { user, otp } = await registerUser({ ...session.data, facialDataUrl: cloudinaryUrl });
+                        const { sendOtpViaBots } = require('../routes/auth'); // Relative to here or absolute? Requiring from a different dir usually works in Node
+                        await sendOtpViaBots(user, otp, "verification");
+
+                        bot.sendMessage(chatId, `🎉 *Registration Successful!*\n\nA verification OTP has been sent to your email. You can now use the *"login"* command once confirmed.`, { parse_mode: 'Markdown' });
+                        clearSession('TELEGRAM', chatId);
+                    } catch (err) {
+                        bot.sendMessage(chatId, `❌ Error: ${err.message}`);
+                        clearSession('TELEGRAM', chatId);
+                    }
+                } else {
+                    // It's a Vendor, move to business info
+                    updateSession('TELEGRAM', chatId, 'AWAITING_REG_BIZ_NAME', { facialDataUrl: cloudinaryUrl });
+                    bot.sendMessage(chatId, "Great! Now let's set up your business. What is your *Shop/Company Name*?", { parse_mode: 'Markdown' });
+                }
+                return;
+            }
+
+            // == VENDOR SHOP PHOTO ==
+            if (session.state === 'AWAITING_REG_SHOP_PHOTO') {
+                updateSession('TELEGRAM', chatId, 'AWAITING_REG_CAC_PHOTO', { shopPhotoUrl: cloudinaryUrl });
+                bot.sendMessage(chatId, "Finally, please send a *Photo of your CAC Certificate* to complete your application.", { parse_mode: 'Markdown' });
+                return;
+            }
+
+            // == VENDOR CAC PHOTO ==
+            if (session.state === 'AWAITING_REG_CAC_PHOTO') {
+                bot.sendMessage(chatId, "⏳ Finalizing your Vendor Application. Please wait...");
+                try {
+                    const { user, otp } = await registerUser({ ...session.data, cacCertificateUrl: cloudinaryUrl });
+                    const { sendOtpViaBots } = require('../routes/auth');
+                    await sendOtpViaBots(user, otp, "verification");
+
+                    bot.sendMessage(chatId, `✅ *Application Submitted!*\n\nYour vendor profile is now under review. A verification OTP has been sent to your email. Admin will verify your documents shortly.`, { parse_mode: 'Markdown' });
+                    clearSession('TELEGRAM', chatId);
+                } catch (err) {
+                    bot.sendMessage(chatId, `❌ Error: ${err.message}`);
+                    clearSession('TELEGRAM', chatId);
+                }
+                return;
+            }
+
+        } catch (e) {
+            console.error(e);
+            bot.sendMessage(chatId, "Sorry, I couldn't process your photo. Please try sending it again.");
+        }
+    });
+
+    // Handle Callback Queries (Role Selection)
+    bot.on('callback_query', (query) => {
+        const chatId = query.message.chat.id;
+        const data = query.data;
+
+        if (data.startsWith('REG_ROLE_')) {
+            const role = data.replace('REG_ROLE_', '');
+            updateSession('TELEGRAM', chatId, 'AWAITING_REG_NAME', { role });
+            bot.answerCallbackQuery(query.id);
+            bot.sendMessage(chatId, `Understood. You are registering as a *${role}*.\n\nPlease enter your *Full Legal Name*.`, { parse_mode: 'Markdown' });
         }
     });
 };

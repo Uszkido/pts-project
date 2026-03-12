@@ -6,6 +6,8 @@ const { generateLocalizedOracleResponse } = require('../services/aiService');
 const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
+const { uploadFromUrl } = require('../services/imageUploader');
+const { registerUser } = require('../services/userService');
 
 // 1. Webhook Verification (Meta requires this when you register your server URL)
 router.get('/webhook', (req, res) => {
@@ -128,7 +130,152 @@ router.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // == END CONVERSATIONAL REGISTRATION FLOW ==
+    // == REGISTRATION FLOW ==
+    if (msgBody.toLowerCase() === 'register') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_ROLE');
+        replyText = "Great! Let's get you registered in the *PTS Sentinel National Registry*.\n\nPlease type your account type:\n1️⃣ *CONSUMER* (Device Owner)\n2️⃣ *VENDOR* (Shop Owner)";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_ROLE') {
+        const choice = msgBody.toUpperCase();
+        const role = choice.includes('CONSUMER') || choice === '1' ? 'CONSUMER' : choice.includes('VENDOR') || choice === '2' ? 'VENDOR' : null;
+        if (!role) {
+            replyText = "I didn't catch that. Please type:\n*1* for Consumer\n*2* for Vendor";
+        } else {
+            updateSession('WHATSAPP', from, 'AWAITING_REG_NAME', { role });
+            replyText = `Understood. You are registering as a *${role}*.\n\nPlease enter your *Full Legal Name*.`;
+        }
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_NAME') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_EMAIL', { fullName: msgBody });
+        replyText = "Thank you. Now, please enter your *Email Address*.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_EMAIL') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_PASS', { email: msgBody });
+        replyText = "Next, set a secure *Password* for your account.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_PASS') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_NIN', { password: msgBody });
+        replyText = "Almost there! Please enter your *National ID Number (NIN)*.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_NIN') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_PHONE', { nationalId: msgBody });
+        replyText = "Please confirm your *Phone Number* (starting with 234...).";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_PHONE') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_ADDRESS', { phoneNumber: msgBody });
+        replyText = "Please enter your *Physical Residential Address*.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_REG_ADDRESS') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_PHOTO', { address: msgBody });
+        replyText = "Verification Step: Please send a *Live Selfie (Photo)* of yourself for biometric identity verification.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    // Media Handling (Selfie, Shop Photo, CAC)
+    if (msgType === 'image' && session.state.startsWith('AWAITING_REG_')) {
+        const mediaId = change.messages[0].image.id;
+        try {
+            const mediaUrl = await getWhatsAppMediaUrl(mediaId);
+            const cloudinaryUrl = await uploadFromUrl(mediaUrl);
+
+            if (!cloudinaryUrl) throw new Error("Cloudinary upload failed");
+
+            // CONSUMER SELFIE
+            if (session.state === 'AWAITING_REG_PHOTO') {
+                if (session.data.role === 'CONSUMER') {
+                    replyText = "⏳ Processing your registration. Please wait...";
+                    await sendWhatsAppMessage(phoneNumberId, from, replyText);
+                    const { user, otp } = await registerUser({ ...session.data, facialDataUrl: cloudinaryUrl });
+                    const { sendOtpViaBots } = require('./auth');
+                    await sendOtpViaBots(user, otp, "verification");
+                    replyText = `🎉 *Registration Successful!*\n\nA verification OTP has been sent to your email. You can now use the *"login"* command once confirmed.`;
+                    clearSession('WHATSAPP', from);
+                } else {
+                    updateSession('WHATSAPP', from, 'AWAITING_REG_BIZ_NAME', { facialDataUrl: cloudinaryUrl });
+                    replyText = "Great! Now let's set up your business. What is your *Shop/Company Name*?";
+                }
+                await sendWhatsAppMessage(phoneNumberId, from, replyText);
+                return res.sendStatus(200);
+            }
+
+            // VENDOR BUSINESS FIELDS handled via text, then photos
+        } catch (err) {
+            console.error(err);
+            await sendWhatsAppMessage(phoneNumberId, from, "Sorry, I couldn't process that photo. Please try again.");
+            return res.sendStatus(200);
+        }
+    }
+
+    // Vendor Specific Fields (Text)
+    if (session.state === 'AWAITING_REG_BIZ_NAME') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_BIZ_ADDR', { companyName: msgBody });
+        replyText = "What is the *Physical Address* of your shop?";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+    if (session.state === 'AWAITING_REG_BIZ_ADDR') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_BIZ_REG', { businessAddress: msgBody });
+        replyText = "Please enter your *CAC Registration Number*.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+    if (session.state === 'AWAITING_REG_BIZ_REG') {
+        updateSession('WHATSAPP', from, 'AWAITING_REG_SHOP_PHOTO', { businessRegNo: msgBody });
+        replyText = "Verification: Please send a *Photo of your Shop Front*.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    // Media Handling for Vendor Shop and CAC
+    if (msgType === 'image') {
+        const mediaId = change.messages[0].image.id;
+        try {
+            const mediaUrl = await getWhatsAppMediaUrl(mediaId);
+            const cloudinaryUrl = await uploadFromUrl(mediaUrl);
+
+            if (session.state === 'AWAITING_REG_SHOP_PHOTO') {
+                updateSession('WHATSAPP', from, 'AWAITING_REG_CAC_PHOTO', { shopPhotoUrl: cloudinaryUrl });
+                replyText = "Finally, please send a *Photo of your CAC Certificate* to complete your application.";
+                await sendWhatsAppMessage(phoneNumberId, from, replyText);
+                return res.sendStatus(200);
+            }
+            if (session.state === 'AWAITING_REG_CAC_PHOTO') {
+                replyText = "⏳ Finalizing your Vendor Application. Please wait...";
+                await sendWhatsAppMessage(phoneNumberId, from, replyText);
+                const { user, otp } = await registerUser({ ...session.data, cacCertificateUrl: cloudinaryUrl });
+                const { sendOtpViaBots } = require('./auth');
+                await sendOtpViaBots(user, otp, "verification");
+                replyText = `✅ *Application Submitted!*\n\nYour profile is under review. A verification OTP has been sent to your email.`;
+                clearSession('WHATSAPP', from);
+                await sendWhatsAppMessage(phoneNumberId, from, replyText);
+                return res.sendStatus(200);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
     // ORIGINAL LOGIC: Scan message for a 15-digit IMEI
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
@@ -244,6 +391,21 @@ async function sendWhatsAppMessage(phoneNumberId, to, text) {
         }
     } catch (error) {
         console.error('Error sending WhatsApp message:', error);
+    }
+}
+
+// Function to fetch the actual media URL from Meta using a Media ID
+async function getWhatsAppMediaUrl(mediaId) {
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    try {
+        const response = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        return data.url; // This is the temporary URL to the media file
+    } catch (error) {
+        console.error('Error fetching WhatsApp media URL:', error);
+        return null;
     }
 }
 

@@ -11,6 +11,7 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 const { sendWhatsAppMessage } = require('./whatsapp');
 const { sendTelegramMessage } = require('../services/telegramOracle');
 const { generateAiOtpEmailContent } = require('../services/aiService');
+const { registerUser } = require('../services/userService');
 
 // Email Transporter (Lazy loaded to ensure env variables are loaded)
 let transporter = null;
@@ -100,52 +101,13 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 router.post('/register', async (req, res) => {
     console.log(`📥 Registration attempt: ${req.body.email}`);
     try {
-        const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo, phoneNumber, address } = req.body;
-
-        // Simple validation
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
-            return res.status(400).json({ error: 'User already exists' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const otp = generateOTP();
-
-        const finalRole = role === 'CONSUMER' ? 'CONSUMER' : 'VENDOR';
-
-        const user = await prisma.user.create({
-            data: {
-                email,
-                password: hashedPassword,
-                companyName: finalRole === 'VENDOR' ? companyName : null,
-                role: finalRole,
-                fullName,
-                nationalId,
-                facialDataUrl,
-                biodataUrl,
-                cacCertificateUrl: finalRole === 'VENDOR' ? cacCertificateUrl : null,
-                businessAddress: finalRole === 'VENDOR' ? businessAddress : null,
-                shopLatitude: finalRole === 'VENDOR' && shopLatitude && !isNaN(parseFloat(shopLatitude)) ? parseFloat(shopLatitude) : null,
-                shopLongitude: finalRole === 'VENDOR' && shopLongitude && !isNaN(parseFloat(shopLongitude)) ? parseFloat(shopLongitude) : null,
-                shopPhotoUrl: finalRole === 'VENDOR' ? shopPhotoUrl : null,
-                businessRegNo: finalRole === 'VENDOR' ? businessRegNo : null,
-                vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED',
-                phoneNumber,
-                address,
-                isEmailConfirmed: false,
-                emailVerificationOtp: otp
-            }
-        });
+        const { user, otp } = await registerUser(req.body);
 
         // 🤖 Send OTP via Bots
         await sendOtpViaBots(user, otp, "verification");
 
         res.status(201).json({
-            message: finalRole === 'VENDOR'
+            message: user.role === 'VENDOR'
                 ? 'Vendor registration submitted. An OTP has been sent via WhatsApp/Telegram (if provided), or check with admin to verify your email.'
                 : 'User registered. An OTP has been sent via WhatsApp/Telegram, or check with admin to verify.',
             userId: user.id,
@@ -153,7 +115,7 @@ router.post('/register', async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(400).json({ error: error.message });
     }
 });
 
