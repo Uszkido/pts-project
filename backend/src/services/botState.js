@@ -4,7 +4,7 @@ const userSessions = new Map();
 const getSession = (platform, userId) => {
     const key = `${platform}_${userId}`;
     if (!userSessions.has(key)) {
-        userSessions.set(key, { state: 'IDLE', data: {} });
+        userSessions.set(key, { state: 'IDLE', data: { language: 'ENGLISH' } });
     }
     return userSessions.get(key);
 };

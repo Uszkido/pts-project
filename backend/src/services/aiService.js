@@ -11,7 +11,7 @@ if (process.env.GEMINI_API_KEY) {
  * Generates a localized response using Google's Gemini AI.
  * Translates the structured PTS device data into conversational Nigerian English/Pidgin.
  */
-const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, deviceModel, riskScore, userQuery, anomalyWarning = "") => {
+const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, deviceModel, riskScore, userQuery, anomalyWarning = "", language = "ENGLISH") => {
     if (!genAI) {
         return `[Fallback Mode]\nDevice: ${deviceBrand} ${deviceModel}\nStatus: ${deviceStatus}\nRisk Score: ${riskScore}%\nRecommendation: ${deviceStatus === 'CLEAN' ? 'Safe to buy' : 'Do not buy. Report to Police.'}`;
     }
@@ -30,11 +30,12 @@ Device Info:
 User Interaction: "${userQuery}"
 
 Your response MUST:
-1. Greet them warmly and professionally.
-2. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snared).
-3. IF CLEAN: You must act as the "National Price Oracle". Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition across major Nigerian hubs (Ikeja Computer Village, Farm Centre Kano, etc).
-4. IF STOLEN/SNATCHED: Warn them strongly that buying this device is a CRIME under Section 427 of the Criminal Code.
-5. Keep it concise, authoritative, and friendly.
+1. Greet them warmly and professionally. Respond in the requested language/tone: ${language} (Options are: ENGLISH, HAUSA, YORUBA, IGBO, PIDGIN).
+2. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snared). 
+3. Use the specific cultural tone of ${language} (e.g. if PIDGIN use "O boy", if YORUBA use "E nle", if IGBO use "Nno").
+4. IF CLEAN: You must act as the "National Price Oracle". Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition across major Nigerian hubs (Ikeja Computer Village, Farm Centre Kano, etc).
+5. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code.
+6. Keep it concise, authoritative, and friendly.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
@@ -165,6 +166,27 @@ const generateVendorTrustSummary = async (vendorData) => {
     } catch (e) { return "Registry Verified Dealer."; }
 };
 
+/**
+ * AI Smuggling & Syndicate Hunter
+ * Analyzes movement patterns between scan locations.
+ */
+const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
+    if (!genAI || status !== 'STOLEN') return { isSmuggled: false, warning: null };
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Analyze this stolen device movement in Nigeria. 
+        Last Scan City: ${lastLocation}
+        Current Scan City: ${currentLocation}
+        Does this move suggest professional smuggling or a syndicate (crossing state lines rapidly while stolen)?
+        Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Professional alert message" }`;
+
+        const result = await model.generateContent(prompt);
+        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+    } catch (e) { return { isSmuggled: false, warning: null }; }
+};
+
 module.exports = {
     generateLocalizedOracleResponse,
     analyzeReceiptForFraud,
@@ -174,5 +196,6 @@ module.exports = {
     generateCrimeInsights,
     generateAffidavitSummary,
     extractImeiFromImage,
-    generateVendorTrustSummary
+    generateVendorTrustSummary,
+    analyzeSmugglingRisk
 };

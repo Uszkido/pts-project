@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary } = require('../services/aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary, analyzeSmugglingRisk } = require('../services/aiService');
 const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
@@ -247,6 +247,40 @@ router.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
+    // == PANIC PROTOCOL ==
+    if (msgBody.toLowerCase() === 'panic') {
+        if (session.state !== 'LOGGED_IN') {
+            await sendWhatsAppMessage(phoneNumberId, from, "You need to be logged in to activate Panic Protocol.");
+            return res.sendStatus(200);
+        }
+        try {
+            await prisma.device.updateMany({
+                where: { registeredOwnerId: session.data.userId },
+                data: { status: 'STOLEN' }
+            });
+            await sendWhatsAppMessage(phoneNumberId, from, "🚨 *PANIC PROTOCOL ACTIVATED!*\n\nAll your devices are now flagged as STOLEN NATIONWIDE. Digital Certificates revoked.");
+        } catch (e) {
+            await sendWhatsAppMessage(phoneNumberId, from, "Panic Protocol failed.");
+        }
+        return res.sendStatus(200);
+    }
+
+    // == LANGUAGE SETTINGS ==
+    if (msgBody.toLowerCase() === 'language') {
+        replyText = "Select Language:\n1. *ENGLISH*\n2. *HAUSA*\n3. *YORUBA*\n4. *IGBO*\n5. *PIDGIN*";
+        updateSession('WHATSAPP', from, 'AWAITING_LANGUAGE');
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_LANGUAGE') {
+        const langs = { '1': 'ENGLISH', '2': 'HAUSA', '3': 'YORUBA', '4': 'IGBO', '5': 'PIDGIN' };
+        const selected = langs[msgBody] || msgBody.toUpperCase();
+        updateSession('WHATSAPP', from, 'LOGGED_IN', { language: selected });
+        await sendWhatsAppMessage(phoneNumberId, from, `Oracle language set to *${selected}* 🇳🇬`);
+        return res.sendStatus(200);
+    }
+
     // == REGISTRATION FLOW ==
     if (msgBody.toLowerCase() === 'register') {
         updateSession('WHATSAPP', from, 'AWAITING_REG_ROLE');
@@ -426,7 +460,7 @@ router.post('/webhook', async (req, res) => {
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify the phone you are buying anywhere in Nigeria to ensure it is not stolen.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n- Type *safety* for AI security alerts\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
+        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify any phone in Nigeria.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to lock ALL your devices (One-Click)\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)\n- Type *safety* for AI security alerts\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready! 😊`;
     } else {
         const imei = imeiMatch[0];
         try {
@@ -438,16 +472,26 @@ router.post('/webhook', async (req, res) => {
             if (!device) {
                 replyText = `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or it could be compromised.\n\nIf you are the owner, please log in and register it via the web dashboard.\n\nPlease be careful when buying unregistered devices. A kiyaye siyayya babu tabbaci (Do not buy without verification).`;
             } else {
-                // Check Fraud Engine for Cloned IMEI Velocity
+                // 1.5. Fraud Engine Anomaly Check
                 const anomalyWarning = await detectClonedImeiAnomaly(imei, "WHATSAPP", from);
 
+                // 1.6. Smuggling Detector
+                if (device.status === 'STOLEN' && device.lastKnownLocation) {
+                    const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
+                    if (smuggling.isSmuggled) {
+                        await sendWhatsAppMessage(phoneNumberId, from, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+                    }
+                }
+
+                // 2. AI Translation / Localization
                 const aiResponse = await generateLocalizedOracleResponse(
                     device.status,
                     device.brand,
                     device.model,
                     device.riskScore,
                     msgBody,
-                    anomalyWarning
+                    anomalyWarning,
+                    session.data.language || 'ENGLISH'
                 );
 
                 const statusEmoji = device.status === 'CLEAN' ? '✅' : '🚨';

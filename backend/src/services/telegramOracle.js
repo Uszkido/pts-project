@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary } = require('./aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary, analyzeSmugglingRisk } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
@@ -27,7 +27,7 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n- Type *safety* to see AI security hotspots in your area`;
+        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria.\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to lock ALL your devices (One-Click)\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)\n- Type *safety* to see AI security hotspots`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
@@ -161,6 +161,45 @@ const initTelegramOracle = () => {
                 bot.sendMessage(chatId, "Error processing report. Please try again.");
             }
             updateSession('TELEGRAM', chatId, 'LOGGED_IN'); // Return to logged in state
+            return;
+        }
+
+        // == PANIC PROTOCOL (ONE-CLICK LOCK) ==
+        if (text.toLowerCase() === 'panic') {
+            if (session.state !== 'LOGGED_IN') {
+                bot.sendMessage(chatId, "You need to be logged in to activate Panic Protocol.");
+                return;
+            }
+            try {
+                const devices = await prisma.device.findMany({ where: { registeredOwnerId: session.data.userId } });
+                if (devices.length === 0) {
+                    bot.sendMessage(chatId, "You have no registered devices in your vault.");
+                    return;
+                }
+
+                await prisma.device.updateMany({
+                    where: { registeredOwnerId: session.data.userId },
+                    data: { status: 'STOLEN' }
+                });
+
+                bot.sendMessage(chatId, `🚨 *PANIC PROTOCOL ACTIVATED!*\n\nAll your ${devices.length} registered devices have been flagged as STOLEN across the National Registry. All certificates are now VOID.`, { parse_mode: 'Markdown' });
+            } catch (e) {
+                bot.sendMessage(chatId, "Failed to activate Panic Protocol.");
+            }
+            return;
+        }
+
+        // == LANGUAGE ORACLE ==
+        if (text.toLowerCase() === 'language') {
+            bot.sendMessage(chatId, "Please select your preferred Sentinel Oracle language:", {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'English 🇬🇧', callback_data: 'LANG_ENGLISH' }, { text: 'Hausa 🇳🇬', callback_data: 'LANG_HAUSA' }],
+                        [{ text: 'Yoruba 🇳🇬', callback_data: 'LANG_YORUBA' }, { text: 'Igbo 🇳🇬', callback_data: 'LANG_IGBO' }],
+                        [{ text: 'Pidgin 🇳🇬', callback_data: 'LANG_PIDGIN' }]
+                    ]
+                }
+            });
             return;
         }
 
@@ -346,6 +385,14 @@ const initTelegramOracle = () => {
             // 1.5. Fraud Engine Anomaly Check
             const anomalyWarning = await detectClonedImeiAnomaly(imei, "TELEGRAM", String(chatId));
 
+            // 1.6. Smuggling Detector
+            if (device.status === 'STOLEN' && device.lastKnownLocation) {
+                const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
+                if (smuggling.isSmuggled) {
+                    bot.sendMessage(chatId, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+                }
+            }
+
             // 2. AI Translation / Localization
             const aiResponse = await generateLocalizedOracleResponse(
                 device.status,
@@ -353,7 +400,8 @@ const initTelegramOracle = () => {
                 device.model,
                 device.riskScore,
                 text,
-                anomalyWarning
+                anomalyWarning,
+                session.data.language || 'ENGLISH'
             );
 
             // 3. Status Block with Owner Details
@@ -472,6 +520,13 @@ const initTelegramOracle = () => {
             updateSession('TELEGRAM', chatId, 'AWAITING_REG_NAME', { role });
             bot.answerCallbackQuery(query.id);
             bot.sendMessage(chatId, `Understood. You are registering as a *${role}*.\n\nPlease enter your *Full Legal Name*.`, { parse_mode: 'Markdown' });
+        }
+
+        if (data.startsWith('LANG_')) {
+            const lang = data.replace('LANG_', '');
+            updateSession('TELEGRAM', chatId, session.state, { language: lang });
+            bot.answerCallbackQuery(query.id);
+            bot.sendMessage(chatId, `Oracle language set to: *${lang}* 🇳🇬`, { parse_mode: 'Markdown' });
         }
     });
 };
