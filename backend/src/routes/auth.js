@@ -82,7 +82,7 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
                         <div style="background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
                             <p style="font-size: 14px; color: #2e7d32; margin: 0;"><b>Never share this code with anyone.</b> Authorities will never ask for your OTP.</p>
                         </div>
-                        <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">🛡️ Managed by National Device Integrity Registry Nigeria</p>
+                        <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">🛡️ Managed by National Device Integrity Registry Nigeria <br><b>Powered by Vexel Innovations</b></p>
                        </div>`
             };
 
