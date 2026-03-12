@@ -138,6 +138,33 @@ const generateAffidavitSummary = async (reportData) => {
     } catch (e) { return "Digital record created in PTS Registry."; }
 }
 
+/**
+ * AI Vision IMEI Extractor
+ */
+const extractImeiFromImage = async (imageUrl) => {
+    if (!genAI || !imageUrl) return null;
+    try {
+        const response = await fetch(imageUrl);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, "Find 15-digit IMEI. Return numbers ONLY."]);
+        const match = result.response.text().match(/\d{15}/);
+        return match ? match[0] : null;
+    } catch (e) { return null; }
+};
+
+/**
+ * AI Vendor Trust Summary
+ */
+const generateVendorTrustSummary = async (vendorData) => {
+    if (!genAI) return "Verified Sentinel Merchant.";
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(`Summarize trust for vendor: ${JSON.stringify(vendorData)}. Professional/Nigerian tone.`);
+        return result.response.text();
+    } catch (e) { return "Registry Verified Dealer."; }
+};
+
 module.exports = {
     generateLocalizedOracleResponse,
     analyzeReceiptForFraud,
@@ -145,5 +172,7 @@ module.exports = {
     generateAiOtpEmailContent,
     transcribeAudio,
     generateCrimeInsights,
-    generateAffidavitSummary
+    generateAffidavitSummary,
+    extractImeiFromImage,
+    generateVendorTrustSummary
 };

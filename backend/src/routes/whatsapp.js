@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary } = require('../services/aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary } = require('../services/aiService');
 const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
@@ -124,6 +124,69 @@ router.post('/webhook', async (req, res) => {
             await sendWhatsAppMessage(phoneNumberId, from, `🚨 *National Security Insights*\n\n${replyText}`);
         } catch (e) {
             await sendWhatsAppMessage(phoneNumberId, from, "Security insights temporarily unavailable.");
+        }
+        return res.sendStatus(200);
+    }    // == TRANSFER FLOW ==
+    if (msgBody.toLowerCase() === 'transfer') {
+        if (session.state !== 'LOGGED_IN') {
+            await sendWhatsAppMessage(phoneNumberId, from, "You need to be logged in to transfer ownership. Please type *login* first.");
+            return res.sendStatus(200);
+        }
+        updateSession('WHATSAPP', from, 'AWAITING_TRANSFER_BUYER_EMAIL');
+        await sendWhatsAppMessage(phoneNumberId, from, "🤝 *Safe-Hand Transfer Initiated*\n\nPlease enter the *Email Address* of the person you are selling this phone to.");
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_TRANSFER_BUYER_EMAIL') {
+        updateSession('WHATSAPP', from, 'AWAITING_TRANSFER_IMEI', { buyerEmail: msgBody });
+        await sendWhatsAppMessage(phoneNumberId, from, "Got it. Now enter the *15-digit IMEI* of the device you want to transfer legally.");
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'AWAITING_TRANSFER_IMEI') {
+        const imeiMatch = msgBody.match(/\b\d{15}\b/);
+        if (!imeiMatch) {
+            await sendWhatsAppMessage(phoneNumberId, from, "Invalid IMEI. Please send 15 digits.");
+            return res.sendStatus(200);
+        }
+        try {
+            const device = await prisma.device.findUnique({ where: { imei: imeiMatch[0] } });
+            const buyer = await prisma.user.findUnique({ where: { email: session.data.buyerEmail } });
+
+            if (device && buyer && device.registeredOwnerId === session.data.userId) {
+                await prisma.device.update({
+                    where: { id: device.id },
+                    data: { registeredOwnerId: buyer.id }
+                });
+                await sendWhatsAppMessage(phoneNumberId, from, `✅ *Transfer Complete!*\n\nOwnership of ${device.brand} ${device.model} has been legally moved to *${buyer.fullName}*.`);
+            } else {
+                await sendWhatsAppMessage(phoneNumberId, from, "❌ Transfer failed. Check device ownership or buyer registration.");
+            }
+        } catch (e) {
+            await sendWhatsAppMessage(phoneNumberId, from, "Transfer error.");
+        }
+        updateSession('WHATSAPP', from, 'LOGGED_IN');
+        return res.sendStatus(200);
+    }
+
+    // == VENDOR TRUST BADGE ==
+    if (msgBody.toLowerCase() === 'badge') {
+        try {
+            const vendor = await prisma.user.findFirst({
+                where: { phoneNumber: from, role: 'VENDOR' }, // Simple matching for demo
+                include: { registeredDevices: true, vendorTrustScore: true }
+            });
+
+            if (!vendor) {
+                await sendWhatsAppMessage(phoneNumberId, from, "This command is only for *Verified Vendors*.");
+                return res.sendStatus(200);
+            }
+
+            const trustData = { companyName: vendor.companyName, tier: vendor.vendorTier, totalSales: vendor.registeredDevices.length };
+            const aiSummary = await generateVendorTrustSummary(trustData);
+            await sendWhatsAppMessage(phoneNumberId, from, `🛡️ *Sentinel Guard Vendor Badge*\n\n*Merchant:* ${vendor.companyName}\n\n_${aiSummary}_`);
+        } catch (e) {
+            await sendWhatsAppMessage(phoneNumberId, from, "Failed to generate badge.");
         }
         return res.sendStatus(200);
     }
@@ -253,8 +316,22 @@ router.post('/webhook', async (req, res) => {
         try {
             const mediaUrl = await getWhatsAppMediaUrl(mediaId);
             const cloudinaryUrl = await uploadFromUrl(mediaUrl);
+            if (!cloudinaryUrl) return res.sendStatus(200);
 
-            if (!cloudinaryUrl) throw new Error("Cloudinary upload failed");
+            // == VISION SCAN (FALLBACK) ==
+            if (session.state === 'IDLE' || !session.state) {
+                await sendWhatsAppMessage(phoneNumberId, from, "📸 *Vision AI Scan initiated...* extracting device identity from your photo.");
+                const imei = await extractImeiFromImage(cloudinaryUrl);
+                if (imei) {
+                    await sendWhatsAppMessage(phoneNumberId, from, `🤖 IMEI Detected: *${imei}*. Checking registry...`);
+                    // Create a pseudo-event or just modify variables to trigger the IMEI flow
+                    msgBody = imei;
+                    // FALLTHROUGH to the IMEI check logic below
+                } else {
+                    await sendWhatsAppMessage(phoneNumberId, from, "Sorry, my Vision AI couldn't find a clear IMEI in that photo. Please try more light or type it.");
+                    return res.sendStatus(200);
+                }
+            }
 
             // CONSUMER SELFIE
             if (session.state === 'AWAITING_REG_PHOTO') {

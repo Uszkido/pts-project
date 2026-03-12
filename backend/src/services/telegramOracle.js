@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary } = require('./aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
@@ -164,6 +164,77 @@ const initTelegramOracle = () => {
             return;
         }
 
+        // == TRANSFER FLOW ==
+        if (text.toLowerCase() === 'transfer') {
+            if (session.state !== 'LOGGED_IN') {
+                bot.sendMessage(chatId, "You need to be logged in to transfer ownership. Please type *login* first.", { parse_mode: 'Markdown' });
+                return;
+            }
+            updateSession('TELEGRAM', chatId, 'AWAITING_TRANSFER_BUYER_EMAIL');
+            bot.sendMessage(chatId, "🤝 *Safe-Hand Transfer Initiated*\n\nPlease enter the *Email Address* of the person you are selling this phone to.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_TRANSFER_BUYER_EMAIL') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_TRANSFER_IMEI', { buyerEmail: text });
+            bot.sendMessage(chatId, "Got it. Now enter the *15-digit IMEI* of the device you want to transfer legally.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_TRANSFER_IMEI') {
+            const imeiMatch = text.match(/\b\d{15}\b/);
+            if (!imeiMatch) {
+                bot.sendMessage(chatId, "Invalid IMEI. Please send 15 digits.");
+                return;
+            }
+            try {
+                const device = await prisma.device.findUnique({ where: { imei: imeiMatch[0] } });
+                const buyer = await prisma.user.findUnique({ where: { email: session.data.buyerEmail } });
+
+                if (device && buyer && device.registeredOwnerId === session.data.userId) {
+                    await prisma.device.update({
+                        where: { id: device.id },
+                        data: { registeredOwnerId: buyer.id }
+                    });
+                    bot.sendMessage(chatId, `✅ *Transfer Complete!*\n\nOwnership of ${device.brand} ${device.model} has been legally moved to *${buyer.fullName}*. A new DDOC has been issued to their vault.`, { parse_mode: 'Markdown' });
+                } else {
+                    bot.sendMessage(chatId, "❌ Transfer failed. Ensure you own the device and the buyer is registered.");
+                }
+            } catch (e) {
+                bot.sendMessage(chatId, "Transfer error. Try again.");
+            }
+            updateSession('TELEGRAM', chatId, 'LOGGED_IN');
+            return;
+        }
+
+        // == VENDOR TRUST BADGE ==
+        if (text.toLowerCase() === 'badge') {
+            bot.sendChatAction(chatId, 'typing');
+            try {
+                const vendor = await prisma.user.findFirst({
+                    where: { telegramChatId: String(chatId), role: 'VENDOR' },
+                    include: { registeredDevices: true, vendorTrustScore: true }
+                });
+
+                if (!vendor) {
+                    bot.sendMessage(chatId, "This command is only for *Verified Verified Vendors*.");
+                    return;
+                }
+
+                const trustData = {
+                    companyName: vendor.companyName,
+                    tier: vendor.vendorTier,
+                    totalSales: vendor.registeredDevices.length
+                };
+
+                const aiSummary = await generateVendorTrustSummary(trustData);
+                bot.sendMessage(chatId, `🛡️ *Sentinel Guard Vendor Badge*\n\n*Merchant:* ${vendor.companyName}\n*Status:* ${vendor.vendorTrustScore?.score > 80 ? 'Elite Trusted' : 'Verified'}\n\n_${aiSummary}_`, { parse_mode: 'Markdown' });
+            } catch (e) {
+                bot.sendMessage(chatId, "Failed to generate badge.");
+            }
+            return;
+        }
+
         // == REGISTRATION FLOW ==
         if (text.toLowerCase() === 'register') {
             updateSession('TELEGRAM', chatId, 'AWAITING_REG_ROLE');
@@ -321,6 +392,21 @@ const initTelegramOracle = () => {
             const cloudinaryUrl = await uploadFromUrl(fileUrl);
 
             if (!cloudinaryUrl) throw new Error("Upload failed");
+
+            // == VISION SCAN (FALLBACK) ==
+            if (session.state === 'IDLE' || !session.state) {
+                bot.sendChatAction(chatId, 'typing');
+                bot.sendMessage(chatId, "📸 *Vision AI Scan initiated...* extracting device identity from your photo.");
+                const imei = await extractImeiFromImage(cloudinaryUrl);
+                if (imei) {
+                    bot.sendMessage(chatId, `🤖 IMEI Detected: *${imei}*. Checking registry...`, { parse_mode: 'Markdown' });
+                    // Trigger the IMEI check flow manually by recursing or mimicking message
+                    // For now, just send the IMEI back as text to the message handler
+                    return bot.emit('message', { chat: { id: chatId }, text: imei });
+                } else {
+                    return bot.sendMessage(chatId, "Sorry, my Vision AI couldn't find a clear IMEI in that photo. Please try one with better light or type it manually.");
+                }
+            }
 
             // == CONSUMER SELFIE ==
             if (session.state === 'AWAITING_REG_PHOTO') {

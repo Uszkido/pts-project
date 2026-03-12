@@ -5,7 +5,8 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 const { calculateValuation } = require('../utils/valuation');
-const { analyzeReceiptForFraud, analyzeDeviceHardwareCondition } = require('../services/aiService');
+const { analyzeReceiptForFraud, analyzeDeviceHardwareCondition, extractImeiFromImage, generateVendorTrustSummary } = require('../services/aiService');
+const { calculateDeviceTrustIndex } = require('../services/RiskEngine');
 const {
     evaluateLazarusProtocol,
     detectSyndicateCollusion,
@@ -329,6 +330,118 @@ router.post('/:imei/track', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// --- SAFE-HAND ESCROW TRANSFER ---
+router.post('/transfer', authenticateToken, async (req, res) => {
+    try {
+        const { deviceId, buyerEmail } = req.body;
+
+        const device = await prisma.device.findUnique({
+            where: { id: deviceId },
+            include: { registeredOwner: true }
+        });
+
+        if (!device) return res.status(404).json({ error: 'Device not found' });
+        if (device.registeredOwnerId !== req.user.id) return res.status(403).json({ error: 'Unauthorized transfer' });
+        if (device.status !== 'CLEAN') return res.status(400).json({ error: 'Cannot transfer a flagged device (STOLEN/LOST). Resolve status first.' });
+
+        const buyer = await prisma.user.findUnique({ where: { email: buyerEmail } });
+        if (!buyer) return res.status(404).json({ error: 'Buyer not found in National Registry. They must register first.' });
+
+        // Execute Transfer
+        const transfer = await prisma.deviceTransfer.create({
+            data: {
+                deviceId,
+                sellerId: req.user.id,
+                buyerId: buyer.id,
+                status: 'COMPLETED'
+            }
+        });
+
+        // Update Device Owner
+        await prisma.device.update({
+            where: { id: deviceId },
+            data: { registeredOwnerId: buyer.id }
+        });
+
+        // Revoke old certificate and create new one
+        await prisma.certificate.updateMany({
+            where: { deviceId, isActive: true },
+            data: { isActive: false }
+        });
+
+        const crypto = require('crypto');
+        const ddocHash = crypto.createHash('sha256').update(`${deviceId}-${buyer.id}-${Date.now()}`).digest('hex');
+        await prisma.certificate.create({
+            data: { deviceId, ownerId: buyer.id, qrHash: ddocHash }
+        });
+
+        res.json({ message: '🛡️ Safe-Hand Transfer Successful. Ownership is now legally moved.', transfer });
+    } catch (error) {
+        res.status(500).json({ error: 'Transfer failed' });
+    }
+});
+
+// --- VISION SEARCH: Scan IMEI from Image ---
+router.post('/scan-imei', authenticateToken, async (req, res) => {
+    try {
+        const { imageUrl } = req.body;
+        if (!imageUrl) return res.status(400).json({ error: 'Image URL required' });
+
+        const imei = await extractImeiFromImage(imageUrl);
+        if (!imei) return res.status(404).json({ error: 'AI could not find a clear IMEI in the photo. Please try more light or type it.' });
+
+        res.json({ imei });
+    } catch (error) {
+        res.status(500).json({ error: 'Vision AI Scan failed' });
+    }
+});
+
+// --- SENTINEL GUARD: Vendor Trust Badge ---
+router.get('/vendor-trust/:vendorId', async (req, res) => {
+    try {
+        const vendor = await prisma.user.findUnique({
+            where: { id: req.params.vendorId },
+            include: {
+                registeredDevices: true,
+                vendorTrustScore: true
+            }
+        });
+
+        if (!vendor || vendor.role !== 'VENDOR') return res.status(404).json({ error: 'Vendor not found' });
+
+        // Calculate stats
+        const totalRegistered = vendor.registeredDevices.length;
+        const stolenInterventions = await prisma.incidentReport.count({
+            where: { reporterId: vendor.id, type: 'STOLEN' }
+        });
+
+        const trustData = {
+            companyName: vendor.companyName,
+            tier: vendor.vendorTier,
+            totalSales: totalRegistered,
+            securityChecks: stolenInterventions,
+            rawScore: vendor.vendorTrustScore?.score || 100
+        };
+
+        const aiSummary = await generateVendorTrustSummary(trustData);
+
+        res.json({
+            badge: {
+                vendor: vendor.companyName,
+                officialId: `PTS-VG-${vendor.id.substring(0, 6).toUpperCase()}`,
+                status: vendor.vendorTrustScore?.score > 50 ? 'Sentinel Trusted' : 'Under Review',
+                aiSummary,
+                stats: {
+                    totalVerifications: totalRegistered,
+                    criminalInterventions: stolenInterventions
+                }
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch trust badge' });
     }
 });
 
