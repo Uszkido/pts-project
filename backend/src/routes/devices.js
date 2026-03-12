@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 const { calculateValuation } = require('../utils/valuation');
-const { analyzeReceiptForFraud } = require('../services/aiService');
+const { analyzeReceiptForFraud, analyzeDeviceHardwareCondition } = require('../services/aiService');
 const {
     evaluateLazarusProtocol,
     detectSyndicateCollusion,
@@ -120,6 +120,23 @@ router.post('/', authenticateToken, async (req, res) => {
                 cameraSerialNumber
             }
         });
+
+        // --- AI HARDWARE DEGRADATION ANALYZER ---
+        if (devicePhotos && devicePhotos.length > 0) {
+            const hardwareGrade = await analyzeDeviceHardwareCondition(devicePhotos, brand, model);
+
+            // Log the visual trust grade to the transaction history ledger
+            if (hardwareGrade.grade !== "Unknown") {
+                await prisma.transactionHistory.create({
+                    data: {
+                        deviceId: device.id,
+                        actorId: req.user.id,
+                        type: "AI_HARDWARE_APPRAISAL",
+                        description: `Visual Grade: ${hardwareGrade.grade}. AI Notes: ${hardwareGrade.notes}. Aftermarket Parts Detected: ${hardwareGrade.hasAftermarketScreen ? 'YES' : 'NO'}`
+                    }
+                });
+            }
+        }
 
         // Generate Digital Device Ownership Certificate (DDOC)
         const crypto = require('crypto');

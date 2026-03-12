@@ -120,4 +120,60 @@ Respond with ONLY a strict JSON object (no markdown, no backticks, no other word
     }
 };
 
-module.exports = { generateLocalizedOracleResponse, analyzeReceiptForFraud };
+/**
+ * AI Hardware Degradation Analyzer (Visual Trust Grading)
+ * Scans uploaded device photos to detect true wear & tear (cracks, swollen batteries, fake LCD bezels).
+ */
+const analyzeDeviceHardwareCondition = async (photoUrls, brand, model) => {
+    if (!genAI || !photoUrls || photoUrls.length === 0) return { grade: "Unknown", notes: "No photos or AI unavailable." };
+
+    try {
+        // Just analyze the first photo for now to save latency
+        const response = await fetch(photoUrls[0]);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+        const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are a professional mobile phone hardware appraiser and digital forensics expert.
+Analyze this photo of a ${brand} ${model} phone.
+
+Look closely for:
+1. Screen bezels: Are they unusually thick? (Sign of a cheap aftermarket LCD replacement).
+2. Battery/Frame: Is the side profile bulging? (Sign of a swollen, dangerous battery).
+3. Glass: Are there visible deep scratches or cracks on the screen or back glass?
+
+Respond with ONLY a strict JSON object (no markdown, no backticks, no other words):
+{
+  "grade": "Grade A" | "Grade B" | "Grade C" | "Grade F (Tampered/Junk)",
+  "notes": "Brief findings (e.g. 'Visible screen crack, thick bottom bezel detected.')",
+  "hasAftermarketScreen": true or false
+}`;
+
+        const imagePart = {
+            inlineData: {
+                data: buffer.toString("base64"),
+                mimeType
+            }
+        };
+
+        const result = await aiModel.generateContent([prompt, imagePart]);
+        const responseText = result.response.text();
+
+        try {
+            const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const resultData = JSON.parse(cleanText);
+
+            console.log(`📸 AI Hardware Grade for ${brand} ${model}: ${resultData.grade}`);
+            return resultData;
+        } catch (e) {
+            console.error("Failed to parse Gemini hardware JSON:", responseText);
+            return { grade: "Unknown", notes: "Parsing failed" };
+        }
+    } catch (error) {
+        console.error("Hardware Analysis Error:", error);
+        return { grade: "Unknown", notes: "Analysis failed" };
+    }
+};
+
+module.exports = { generateLocalizedOracleResponse, analyzeReceiptForFraud, analyzeDeviceHardwareCondition };
