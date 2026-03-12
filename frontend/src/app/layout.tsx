@@ -21,7 +21,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "PTS | National Device Tracking System",
+  title: "PTS Sentinel (Vexel AI)",
   description: "Secure, Immutable, and Real-Time Mobile Asset Protection",
   manifest: "/manifest.json",
 };

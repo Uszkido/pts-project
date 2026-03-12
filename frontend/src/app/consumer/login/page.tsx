@@ -249,7 +249,7 @@ export default function ConsumerLogin() {
                         </button>
                     )}
                     <button onClick={() => { setIsLogin(!isLogin); setIsForgotPassword(false); }} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">
-                        {isLogin ? "Don't have a PTS Identity? Create one." : "Already have an account? Log in."}
+                        {isLogin ? "Don't have a Sentinel Identity? Create one." : "Already have an account? Log in."}
                     </button>
                     {isForgotPassword && (
                         <button onClick={() => setIsForgotPassword(false)} className="text-sm font-medium text-slate-400 hover:text-white transition-colors">

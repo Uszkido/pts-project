@@ -69,7 +69,7 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-blue-500/20 tracking-tighter">PTS</div>
-                        <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Registry</span>
+                        <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Sentinel <span className="text-blue-500 text-xs font-medium ml-1 text-[10px] bg-blue-500/10 px-1.5 py-0.5 rounded">VEXEL AI</span></span>
                     </div>
                     <div className="flex gap-2 sm:gap-4">
                         <a href="/admin/login" className="text-sm font-semibold text-amber-400 hover:text-white transition-all bg-amber-600/10 hover:bg-amber-600/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-amber-500/20 hover:border-amber-500/40 hidden sm:block">Admin</a>
@@ -100,7 +100,7 @@ export default function Home() {
                     </div>
 
                     <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-slate-200 to-slate-500">
-                        Verify Device <br className="hidden sm:block" />Integrity.
+                        PTS Sentinel <br className="hidden sm:block" />Device Integrity.
                     </h1>
                     <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto font-medium leading-relaxed">
                         The decentralized digital authority for phone ownership. Check if a device is clean or reported stolen before completing your purchase.
