@@ -67,13 +67,13 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
             }
 
             const mailOptions = {
-                from: `"PTS National Registry AI Oracle" <${process.env.EMAIL_USER}>`,
+                from: `"PTS BY VEXEL INNOVATIONS" <${process.env.EMAIL_USER}>`,
                 to: user.email,
                 subject: aiContent.subject,
                 text: aiContent.body,
                 html: `<div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 30px; border-radius: 12px; max-width: 600px; margin: auto; background-color: #ffffff; color: #333; text-align: center;">
                         <div style="text-align: center; margin-bottom: 20px;">
-                            <h1 style="color: #2e7d32; font-size: 28px; margin: 0;">🇳🇬 PTS AI Oracle</h1>
+                            <h1 style="color: #2e7d32; font-size: 28px; margin: 0;">🇳🇬 PTS BY VEXEL INNOVATIONS</h1>
                             <p style="color: #666; font-size: 14px; margin: 5px 0;">Sovereign Device Security System</p>
                         </div>
                         <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 5px solid #2e7d32; margin-bottom: 20px;">

@@ -23,7 +23,7 @@ async function runTest() {
 
         console.log(`📧 Step 2: Sending Secure SMTP Email to ${targetEmail}...`);
         const mailOptions = {
-            from: `"PTS AI Oracle" <${process.env.EMAIL_USER}>`,
+            from: `"PTS BY VEXEL INNOVATIONS" <${process.env.EMAIL_USER}>`,
             to: targetEmail,
             subject: aiContent.subject,
             text: aiContent.body,
