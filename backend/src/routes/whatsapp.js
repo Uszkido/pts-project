@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse } = require('../services/aiService');
+const { generateLocalizedOracleResponse, transcribeAudio } = require('../services/aiService');
 const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
@@ -41,10 +41,36 @@ router.post('/webhook', async (req, res) => {
     const phoneNumberId = change.metadata.phone_number_id;
     const from = change.messages[0].from;
     const msgType = change.messages[0]?.type;
-    const msgBody = msgType === 'text' ? change.messages[0]?.text?.body || '' : '';
+    let msgBody = msgType === 'text' ? change.messages[0]?.text?.body || '' : '';
 
-    // Ignore unsupported types, but allow text and image
-    if (msgType !== 'text' && msgType !== 'image') {
+    // == VOICE COMMAND HANDLING ==
+    if (msgType === 'audio') {
+        const audioId = change.messages[0].audio.id;
+        try {
+            const audioUrl = await getWhatsAppMediaUrl(audioId);
+            const response = await fetch(audioUrl, {
+                headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+            });
+            const buffer = Buffer.from(await response.arrayBuffer());
+
+            // Transcribe using Gemini
+            const transcribedText = await transcribeAudio(buffer, 'audio/ogg');
+            if (transcribedText) {
+                msgBody = transcribedText;
+                await sendWhatsAppMessage(phoneNumberId, from, `🎤 *Voice Recognized:* "${msgBody}"`);
+            } else {
+                await sendWhatsAppMessage(phoneNumberId, from, "Sorry, I couldn't understand that voice message. Could you try typing it?");
+                return res.sendStatus(200);
+            }
+        } catch (err) {
+            console.error("WhatsApp Voice Error:", err);
+            await sendWhatsAppMessage(phoneNumberId, from, "Trouble processing voice. Please try typing.");
+            return res.sendStatus(200);
+        }
+    }
+
+    // Ignore unsupported types, but allow text, image, and processed audio
+    if (msgType !== 'text' && msgType !== 'image' && msgType !== 'audio') {
         return res.sendStatus(200);
     }
 

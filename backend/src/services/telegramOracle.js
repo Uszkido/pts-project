@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse } = require('./aiService');
+const { generateLocalizedOracleResponse, transcribeAudio } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
@@ -32,12 +32,36 @@ const initTelegramOracle = () => {
     });
 
     // Listen for any standard message and try to extract an IMEI inside it
+    // Listen for any standard message or voice command
     bot.on('message', async (msg) => {
         const chatId = msg.chat.id;
-        const text = msg.text || '';
+        let text = msg.text || '';
         const session = getSession('TELEGRAM', chatId);
 
-        // Ignore start slash command so it doesnt double trigger
+        // == VOICE COMMAND HANDLING ==
+        if (msg.voice) {
+            bot.sendChatAction(chatId, 'typing');
+            try {
+                const fileId = msg.voice.file_id;
+                const fileUrl = await bot.getFileLink(fileId);
+                const response = await fetch(fileUrl);
+                const buffer = Buffer.from(await response.arrayBuffer());
+
+                // Transcribe using Gemini
+                const transcribedText = await transcribeAudio(buffer, 'audio/ogg');
+                if (transcribedText) {
+                    text = transcribedText;
+                    bot.sendMessage(chatId, `🎤 *Voice Recognized:* "${text}"`, { parse_mode: 'Markdown' });
+                } else {
+                    return bot.sendMessage(chatId, "Sorry, I couldn't understand that voice message. Could you try typing it?");
+                }
+            } catch (err) {
+                console.error("Telegram Voice Error:", err);
+                return bot.sendMessage(chatId, "I had trouble processing your voice command. Please try again or type.");
+            }
+        }
+
+        if (!text) return;
         if (text.startsWith('/start')) return;
 
         // == LOGIN FLOW ==

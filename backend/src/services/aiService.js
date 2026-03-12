@@ -222,9 +222,39 @@ const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") =
     }
 };
 
+/**
+ * AI Audio Transcription (Voice Command Processor)
+ * Converts a voice message buffer into text.
+ */
+const transcribeAudio = async (audioBuffer, mimeType) => {
+    if (!genAI || !audioBuffer) return null;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = "Transcribe this audio message exactly as it is spoken. If it's in Hausa or Pidgin, transcribe it accurately. Return ONLY the transcribed text.";
+
+        const audioPart = {
+            inlineData: {
+                data: audioBuffer.toString("base64"),
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, audioPart]);
+        const responseText = result.response.text().trim();
+
+        console.log(`🎙️ AI Transcribed Voice: "${responseText}"`);
+        return responseText;
+    } catch (error) {
+        console.error("Audio Transcription Error:", error);
+        return null;
+    }
+};
+
 module.exports = {
     generateLocalizedOracleResponse,
     analyzeReceiptForFraud,
     analyzeDeviceHardwareCondition,
-    generateAiOtpEmailContent
+    generateAiOtpEmailContent,
+    transcribeAudio
 };
