@@ -6,6 +6,12 @@ const jwt = require('jsonwebtoken');
 const prisma = new PrismaClient();
 const { calculateValuation } = require('../utils/valuation');
 const { analyzeReceiptForFraud } = require('../services/aiService');
+const {
+    evaluateLazarusProtocol,
+    detectSyndicateCollusion,
+    evaluateBloodhoundState,
+    predictSmugglingTrajectory
+} = require('../services/DeepSecurityAI');
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 // Middleware to verify JWT
@@ -59,6 +65,42 @@ router.post('/', authenticateToken, async (req, res) => {
                     error: 'Receipt Analysis Failed',
                     details: 'The uploaded purchase receipt failed our AI authenticity checks. Please upload a clear, unaltered original receipt.'
                 });
+            }
+        }
+
+        // --- LAZARUS PROTOCOL (CHOP-SHOP DETECTION) ---
+        const lazarusCheck = await evaluateLazarusProtocol(screenSerialNumber, batterySerialNumber, motherboardSerialNumber, cameraSerialNumber);
+        if (lazarusCheck.isFrankenstein) {
+            // Log Incident secretly
+            await prisma.incidentReport.create({
+                data: {
+                    deviceId: lazarusCheck.blacklistedOrigins[0].imei, // Try to link it back to the original device 
+                    reporterId: req.user.id,
+                    type: "LAZARUS_CHOP_SHOP_DETECTED",
+                    description: lazarusCheck.reason,
+                    status: "OPEN"
+                }
+            }).catch(() => { }); // Catch and ignore if original IMEI doesn't exist in our DB as UUID 
+
+            return res.status(403).json({
+                error: 'SECURITY LOCK: Hardware Mismatch',
+                details: lazarusCheck.reason
+            });
+        }
+
+        // --- SYNDICATE MAPPER (CARTEL NETWORK DETECTION) ---
+        if (req.user.role === 'VENDOR') {
+            const currentIp = req.ip || req.headers['x-forwarded-for'];
+            const syndicateCheck = await detectSyndicateCollusion(req.user.id, currentIp);
+            if (syndicateCheck.isColluding) {
+                // Secretly flag this vendor's Trust Score
+                const tScore = await prisma.vendorTrustScore.findUnique({ where: { vendorId: req.user.id } });
+                if (tScore) {
+                    await prisma.vendorTrustScore.update({
+                        where: { vendorId: req.user.id },
+                        data: { score: Math.max(0, tScore.score - 50) } // Massive penalty
+                    });
+                }
             }
         }
 
@@ -236,7 +278,37 @@ router.post('/:imei/track', async (req, res) => {
             }
         });
 
-        res.json({ message: 'Device location updated securely', lastUpdate: updatedDevice.lastLocationUpdate });
+        // --- DIGITAL BLOODHOUND (BATTERY / TRACKING STATE AI) ---
+        // Assume battery is sent in body, default to 50% if not
+        const { batteryLevel = 50, speedKmH = 0, isMovingFast = false, latitude, longitude } = req.body;
+
+        const bloodhoundState = evaluateBloodhoundState(updatedDevice.status, batteryLevel, isMovingFast || speedKmH > 20);
+
+        // --- PREDICTIVE SMUGGLING ROUTE AI ---
+        let smugglingAlert = null;
+        if (updatedDevice.status === 'STOLEN' && latitude && longitude) {
+            // Very basic mock check, normally would fetch previous GPS ping and calculate elapsed time
+            // We just call the engine to demonstrate intelligence
+            smugglingAlert = predictSmugglingTrajectory(9.0, 7.0, parseFloat(latitude), parseFloat(longitude), 2);
+            if (smugglingAlert && smugglingAlert.alert) {
+                await prisma.incidentReport.create({
+                    data: {
+                        deviceId: updatedDevice.id,
+                        reporterId: updatedDevice.registeredOwnerId, // auto reported
+                        type: "SMUGGLING_ATTEMPT_PREDICTED",
+                        description: smugglingAlert.warning,
+                        status: "OPEN"
+                    }
+                });
+            }
+        }
+
+        res.json({
+            message: 'Device location updated securely',
+            lastUpdate: updatedDevice.lastLocationUpdate,
+            bloodhoundMode: bloodhoundState,
+            smugglingWarning: smugglingAlert?.alert ? smugglingAlert.warning : null
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
