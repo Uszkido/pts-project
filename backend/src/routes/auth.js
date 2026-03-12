@@ -7,6 +7,30 @@ const jwt = require('jsonwebtoken');
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
+const { sendWhatsAppMessage } = require('./whatsapp');
+const { sendTelegramMessage } = require('../services/telegramOracle');
+
+const sendOtpViaBots = async (user, otp) => {
+    const text = `🔐 *PTS National Registry*\n\nYour Verification OTP is: *${otp}*\n\nPlease use this to verify your account.`;
+
+    // If they have a phone number, attempt to send via WhatsApp
+    if (user.phoneNumber) {
+        // Strip any non-digit chars just in case, but usually WhatsApp expects country code
+        let cleanNum = user.phoneNumber.replace(/[\+\s\-()]/g, '');
+        if (!cleanNum.startsWith('234') && cleanNum.startsWith('0')) {
+            cleanNum = '234' + cleanNum.substring(1); // Default to Nigeria
+        }
+        await sendWhatsAppMessage(null, cleanNum, text);
+    }
+
+    // Since telegram bots use chat IDs, if we have a way to identify them, we send it.
+    // We used email as a pseudo-identifier if they didn't provide one: chatid@telegram.local
+    if (user.email && user.email.endsWith('@telegram.local')) {
+        const chatId = user.email.replace('@telegram.local', '');
+        await sendTelegramMessage(chatId, text);
+    }
+};
+
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 router.post('/register', async (req, res) => {
@@ -52,8 +76,13 @@ router.post('/register', async (req, res) => {
             }
         });
 
+        // 🤖 Send OTP via Bots
+        await sendOtpViaBots(user, otp);
+
         res.status(201).json({
-            message: finalRole === 'VENDOR' ? 'Vendor registration submitted. Please verify your email with the OTP from admin.' : 'User registered. Please verify your email with the OTP.',
+            message: finalRole === 'VENDOR'
+                ? 'Vendor registration submitted. An OTP has been sent via WhatsApp/Telegram (if provided), or check with admin to verify your email.'
+                : 'User registered. An OTP has been sent via WhatsApp/Telegram, or check with admin to verify.',
             userId: user.id,
             requiresOtp: true
         });
@@ -77,7 +106,15 @@ router.post('/login', async (req, res) => {
         }
 
         if (!user.isEmailConfirmed && !['ADMIN', 'POLICE', 'INSURANCE', 'TELECOM'].includes(user.role)) {
-            return res.status(403).json({ error: 'Please confirm your email using the OTP before logging in.', requiresOtp: true });
+            // Generate and send a fresh OTP if they try to login while unverified
+            const newOtp = generateOTP();
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { emailVerificationOtp: newOtp }
+            });
+            await sendOtpViaBots(user, newOtp);
+
+            return res.status(403).json({ error: 'Please confirm your email. A new OTP has been sent to your WhatsApp/Telegram (or check with admin).', requiresOtp: true });
         }
 
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
@@ -115,7 +152,10 @@ router.post('/reset-password', async (req, res) => {
             }
         });
 
-        res.json({ message: 'Password reset request submitted. Please provide the OTP from the administrator to verify.', requiresOtp: true });
+        // 🤖 Send Reset OTP via Bots
+        await sendOtpViaBots(user, otp);
+
+        res.json({ message: 'Password reset request submitted. An OTP has been sent to your WhatsApp/Telegram, or contact your administrator.', requiresOtp: true });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
