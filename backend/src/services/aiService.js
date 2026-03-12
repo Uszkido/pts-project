@@ -59,4 +59,65 @@ Keep the response concise (around 4-5 sentences total). Do not use Markdown form
     }
 };
 
-module.exports = { generateLocalizedOracleResponse };
+/**
+ * AI Fake Receipt & Photoshop Detector (OCR AI)
+ * Analyzes a purchase receipt image for signs of forgery, tampering, or inconsistencies.
+ * Uses Gemini 1.5 Flash vision capabilities.
+ */
+const analyzeReceiptForFraud = async (receiptUrl, expectedBrand, expectedModel) => {
+    if (!genAI || !receiptUrl) return { isLikelyFake: false, reason: "No AI or no receipt" };
+
+    try {
+        const response = await fetch(receiptUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const mimeType = response.headers.get('content-type') || 'image/jpeg';
+
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are an expert digital forensics AI. Analyze this device purchase receipt image.
+The user claims this receipt is for a: ${expectedBrand} ${expectedModel}.
+
+Look for:
+1. Does the receipt explicitly mention this brand and model?
+2. Are there obvious signs of Photoshop, text misalignment, or tampering?
+3. Do the dates look legitimate?
+4. Is the vendor name present and does it look like a real business?
+
+Respond with ONLY a strict JSON object (no markdown, no backticks, no other words):
+{
+  "isLikelyFake": true or false,
+  "confidenceScore": 0-100,
+  "reasonText": "Brief explanation of why it is fake or genuine"
+}`;
+
+        const imagePart = {
+            inlineData: {
+                data: buffer.toString("base64"),
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const responseText = result.response.text();
+
+        // Parse JSON safely
+        try {
+            const cleanText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            const resultData = JSON.parse(cleanText);
+
+            // Log it if we see something suspicious
+            if (resultData.isLikelyFake && resultData.confidenceScore > 80) {
+                console.warn(`🚨 AI RECEIPT FRAUD ALERT [${expectedBrand} ${expectedModel}]:`, resultData.reasonText);
+            }
+            return resultData;
+        } catch (e) {
+            console.error("Failed to parse Gemini receipt JSON:", responseText);
+            return { isLikelyFake: false, reasonText: "Parse error" };
+        }
+    } catch (error) {
+        console.error("Receipt Analysis Error:", error);
+        return { isLikelyFake: false, reasonText: "Analysis failed" };
+    }
+};
+
+module.exports = { generateLocalizedOracleResponse, analyzeReceiptForFraud };

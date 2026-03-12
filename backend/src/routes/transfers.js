@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
+const { checkPatternOfLifeAnomaly } = require('../services/fraudEngine');
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -32,6 +33,19 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         const buyer = await prisma.user.findUnique({ where: { email: buyerEmail } });
         if (!buyer) {
             return res.status(404).json({ error: 'Buyer not found. They must register for a PTS account first.' });
+        }
+
+        // --- AI Pattern of Life Lock (Account Takeover Protection) ---
+        // Prevents a thief who stole a logged-in phone from transferring devices to themselves
+        const currentIp = req.ip || req.headers['x-forwarded-for'];
+        const pOLCheck = await checkPatternOfLifeAnomaly(req.user.id, currentIp);
+
+        if (pOLCheck.anomalyDetected) {
+            return res.status(403).json({
+                error: 'SECURITY LOCK: Pattern of Life Anomaly',
+                details: pOLCheck.reason,
+                requiresSelfieVerification: true
+            });
         }
 
         // Generate 6-digit Handover Code (2FA)

@@ -44,4 +44,42 @@ const detectClonedImeiAnomaly = async (imei, currentMethod, currentLocation) => 
     }
 };
 
-module.exports = { detectClonedImeiAnomaly };
+/**
+ * AI Behavioral "Pattern of Life" Lock (Account Takeover Protection)
+ * Checks if a transfer request breaks the user's "Pattern of Life".
+ */
+const checkPatternOfLifeAnomaly = async (userId, currentIp) => {
+    try {
+        // Fetch the last 5 actions performed by this user
+        const recentHistory = await prisma.transactionHistory.findMany({
+            where: { actorId: userId },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+        });
+
+        // Extract historical IPs from metadata
+        const historicIps = recentHistory.map(h => {
+            try {
+                const meta = h.metadata ? JSON.parse(h.metadata) : {};
+                return meta.ip || null;
+            } catch (e) { return null; }
+        }).filter(ip => ip !== null);
+
+        // Simple Anomaly Logic: If the user has an established pattern (at least 2 previous IPs)
+        // and the current IP has NEVER been seen before, we lock the account to prevent hostile takeover.
+        // In a deployed ML system, this analyzes distance/velocity (e.g. Kano -> Lagos in 5 mins).
+        if (historicIps.length >= 2 && currentIp && !historicIps.includes(currentIp)) {
+            return {
+                anomalyDetected: true,
+                reason: `Unusual geographic or network location detected (IP: ${currentIp}). This does not match your typical Pattern of Life. A Live Selfie verification is required to authorize this transfer.`
+            };
+        }
+
+        return { anomalyDetected: false, reason: "" };
+    } catch (error) {
+        console.error("Pattern of life check error:", error);
+        return { anomalyDetected: false, reason: "" }; // Fallback open
+    }
+};
+
+module.exports = { detectClonedImeiAnomaly, checkPatternOfLifeAnomaly };

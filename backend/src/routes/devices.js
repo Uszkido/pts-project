@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 
 const prisma = new PrismaClient();
 const { calculateValuation } = require('../utils/valuation');
+const { analyzeReceiptForFraud } = require('../services/aiService');
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 // Middleware to verify JWT
@@ -37,6 +38,28 @@ router.post('/', authenticateToken, async (req, res) => {
         const existingDevice = await prisma.device.findUnique({ where: { imei } });
         if (existingDevice) {
             return res.status(400).json({ error: 'Device with this IMEI already registered' });
+        }
+
+        // --- AI RECEIPT FRAUD DETECTION ---
+        if (purchaseReceiptUrl) {
+            const receiptAnalysis = await analyzeReceiptForFraud(purchaseReceiptUrl, brand, model);
+
+            // If the AI is highly confident the receipt is a forgery:
+            if (receiptAnalysis && receiptAnalysis.isLikelyFake && receiptAnalysis.confidenceScore > 80) {
+                // Here we could proactively flag the Vendor or create a suspicious alert
+                await prisma.vendorSuspiciousAlert.create({
+                    data: {
+                        deviceId: "FORGERY_ATTEMPT", // We don't have a device ID yet
+                        vendorId: req.user.id,
+                        description: `AI flagged purchase receipt as forged/tampered with ${receiptAnalysis.confidenceScore}% confidence. Reason: ${receiptAnalysis.reasonText}`
+                    }
+                });
+
+                return res.status(400).json({
+                    error: 'Receipt Analysis Failed',
+                    details: 'The uploaded purchase receipt failed our AI authenticity checks. Please upload a clear, unaltered original receipt.'
+                });
+            }
         }
 
         const device = await prisma.device.create({
