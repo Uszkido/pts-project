@@ -12,16 +12,25 @@ const { sendWhatsAppMessage } = require('./whatsapp');
 const { sendTelegramMessage } = require('../services/telegramOracle');
 const { generateAiOtpEmailContent } = require('../services/aiService');
 
-// Email Transporter (Update these with actual credentials in .env later)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+// Email Transporter (Lazy loaded to ensure env variables are loaded)
+let transporter = null;
+const getTransporter = () => {
+    if (transporter) return transporter;
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.warn("⚠️ Email credentials are not defined in .env. Email OTPs will fail.");
+        return null;
     }
-});
+    transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+    return transporter;
+};
 
 const sendOtpViaBots = async (user, otp, mode = "verification") => {
     console.log(`📡 Attempting to send OTP (${otp}) to user ${user.email || user.id}`);
@@ -50,6 +59,12 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
         if (user.email && !user.email.endsWith('.local')) {
             console.log(`📧 Email: Generating AI content for ${user.email}`);
             const aiContent = await generateAiOtpEmailContent(user.fullName || "Valued User", otp, mode);
+            const currentTransporter = getTransporter();
+
+            if (!currentTransporter) {
+                console.error("❌ Cannot send email: Transporter not initialized.");
+                return;
+            }
 
             const mailOptions = {
                 from: `"PTS National Registry AI Oracle" <${process.env.EMAIL_USER}>`,
@@ -71,8 +86,8 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
                        </div>`
             };
 
-            console.log(`📧 Email: Sending SMTP request to ${user.email}`);
-            await transporter.sendMail(mailOptions);
+            console.log(`📧 Email: Sending SMTP request to ${user.email} from ${process.env.EMAIL_USER}`);
+            await currentTransporter.sendMail(mailOptions);
             console.log(`✅ AI Personalized Email OTP sent to ${user.email}`);
         }
     } catch (err) {
@@ -83,6 +98,7 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 router.post('/register', async (req, res) => {
+    console.log(`📥 Registration attempt: ${req.body.email}`);
     try {
         const { email, password, companyName, role, fullName, nationalId, facialDataUrl, biodataUrl, cacCertificateUrl, businessAddress, shopLatitude, shopLongitude, shopPhotoUrl, businessRegNo, phoneNumber, address } = req.body;
 
