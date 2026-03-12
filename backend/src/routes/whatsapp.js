@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio } = require('../services/aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary } = require('../services/aiService');
 const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
@@ -99,7 +99,7 @@ router.post('/webhook', async (req, res) => {
             const user = await prisma.user.findUnique({ where: { email: session.data.email } });
             if (user && await bcrypt.compare(msgBody, user.password)) {
                 updateSession('WHATSAPP', from, 'LOGGED_IN', { userId: user.id, fullName: user.fullName });
-                replyText = `✅ Welcome, *${user.fullName}*! You are now logged in.\n\nYou can now use the *"report"* command to flag a stolen device.`;
+                replyText = `✅ Welcome, *${user.fullName}*! You are now logged in.\n\nCommands:\n- *report* (Flag stolen device)\n- *safety* (National security insights)`;
             } else {
                 replyText = "❌ Invalid email or password. Please try again or type *login* to restart.";
                 clearSession('WHATSAPP', from);
@@ -109,6 +109,22 @@ router.post('/webhook', async (req, res) => {
             replyText = "Error logging in. Please try again later.";
         }
         await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    // == SAFETY INSIGHTS ==
+    if (msgBody.toLowerCase() === 'safety') {
+        try {
+            const recentReports = await prisma.incidentReport.findMany({
+                take: 20,
+                orderBy: { createdAt: 'desc' },
+                select: { type: true, location: true }
+            });
+            replyText = await generateCrimeInsights(recentReports);
+            await sendWhatsAppMessage(phoneNumberId, from, `🚨 *National Security Insights*\n\n${replyText}`);
+        } catch (e) {
+            await sendWhatsAppMessage(phoneNumberId, from, "Security insights temporarily unavailable.");
+        }
         return res.sendStatus(200);
     }
 
@@ -141,11 +157,23 @@ router.post('/webhook', async (req, res) => {
             } else if (device.registeredOwnerId !== session.data.userId) {
                 replyText = "❌ You are not the registered owner of this device. Reporting is only allowed by the owner.";
             } else {
+                const report = await prisma.incidentReport.create({
+                    data: {
+                        deviceId: device.id,
+                        reporterId: session.data.userId,
+                        type: 'STOLEN',
+                        description: 'Reported via WhatsApp Bot',
+                        status: 'OPEN'
+                    }
+                });
+
                 await prisma.device.update({
                     where: { imei },
                     data: { status: 'STOLEN', riskScore: 0 }
                 });
-                replyText = `🚨 *STOLEN REPORTED!* Your ${device.brand} ${device.model} (${imei}) has been marked as STOLEN in the National Registry. Authorities and vendors have been alerted.`;
+
+                const affidavitSummary = await generateAffidavitSummary(report);
+                replyText = `🚨 *STOLEN REPORTED!*\n\nYour ${device.brand} ${device.model} (${imei}) is now flagged NATIONWIDE.\n\n📄 *Digital Affidavit Summary:*\n${affidavitSummary}\n\nAuthorities and vendors have been notified.`;
             }
         } catch (e) {
             console.error(e);
@@ -321,7 +349,7 @@ router.post('/webhook', async (req, res) => {
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify the phone you are buying anywhere in Nigeria to ensure it is not stolen.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
+        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify the phone you are buying anywhere in Nigeria to ensure it is not stolen.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n- Type *safety* for AI security alerts\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
     } else {
         const imei = imeiMatch[0];
         try {

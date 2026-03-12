@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { generateLocalizedOracleResponse, transcribeAudio } = require('./aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
@@ -27,7 +27,7 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen`;
+        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n- Type *safety* to see AI security hotspots in your area`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
@@ -94,6 +94,23 @@ const initTelegramOracle = () => {
             return;
         }
 
+        // == SAFETY INSIGHTS ==
+        if (text.toLowerCase() === 'safety') {
+            bot.sendChatAction(chatId, 'typing');
+            try {
+                const recentReports = await prisma.incidentReport.findMany({
+                    take: 20,
+                    orderBy: { createdAt: 'desc' },
+                    select: { type: true, location: true }
+                });
+                const insights = await generateCrimeInsights(recentReports);
+                bot.sendMessage(chatId, `🚨 *National Security Insights*\n\n${insights}`, { parse_mode: 'Markdown' });
+            } catch (e) {
+                bot.sendMessage(chatId, "Security insights temporarily unavailable.");
+            }
+            return;
+        }
+
         // == REPORT FLOW ==
         if (text.toLowerCase() === 'report') {
             if (session.state !== 'LOGGED_IN') {
@@ -120,11 +137,24 @@ const initTelegramOracle = () => {
                 } else if (device.registeredOwnerId !== session.data.userId) {
                     bot.sendMessage(chatId, "❌ You are not the registered owner of this device. Reporting is only allowed by the owner.", { parse_mode: 'Markdown' });
                 } else {
+                    const report = await prisma.incidentReport.create({
+                        data: {
+                            deviceId: device.id,
+                            reporterId: session.data.userId,
+                            type: 'STOLEN',
+                            description: 'Reported via Telegram Bot',
+                            status: 'OPEN'
+                        }
+                    });
+
                     await prisma.device.update({
                         where: { imei },
                         data: { status: 'STOLEN', riskScore: 0 }
                     });
-                    bot.sendMessage(chatId, `🚨 *STOLEN REPORTED!* Your ${device.brand} ${device.model} (${imei}) has been marked as STOLEN in the National Registry. Authorities and vendors have been alerted.`, { parse_mode: 'Markdown' });
+
+                    const affidavitSummary = await generateAffidavitSummary(report);
+
+                    bot.sendMessage(chatId, `🚨 *STOLEN REPORTED!*\n\nYour ${device.brand} ${device.model} (${imei}) is now flagged NATIONWIDE.\n\n📄 *Digital Affidavit Summary:*\n${affidavitSummary}\n\nKeep this chat as proof of verification. Authorities and vendors have been notified.`, { parse_mode: 'Markdown' });
                 }
             } catch (e) {
                 console.error(e);

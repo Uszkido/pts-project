@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
+const { generateCrimeInsights, generateAffidavitSummary } = require('../services/aiService');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
@@ -111,6 +112,49 @@ router.post('/emergency-freeze', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// AI Crime Hotspot Mapping (Predictive Security)
+router.get('/hotspots', async (req, res) => {
+    try {
+        const recentReports = await prisma.incidentReport.findMany({
+            take: 100,
+            orderBy: { createdAt: 'desc' },
+            select: { type: true, location: true, createdAt: true }
+        });
+
+        const insights = await generateCrimeInsights(recentReports);
+        res.json({ insights });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate security insights' });
+    }
+});
+
+// Digital Police Affidavit (AI Summary)
+router.get('/affidavit/:reportId', async (req, res) => {
+    try {
+        const report = await prisma.incidentReport.findUnique({
+            where: { id: req.params.reportId },
+            include: { device: true, reporter: true }
+        });
+
+        if (!report) return res.status(404).json({ error: 'Report not found' });
+
+        const summary = await generateAffidavitSummary(report);
+        res.json({
+            officialId: `PTS-AF-${report.id.substring(0, 8).toUpperCase()}`,
+            timestamp: report.createdAt,
+            summary,
+            device: {
+                brand: report.device.brand,
+                model: report.device.model,
+                imei: report.device.imei
+            },
+            status: 'SENTINEL_VERIFIED'
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate affidavit' });
     }
 });
 
