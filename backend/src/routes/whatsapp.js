@@ -51,205 +51,105 @@ router.post('/webhook', async (req, res) => {
     const session = getSession('WHATSAPP', from);
     let replyText = "";
 
-    // == CONVERSATIONAL REGISTRATION FLOW ==
-    if (msgBody.toLowerCase() === 'register') {
-        updateSession('WHATSAPP', from, 'AWAITING_ROLE');
-        replyText = "Great! Let's get you registered.\n\nAre you registering as a *Regular User* or a *Vendor*? (Reply with 'user' or 'vendor')";
+    // == LOGIN FLOW ==
+    if (msgBody.toLowerCase() === 'login') {
+        updateSession('WHATSAPP', from, 'AWAITING_LOGIN_EMAIL');
+        replyText = "Welcome back! Please enter your registered *Email Address*.";
         await sendWhatsAppMessage(phoneNumberId, from, replyText);
         return res.sendStatus(200);
     }
 
-    if (session.state === 'AWAITING_ROLE') {
-        const role = msgBody.toLowerCase() === 'vendor' ? 'VENDOR' : 'PUBLIC';
-        updateSession('WHATSAPP', from, 'AWAITING_NAME', { role });
-        replyText = "Got it! First, please reply with your *Full Name*.";
+    if (session.state === 'AWAITING_LOGIN_EMAIL') {
+        updateSession('WHATSAPP', from, 'AWAITING_LOGIN_PASSWORD', { email: msgBody });
+        replyText = "Got it! Now please enter your *Password*.";
         await sendWhatsAppMessage(phoneNumberId, from, replyText);
         return res.sendStatus(200);
     }
 
-    if (session.state === 'AWAITING_NAME') {
-        updateSession('WHATSAPP', from, 'AWAITING_EMAIL', { fullName: msgBody });
-        replyText = "Thanks! Now, please reply with your *Email Address* (or type 'skip' if you don't have one).";
-        await sendWhatsAppMessage(phoneNumberId, from, replyText);
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_EMAIL') {
-        const email = msgBody.toLowerCase() === 'skip' ? `${from}@whatsapp.local` : msgBody;
-        updateSession('WHATSAPP', from, 'AWAITING_USER_SELFIE', { email });
-        replyText = "Please *upload a selfie* for identity verification.";
-        await sendWhatsAppMessage(phoneNumberId, from, replyText);
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_USER_SELFIE') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo (your selfie).");
-            return res.sendStatus(200);
-        }
-        const selfieUrl = `whatsapp-media://${change.messages[0].image.id}`;
-        updateSession('WHATSAPP', from, session.data.role === 'VENDOR' ? 'AWAITING_CAC_CERT' : 'CREATING_USER', { facialDataUrl: selfieUrl });
-
-        if (session.data.role === 'VENDOR') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Great! Since you are a Vendor, please *upload a photo of your CAC Certificate*.");
-            return res.sendStatus(200);
-        }
-        session.state = 'CREATING_USER';
-    }
-
-    if (session.state === 'AWAITING_CAC_CERT') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo of your CAC Certificate.");
-            return res.sendStatus(200);
-        }
-        updateSession('WHATSAPP', from, 'AWAITING_SHOP_PHOTO', { cacCertificateUrl: `whatsapp-media://${change.messages[0].image.id}` });
-        await sendWhatsAppMessage(phoneNumberId, from, "Thanks! Finally for your vendor details, please *upload a photo of your shop*.");
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_SHOP_PHOTO') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo of your shop.");
-            return res.sendStatus(200);
-        }
-        updateSession('WHATSAPP', from, 'CREATING_USER', { shopPhotoUrl: `whatsapp-media://${change.messages[0].image.id}` });
-        session.state = 'CREATING_USER';
-    }
-
-    if (session.state === 'CREATING_USER') {
-        const plainPassword = Math.random().toString(36).slice(-8);
-        const hashedPassword = await bcrypt.hash(plainPassword, 10);
-
+    if (session.state === 'AWAITING_LOGIN_PASSWORD') {
         try {
-            const user = await prisma.user.create({
-                data: {
-                    fullName: session.data.fullName,
-                    email: session.data.email,
-                    password: hashedPassword,
-                    phoneNumber: from,
-                    role: session.data.role,
-                    facialDataUrl: session.data.facialDataUrl,
-                    cacCertificateUrl: session.data.cacCertificateUrl || null,
-                    shopPhotoUrl: session.data.shopPhotoUrl || null,
-                    vendorStatus: session.data.role === 'VENDOR' ? 'PENDING' : 'APPROVED'
-                }
-            });
-            updateSession('WHATSAPP', from, 'AWAITING_DEVICE_IMEI', { userId: user.id });
-            replyText = `🎉 Account created successfully!\n\nYour temporary password is: *${plainPassword}*\n\nNow, let's register your device. Please reply with the *15-digit IMEI* of the device (dial *#06#* to find it).`;
+            const user = await prisma.user.findUnique({ where: { email: session.data.email } });
+            if (user && await bcrypt.compare(msgBody, user.password)) {
+                updateSession('WHATSAPP', from, 'LOGGED_IN', { userId: user.id, fullName: user.fullName });
+                replyText = `✅ Welcome, *${user.fullName}*! You are now logged in.\n\nYou can now use the *"report"* command to flag a stolen device.`;
+            } else {
+                replyText = "❌ Invalid email or password. Please try again or type *login* to restart.";
+                clearSession('WHATSAPP', from);
+            }
         } catch (e) {
             console.error(e);
-            replyText = "Oops, failed to create account. Registration cancelled.";
-            clearSession('WHATSAPP', from);
+            replyText = "Error logging in. Please try again later.";
         }
-        if (replyText) {
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
+    // == REPORT FLOW ==
+    if (msgBody.toLowerCase() === 'report') {
+        if (session.state !== 'LOGGED_IN') {
+            replyText = "You need to be logged in to report a stolen device. Please type *login* first.";
             await sendWhatsAppMessage(phoneNumberId, from, replyText);
             return res.sendStatus(200);
         }
+        updateSession('WHATSAPP', from, 'AWAITING_REPORT_IMEI');
+        replyText = "Please send the *15-digit IMEI* of the device you want to report as STOLEN.";
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
     }
 
-    if (session.state === 'AWAITING_DEVICE_IMEI') {
+    if (session.state === 'AWAITING_REPORT_IMEI') {
         const imeiMatch = msgBody.match(/\b\d{15}\b/);
         if (!imeiMatch) {
             replyText = "That doesn't look like a 15-digit IMEI. Please dial *#06#* and send the 15 digits.";
             await sendWhatsAppMessage(phoneNumberId, from, replyText);
             return res.sendStatus(200);
         }
-        const existing = await prisma.device.findUnique({ where: { imei: imeiMatch[0] } });
-        if (existing) {
-            replyText = "This IMEI is already registered! If this is a mistake, please contact support. Registration cancelled.";
-            clearSession('WHATSAPP', from);
-            await sendWhatsAppMessage(phoneNumberId, from, replyText);
-            return res.sendStatus(200);
-        }
-        updateSession('WHATSAPP', from, 'AWAITING_DEVICE_BRAND', { imei: imeiMatch[0] });
-        replyText = "Got it! What is the *Brand* of the device? (e.g., Apple, Samsung, Tecno)";
-        await sendWhatsAppMessage(phoneNumberId, from, replyText);
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_DEVICE_BRAND') {
-        updateSession('WHATSAPP', from, 'AWAITING_DEVICE_MODEL', { brand: msgBody });
-        replyText = "And what is the *Model*? (e.g., iPhone 13 Pro, Galaxy S21)";
-        await sendWhatsAppMessage(phoneNumberId, from, replyText);
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_DEVICE_MODEL') {
-        updateSession('WHATSAPP', from, 'AWAITING_DEVICE_PHOTO', { model: msgBody });
-        replyText = "Almost done! Please *upload a photo of the device itself*.";
-        await sendWhatsAppMessage(phoneNumberId, from, replyText);
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_DEVICE_PHOTO') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo of the device.");
-            return res.sendStatus(200);
-        }
-        const photoUrl = `whatsapp-media://${change.messages[0].image.id}`;
-        updateSession('WHATSAPP', from, 'AWAITING_DEVICE_CARTON', { devicePhoto: photoUrl });
-        await sendWhatsAppMessage(phoneNumberId, from, "Awesome! Now please *upload a photo of the device carton*.");
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_DEVICE_CARTON') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo of the device carton.");
-            return res.sendStatus(200);
-        }
-        const cartonUrl = `whatsapp-media://${change.messages[0].image.id}`;
-        updateSession('WHATSAPP', from, 'AWAITING_DEVICE_RECEIPT', { cartonPhotoUrl: cartonUrl });
-        await sendWhatsAppMessage(phoneNumberId, from, "Almost finished! Finally, *upload a photo of the purchase receipt*.");
-        return res.sendStatus(200);
-    }
-
-    if (session.state === 'AWAITING_DEVICE_RECEIPT') {
-        if (msgType !== 'image') {
-            await sendWhatsAppMessage(phoneNumberId, from, "Please upload a photo of the purchase receipt.");
-            return res.sendStatus(200);
-        }
-        const receiptUrl = `whatsapp-media://${change.messages[0].image.id}`;
-
+        const imei = imeiMatch[0];
         try {
-            await prisma.device.create({
-                data: {
-                    imei: session.data.imei,
-                    brand: session.data.brand,
-                    model: session.data.model,
-                    registeredOwnerId: session.data.userId,
-                    devicePhotos: [session.data.devicePhoto],
-                    cartonPhotoUrl: session.data.cartonPhotoUrl,
-                    purchaseReceiptUrl: receiptUrl,
-                    status: 'CLEAN'
-                }
-            });
-            replyText = `✅ Registration Complete!\n\nYour *${session.data.brand} ${session.data.model}* (${session.data.imei}) is now fully secured on the National Registry.`;
+            const device = await prisma.device.findUnique({ where: { imei } });
+
+            if (!device) {
+                replyText = "❌ We couldn't find a device with that IMEI in the registry.";
+            } else if (device.registeredOwnerId !== session.data.userId) {
+                replyText = "❌ You are not the registered owner of this device. Reporting is only allowed by the owner.";
+            } else {
+                await prisma.device.update({
+                    where: { imei },
+                    data: { status: 'STOLEN', riskScore: 0 }
+                });
+                replyText = `🚨 *STOLEN REPORTED!* Your ${device.brand} ${device.model} (${imei}) has been marked as STOLEN in the National Registry. Authorities and vendors have been alerted.`;
+            }
         } catch (e) {
-            replyText = "Failed to register device. Please try again.";
+            console.error(e);
+            replyText = "Error processing report. Please try again.";
         }
-        clearSession('WHATSAPP', from);
+        updateSession('WHATSAPP', from, 'LOGGED_IN');
         await sendWhatsAppMessage(phoneNumberId, from, replyText);
         return res.sendStatus(200);
     }
+
     // == END CONVERSATIONAL REGISTRATION FLOW ==
 
     // ORIGINAL LOGIC: Scan message for a 15-digit IMEI
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am your friendly PTS National Registry assistant. 🇳🇬\n\nI can help you verify a fairly used phone before you buy it at Farm Centre or anywhere else in Kano.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\n*(Or, if you want to register a new account and device, just reply with the word "register")*\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
+        replyText = `Hello there! 👋 Barka da zuwa! I am your friendly PTS National Registry assistant. 🇳🇬\n\nI can help you verify a fairly used phone before you buy it at Farm Centre or anywhere else in Kano.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
     } else {
         const imei = imeiMatch[0];
         try {
-            const device = await prisma.device.findUnique({ where: { imei } });
+            const device = await prisma.device.findUnique({
+                where: { imei },
+                include: { registeredOwner: true }
+            });
 
             if (!device) {
-                replyText = `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or it could be compromised.\n\nIf this is your device, you can securely register it right here! Just reply with the word *"register"* to begin taking ownership.\n\nPlease be careful when buying unregistered devices. A kiyaye siyayya babu tabbaci (Do not buy without verification).`;
+                replyText = `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or it could be compromised.\n\nIf you are the owner, please log in and register it via the web dashboard.\n\nPlease be careful when buying unregistered devices. A kiyaye siyayya babu tabbaci (Do not buy without verification).`;
             } else {
                 // Check Fraud Engine for Cloned IMEI Velocity
                 const anomalyWarning = await detectClonedImeiAnomaly(imei, "WHATSAPP", from);
 
-                replyText = await generateLocalizedOracleResponse(
+                const aiResponse = await generateLocalizedOracleResponse(
                     device.status,
                     device.brand,
                     device.model,
@@ -257,6 +157,10 @@ router.post('/webhook', async (req, res) => {
                     msgBody,
                     anomalyWarning
                 );
+
+                const statusEmoji = device.status === 'CLEAN' ? '✅' : '🚨';
+                const ownerName = device.registeredOwner?.fullName || 'Hidden/Unknown';
+                replyText = `📱 *Device Details:*\n- *Status:* ${statusEmoji} ${device.status}\n- *Owner:* 👤 ${ownerName}\n- *Brand/Model:* ${device.brand} ${device.model}\n- *Risk Score:* ${device.riskScore}/100\n\n_" ${aiResponse} "_`;
             }
         } catch (error) {
             console.error("DB/AI Error in WhatsApp webhook:", error);

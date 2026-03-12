@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
@@ -10,24 +11,56 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 const { sendWhatsAppMessage } = require('./whatsapp');
 const { sendTelegramMessage } = require('../services/telegramOracle');
 
+// Email Transporter (Update these with actual credentials in .env later)
+const transporter = nodemailer.createTransport({
+    service: 'gmail', // Or your preferred email service
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
 const sendOtpViaBots = async (user, otp) => {
     const text = `🔐 *PTS National Registry*\n\nYour Verification OTP is: *${otp}*\n\nPlease use this to verify your account.`;
 
-    // If they have a phone number, attempt to send via WhatsApp
+    // 1. Send via WhatsApp
     if (user.phoneNumber) {
-        // Strip any non-digit chars just in case, but usually WhatsApp expects country code
         let cleanNum = user.phoneNumber.replace(/[\+\s\-()]/g, '');
         if (!cleanNum.startsWith('234') && cleanNum.startsWith('0')) {
-            cleanNum = '234' + cleanNum.substring(1); // Default to Nigeria
+            cleanNum = '234' + cleanNum.substring(1);
         }
         await sendWhatsAppMessage(null, cleanNum, text);
     }
 
-    // Since telegram bots use chat IDs, if we have a way to identify them, we send it.
-    // We used email as a pseudo-identifier if they didn't provide one: chatid@telegram.local
+    // 2. Send via Telegram
     if (user.email && user.email.endsWith('@telegram.local')) {
         const chatId = user.email.replace('@telegram.local', '');
         await sendTelegramMessage(chatId, text);
+    }
+
+    // 3. 📧 Automatically Send via Email
+    if (user.email && !user.email.endsWith('.local')) {
+        const mailOptions = {
+            from: `"PTS National Registry" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: 'Verification OTP - PTS National Registry',
+            text: `Your Verification OTP is: ${otp}`,
+            html: `<div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
+                    <h2 style="color: #2e7d32;">PTS National Registry</h2>
+                    <p>Hello <b>${user.fullName || 'User'}</b>,</p>
+                    <p>Your Verification OTP is:</p>
+                    <div style="font-size: 24px; font-weight: bold; background: #f4f4f4; padding: 10px; display: inline-block; border-radius: 5px;">${otp}</div>
+                    <p>Please use this to verify your account. If you did not request this, please ignore this email.</p>
+                    <p style="color: #777; font-size: 12px; margin-top: 20px;">&copy; 2026 PTS National Registry Nigeria.</p>
+                   </div>`
+        };
+
+        try {
+            await transporter.sendMail(mailOptions);
+            console.log(`✅ Email OTP sent to ${user.email}`);
+        } catch (error) {
+            console.error('❌ Failed to send email OTP:', error);
+        }
     }
 };
 

@@ -25,7 +25,7 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS National Registry AI Oracle*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify fairly used phones before you buy them at Farm Centre or anywhere else in Kano, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\n*(Or, if you want to register a new account and device, just reply with the word "register")*`;
+        const resp = `Hello there! 👋 I am the *PTS National Registry AI Oracle*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify fairly used phones before you buy them at Farm Centre or anywhere else in Kano, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
@@ -38,172 +38,76 @@ const initTelegramOracle = () => {
         // Ignore start slash command so it doesnt double trigger
         if (text.startsWith('/start')) return;
 
-        // == CONVERSATIONAL REGISTRATION FLOW ==
-        if (text.toLowerCase() === 'register') {
-            updateSession('TELEGRAM', chatId, 'AWAITING_ROLE');
-            bot.sendMessage(chatId, "Great! Let's get you registered.\n\nAre you registering as a *Regular User* or a *Vendor*? (Reply with 'user' or 'vendor')", { parse_mode: 'Markdown' });
+        // == LOGIN FLOW ==
+        if (text.toLowerCase() === 'login') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_LOGIN_EMAIL');
+            bot.sendMessage(chatId, "Welcome back! Please enter your registered *Email Address*.", { parse_mode: 'Markdown' });
             return;
         }
 
-        if (session.state === 'AWAITING_ROLE') {
-            const role = text.toLowerCase() === 'vendor' ? 'VENDOR' : 'PUBLIC';
-            updateSession('TELEGRAM', chatId, 'AWAITING_NAME', { role });
-            bot.sendMessage(chatId, "Got it! First, please reply with your *Full Name*.", { parse_mode: 'Markdown' });
+        if (session.state === 'AWAITING_LOGIN_EMAIL') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_LOGIN_PASSWORD', { email: text });
+            bot.sendMessage(chatId, "Got it! Now please enter your *Password*.", { parse_mode: 'Markdown' });
             return;
         }
 
-        if (session.state === 'AWAITING_NAME') {
-            updateSession('TELEGRAM', chatId, 'AWAITING_EMAIL', { fullName: text });
-            bot.sendMessage(chatId, "Thanks! Now, please reply with your *Email Address* (or type 'skip' if you don't have one).", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_EMAIL') {
-            const email = text.toLowerCase() === 'skip' ? `${chatId}@telegram.local` : text;
-            updateSession('TELEGRAM', chatId, 'AWAITING_USER_SELFIE', { email });
-            bot.sendMessage(chatId, "Please *upload a selfie* for identity verification.", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_USER_SELFIE') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo (your selfie).");
-                return;
-            }
-            const selfieUrl = `telegram-file://${msg.photo[msg.photo.length - 1].file_id}`;
-            updateSession('TELEGRAM', chatId, session.data.role === 'VENDOR' ? 'AWAITING_CAC_CERT' : 'CREATING_USER', { facialDataUrl: selfieUrl });
-
-            if (session.data.role === 'VENDOR') {
-                bot.sendMessage(chatId, "Great! Since you are a Vendor, please *upload a photo of your CAC Certificate*.", { parse_mode: 'Markdown' });
-                return;
-            }
-            session.state = 'CREATING_USER';
-        }
-
-        if (session.state === 'AWAITING_CAC_CERT') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo of your CAC Certificate.");
-                return;
-            }
-            updateSession('TELEGRAM', chatId, 'AWAITING_SHOP_PHOTO', { cacCertificateUrl: `telegram-file://${msg.photo[msg.photo.length - 1].file_id}` });
-            bot.sendMessage(chatId, "Thanks! Finally for your vendor details, please *upload a photo of your shop*.", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_SHOP_PHOTO') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo of your shop.");
-                return;
-            }
-            updateSession('TELEGRAM', chatId, 'CREATING_USER', { shopPhotoUrl: `telegram-file://${msg.photo[msg.photo.length - 1].file_id}` });
-            session.state = 'CREATING_USER';
-        }
-
-        if (session.state === 'CREATING_USER') {
-            const plainPassword = Math.random().toString(36).slice(-8);
-            const hashedPassword = await bcrypt.hash(plainPassword, 10);
-
+        if (session.state === 'AWAITING_LOGIN_PASSWORD') {
             try {
-                const user = await prisma.user.create({
-                    data: {
-                        fullName: session.data.fullName,
-                        email: session.data.email,
-                        password: hashedPassword,
-                        role: session.data.role,
-                        facialDataUrl: session.data.facialDataUrl,
-                        cacCertificateUrl: session.data.cacCertificateUrl || null,
-                        shopPhotoUrl: session.data.shopPhotoUrl || null,
-                        vendorStatus: session.data.role === 'VENDOR' ? 'PENDING' : 'APPROVED'
-                    }
-                });
-                updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_IMEI', { userId: user.id });
-                bot.sendMessage(chatId, `🎉 Account created successfully!\n\nYour temporary password is: *${plainPassword}*\n\nNow, let's register your device. Please reply with the *15-digit IMEI* of the device (dial *#06#* to find it).`, { parse_mode: 'Markdown' });
+                const user = await prisma.user.findUnique({ where: { email: session.data.email } });
+                if (user && await bcrypt.compare(text, user.password)) {
+                    updateSession('TELEGRAM', chatId, 'LOGGED_IN', { userId: user.id, fullName: user.fullName });
+                    bot.sendMessage(chatId, `✅ Welcome, *${user.fullName}*! You are now logged in.\n\nYou can now use the *"report"* command to flag a stolen device.`, { parse_mode: 'Markdown' });
+                } else {
+                    bot.sendMessage(chatId, "❌ Invalid email or password. Please try again or type 'login' to restart.", { parse_mode: 'Markdown' });
+                    clearSession('TELEGRAM', chatId);
+                }
             } catch (e) {
                 console.error(e);
-                bot.sendMessage(chatId, "Oops, failed to create account. Registration cancelled.");
-                clearSession('TELEGRAM', chatId);
+                bot.sendMessage(chatId, "Error logging in. Please try again later.");
             }
             return;
         }
 
-        if (session.state === 'AWAITING_DEVICE_IMEI') {
+        // == REPORT FLOW ==
+        if (text.toLowerCase() === 'report') {
+            if (session.state !== 'LOGGED_IN') {
+                bot.sendMessage(chatId, "You need to be logged in to report a stolen device. Please type *login* first.", { parse_mode: 'Markdown' });
+                return;
+            }
+            updateSession('TELEGRAM', chatId, 'AWAITING_REPORT_IMEI');
+            bot.sendMessage(chatId, "Please send the *15-digit IMEI* of the device you want to report as STOLEN.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_REPORT_IMEI') {
             const imeiMatch = text.match(/\b\d{15}\b/);
             if (!imeiMatch) {
                 bot.sendMessage(chatId, "That doesn't look like a 15-digit IMEI. Please dial *#06#* and send the 15 digits.", { parse_mode: 'Markdown' });
                 return;
             }
-            const existing = await prisma.device.findUnique({ where: { imei: imeiMatch[0] } });
-            if (existing) {
-                bot.sendMessage(chatId, "This IMEI is already registered! If this is a mistake, please contact support. Registration cancelled.");
-                clearSession('TELEGRAM', chatId);
-                return;
-            }
-            updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_BRAND', { imei: imeiMatch[0] });
-            bot.sendMessage(chatId, "Got it! What is the *Brand* of the device? (e.g., Apple, Samsung, Tecno)", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_DEVICE_BRAND') {
-            updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_MODEL', { brand: text });
-            bot.sendMessage(chatId, "And what is the *Model*? (e.g., iPhone 13 Pro, Galaxy S21)", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_DEVICE_MODEL') {
-            updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_PHOTO', { model: text });
-            bot.sendMessage(chatId, "Almost done! Please *upload a photo of the device itself*.", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_DEVICE_PHOTO') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo of the device.");
-                return;
-            }
-            const photoUrl = `telegram-file://${msg.photo[msg.photo.length - 1].file_id}`;
-            updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_CARTON', { devicePhoto: photoUrl });
-            bot.sendMessage(chatId, "Awesome! Now please *upload a photo of the device carton*.", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_DEVICE_CARTON') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo of the device carton.");
-                return;
-            }
-            const cartonUrl = `telegram-file://${msg.photo[msg.photo.length - 1].file_id}`;
-            updateSession('TELEGRAM', chatId, 'AWAITING_DEVICE_RECEIPT', { cartonPhotoUrl: cartonUrl });
-            bot.sendMessage(chatId, "Almost finished! Finally, *upload a photo of the purchase receipt*.", { parse_mode: 'Markdown' });
-            return;
-        }
-
-        if (session.state === 'AWAITING_DEVICE_RECEIPT') {
-            if (!msg.photo || msg.photo.length === 0) {
-                bot.sendMessage(chatId, "Please upload a photo of the purchase receipt.");
-                return;
-            }
-            const receiptUrl = `telegram-file://${msg.photo[msg.photo.length - 1].file_id}`;
-
+            const imei = imeiMatch[0];
             try {
-                await prisma.device.create({
-                    data: {
-                        imei: session.data.imei,
-                        brand: session.data.brand,
-                        model: session.data.model,
-                        registeredOwnerId: session.data.userId,
-                        devicePhotos: [session.data.devicePhoto],
-                        cartonPhotoUrl: session.data.cartonPhotoUrl,
-                        purchaseReceiptUrl: receiptUrl,
-                        status: 'CLEAN'
-                    }
-                });
-                bot.sendMessage(chatId, `✅ Registration Complete!\n\nYour *${session.data.brand} ${session.data.model}* (${session.data.imei}) is now fully secured on the National Registry.`, { parse_mode: 'Markdown' });
+                const device = await prisma.device.findUnique({ where: { imei } });
+
+                if (!device) {
+                    bot.sendMessage(chatId, "❌ We couldn't find a device with that IMEI in the registry.", { parse_mode: 'Markdown' });
+                } else if (device.registeredOwnerId !== session.data.userId) {
+                    bot.sendMessage(chatId, "❌ You are not the registered owner of this device. Reporting is only allowed by the owner.", { parse_mode: 'Markdown' });
+                } else {
+                    await prisma.device.update({
+                        where: { imei },
+                        data: { status: 'STOLEN', riskScore: 0 }
+                    });
+                    bot.sendMessage(chatId, `🚨 *STOLEN REPORTED!* Your ${device.brand} ${device.model} (${imei}) has been marked as STOLEN in the National Registry. Authorities and vendors have been alerted.`, { parse_mode: 'Markdown' });
+                }
             } catch (e) {
-                bot.sendMessage(chatId, "Failed to register device. Please try again.");
+                console.error(e);
+                bot.sendMessage(chatId, "Error processing report. Please try again.");
             }
-            clearSession('TELEGRAM', chatId);
+            updateSession('TELEGRAM', chatId, 'LOGGED_IN'); // Return to logged in state
             return;
         }
+
         // == END CONVERSATIONAL REGISTRATION FLOW ==
 
         // ORIGINAL LOGIC: RegEx to find any standalone 15-digit number
@@ -224,10 +128,11 @@ const initTelegramOracle = () => {
             // 1. Database Check
             const device = await prisma.device.findUnique({
                 where: { imei },
+                include: { registeredOwner: true }
             });
 
             if (!device) {
-                bot.sendMessage(chatId, `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or the IMEI might be compromised. \n\nIf you own this device, you can register it right here! Just reply with the word *"register"* to begin.\n\nPlease exercise caution when buying unregistered devices. A kiyaye siyayya babu tabbaci.`, { parse_mode: 'Markdown' });
+                bot.sendMessage(chatId, `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or the IMEI might be compromised.\n\nIf you own this device, please log in or visit our web dashboard to register it.`, { parse_mode: 'Markdown' });
                 return;
             }
 
@@ -244,8 +149,13 @@ const initTelegramOracle = () => {
                 anomalyWarning
             );
 
-            // 3. Send final AI generated response to the person on Telegram
-            bot.sendMessage(chatId, `" ${aiResponse} "`);
+            // 3. Status Block with Owner Details
+            const statusEmoji = device.status === 'CLEAN' ? '✅' : '🚨';
+            const ownerName = device.registeredOwner?.fullName || 'Hidden/Unknown';
+            const detailBlock = `📱 *Device Details:*\n- *Status:* ${statusEmoji} ${device.status}\n- *Owner:* 👤 ${ownerName}\n- *Brand/Model:* ${device.brand} ${device.model}\n- *Risk Score:* ${device.riskScore}/100\n\n_" ${aiResponse} "_`;
+
+            // 4. Send final response
+            bot.sendMessage(chatId, detailBlock, { parse_mode: 'Markdown' });
 
         } catch (error) {
             console.error('Telegram Oracle Flow Error: ', error);
