@@ -161,6 +161,12 @@ router.post('/webhook', async (req, res) => {
                 const statusEmoji = device.status === 'CLEAN' ? '✅' : '🚨';
                 const ownerName = device.registeredOwner?.fullName || 'Hidden/Unknown';
                 replyText = `📱 *Device Details:*\n- *Status:* ${statusEmoji} ${device.status}\n- *Owner:* 👤 ${ownerName}\n- *Brand/Model:* ${device.brand} ${device.model}\n- *Risk Score:* ${device.riskScore}/100\n\n_" ${aiResponse} "_`;
+
+                // If images exist, send the image + details as a caption
+                if (device.devicePhotos && device.devicePhotos.length > 0) {
+                    await sendWhatsAppImage(phoneNumberId, from, device.devicePhotos[0], replyText);
+                    return res.sendStatus(200);
+                }
             }
         } catch (error) {
             console.error("DB/AI Error in WhatsApp webhook:", error);
@@ -168,22 +174,53 @@ router.post('/webhook', async (req, res) => {
         }
     }
 
-    // Send reply BEFORE ending the response so Vercel doesn't kill the function
+    // Send fallback text reply if no image flow was triggered
     await sendWhatsAppMessage(phoneNumberId, from, replyText);
-
-    // Only AFTER the reply is sent, acknowledge Meta's webhook request
     return res.sendStatus(200);
 });
 
-// Function to send a message via WhatsApp Cloud API
+// Function to send an image with optional caption via WhatsApp Cloud API
+async function sendWhatsAppImage(phoneNumberId, to, imageUrl, caption = "") {
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const numId = phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+    if (!token) return console.warn("⚠️ WHATSAPP_ACCESS_TOKEN is missing.");
+
+    try {
+        const response = await fetch(`https://graph.facebook.com/v18.0/${numId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: to,
+                type: "image",
+                image: {
+                    link: imageUrl,
+                    caption: caption
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            console.error('WhatsApp Image API Error:', JSON.stringify(err));
+        } else {
+            console.log(`✅ WhatsApp image sent to ${to}`);
+        }
+    } catch (error) {
+        console.error('Error sending WhatsApp image:', error);
+    }
+}
+
+// Function to send a text message via WhatsApp Cloud API
 async function sendWhatsAppMessage(phoneNumberId, to, text) {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
     const numId = phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-    if (!token) {
-        console.warn("⚠️ WHATSAPP_ACCESS_TOKEN is missing. Cannot send WhatsApp reply.");
-        return;
-    }
+    if (!token) return console.warn("⚠️ WHATSAPP_ACCESS_TOKEN is missing.");
 
     try {
         const response = await fetch(`https://graph.facebook.com/v18.0/${numId}/messages`, {
@@ -212,3 +249,4 @@ async function sendWhatsAppMessage(phoneNumberId, to, text) {
 
 module.exports = router;
 module.exports.sendWhatsAppMessage = sendWhatsAppMessage;
+module.exports.sendWhatsAppImage = sendWhatsAppImage;

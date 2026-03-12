@@ -154,8 +154,16 @@ const initTelegramOracle = () => {
             const ownerName = device.registeredOwner?.fullName || 'Hidden/Unknown';
             const detailBlock = `📱 *Device Details:*\n- *Status:* ${statusEmoji} ${device.status}\n- *Owner:* 👤 ${ownerName}\n- *Brand/Model:* ${device.brand} ${device.model}\n- *Risk Score:* ${device.riskScore}/100\n\n_" ${aiResponse} "_`;
 
-            // 4. Send final response
-            bot.sendMessage(chatId, detailBlock, { parse_mode: 'Markdown' });
+            // 4. Send Visual & Text Confirmation
+            if (device.devicePhotos && device.devicePhotos.length > 0) {
+                // Send the first official photo as the main visual proof
+                bot.sendPhoto(chatId, device.devicePhotos[0], {
+                    caption: detailBlock,
+                    parse_mode: 'Markdown'
+                });
+            } else {
+                bot.sendMessage(chatId, detailBlock, { parse_mode: 'Markdown' });
+            }
 
         } catch (error) {
             console.error('Telegram Oracle Flow Error: ', error);
