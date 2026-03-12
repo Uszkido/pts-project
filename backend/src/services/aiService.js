@@ -11,7 +11,7 @@ if (process.env.GEMINI_API_KEY) {
  * Generates a localized response using Google's Gemini AI.
  * Translates the structured PTS device data into conversational Nigerian English/Pidgin.
  */
-const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, deviceModel, riskScore, userQuery) => {
+const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, deviceModel, riskScore, userQuery, anomalyWarning = "") => {
     if (!genAI) {
         // Fallback response if the API is not configured.
         return `[Fallback Mode]\nDevice: ${deviceBrand} ${deviceModel}\nStatus: ${deviceStatus}\nRisk Score: ${riskScore}%\nRecommendation: ${deviceStatus === 'CLEAN' ? 'Safe to buy' : 'Do not buy. Report to Police.'}`;
@@ -34,9 +34,13 @@ User's original message: "${userQuery}"
 Your response MUST:
 1. Greet them warmly (e.g., using "Barka" or "Sannu" alongside English).
 2. Tell them clearly if the phone is safe to buy or if it's flagged as stolen/lost.
-3. Mention the brand and model.
-4. If stolen/red, warn them strongly (in English and Hausa) not to buy it and that purchasing stolen property could lead to arrest.
-Keep the response under 4 short sentences. Do not use Markdown formatting like bold or italics, just plain text.`;
+3. Mention the brand and model explicitly.
+4. If stolen/red OR if there is an anomaly warning provided below, warn them strongly (in English and Hausa) not to buy it under any circumstances.
+5. IF the device is CLEAN, you MUST act as a dynamic market valuation oracle: provide a rough estimated current market price (in Nigerian Naira, ₦) for a UK-Used/Nigerian-Used version of this specific brand and model.
+
+CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}
+
+Keep the response concise (around 4-5 sentences total). Do not use Markdown formatting like bold or italics, just plain text.`;
 
     try {
         const result = await model.generateContent({

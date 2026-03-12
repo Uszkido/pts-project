@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { generateLocalizedOracleResponse } = require('./aiService');
+const { detectClonedImeiAnomaly } = require('./fraudEngine');
 
 const initTelegramOracle = () => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -55,13 +56,17 @@ const initTelegramOracle = () => {
                 return;
             }
 
+            // 1.5. Fraud Engine Anomaly Check
+            const anomalyWarning = await detectClonedImeiAnomaly(imei, "TELEGRAM", String(chatId));
+
             // 2. AI Translation / Localization
             const aiResponse = await generateLocalizedOracleResponse(
                 device.status,
                 device.brand,
                 device.model,
                 device.riskScore,
-                text
+                text,
+                anomalyWarning
             );
 
             // 3. Send final AI generated response to the person on Telegram

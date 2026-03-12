@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { generateLocalizedOracleResponse } = require('../services/aiService');
+const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 
 // 1. Webhook Verification (Meta requires this when you register your server URL)
 router.get('/webhook', (req, res) => {
@@ -59,12 +60,16 @@ router.post('/webhook', async (req, res) => {
             if (!device) {
                 replyText = `❌ I did not find this IMEI (${imei}) in our National Registry.\n\nThis means the device is either unregistered or its IMEI has been tampered with. Please exercise caution.\n\nA kiyaye siyayya babu tabbaci (Do not buy without verification).`;
             } else {
+                // Check Fraud Engine for Cloned IMEI Velocity
+                const anomalyWarning = await detectClonedImeiAnomaly(imei, "WHATSAPP", from);
+
                 replyText = await generateLocalizedOracleResponse(
                     device.status,
                     device.brand,
                     device.model,
                     device.riskScore,
-                    msgBody
+                    msgBody,
+                    anomalyWarning
                 );
             }
         } catch (error) {
