@@ -3,9 +3,9 @@ const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 
 /**
- * Shared logic for registering a user from Web or Bots
+ * Stage 1: Store registration data in PendingUser and generate OTP
  */
-const registerUser = async (data) => {
+const startRegistration = async (data) => {
     const {
         email, password, role, fullName, nationalId,
         facialDataUrl, phoneNumber, address,
@@ -13,40 +13,77 @@ const registerUser = async (data) => {
         shopPhotoUrl, cacCertificateUrl, shopLatitude, shopLongitude
     } = data;
 
+    // Check if user already exists in real table
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-        throw new Error('User already exists');
+        throw new Error('User already exists in the registry.');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const finalRole = role === 'CONSUMER' ? 'CONSUMER' : 'VENDOR';
-
-    const user = await prisma.user.create({
-        data: {
+    // Upsert into PendingUser (replace if they try again with same email)
+    const pending = await prisma.pendingUser.upsert({
+        where: { email },
+        update: {
+            password: hashedPassword,
+            role, fullName, nationalId, facialDataUrl, phoneNumber, address,
+            companyName, businessAddress, businessRegNo, shopPhotoUrl,
+            cacCertificateUrl, shopLatitude: shopLatitude ? parseFloat(shopLatitude) : null,
+            shopLongitude: shopLongitude ? parseFloat(shopLongitude) : null,
+            otp
+        },
+        create: {
             email,
             password: hashedPassword,
-            role: finalRole,
-            fullName,
-            nationalId,
-            facialDataUrl,
-            phoneNumber,
-            address,
-            companyName: finalRole === 'VENDOR' ? companyName : null,
-            businessAddress: finalRole === 'VENDOR' ? businessAddress : null,
-            businessRegNo: finalRole === 'VENDOR' ? businessRegNo : null,
-            shopPhotoUrl: finalRole === 'VENDOR' ? shopPhotoUrl : null,
-            cacCertificateUrl: finalRole === 'VENDOR' ? cacCertificateUrl : null,
-            shopLatitude: finalRole === 'VENDOR' && shopLatitude ? parseFloat(shopLatitude) : null,
-            shopLongitude: finalRole === 'VENDOR' && shopLongitude ? parseFloat(shopLongitude) : null,
-            vendorStatus: finalRole === 'VENDOR' ? 'PENDING' : 'APPROVED',
-            isEmailConfirmed: false,
-            emailVerificationOtp: otp
+            role, fullName, nationalId, facialDataUrl, phoneNumber, address,
+            companyName, businessAddress, businessRegNo, shopPhotoUrl,
+            cacCertificateUrl, shopLatitude: shopLatitude ? parseFloat(shopLatitude) : null,
+            shopLongitude: shopLongitude ? parseFloat(shopLongitude) : null,
+            otp
         }
     });
 
-    return { user, otp };
+    return { pending, otp };
 };
 
-module.exports = { registerUser };
+/**
+ * Stage 2: Finalize registration from PendingUser to User
+ */
+const finalizeRegistration = async (email, otp) => {
+    const pending = await prisma.pendingUser.findUnique({ where: { email } });
+
+    if (!pending || pending.otp !== otp) {
+        throw new Error('Invalid or expired OTP');
+    }
+
+    // Create the real user
+    const user = await prisma.user.create({
+        data: {
+            email: pending.email,
+            password: pending.password,
+            role: pending.role,
+            fullName: pending.fullName,
+            nationalId: pending.nationalId,
+            facialDataUrl: pending.facialDataUrl,
+            phoneNumber: pending.phoneNumber,
+            address: pending.address,
+            companyName: pending.companyName,
+            businessAddress: pending.businessAddress,
+            businessRegNo: pending.businessRegNo,
+            shopPhotoUrl: pending.shopPhotoUrl,
+            cacCertificateUrl: pending.cacCertificateUrl,
+            shopLatitude: pending.shopLatitude,
+            shopLongitude: pending.shopLongitude,
+            vendorStatus: pending.role === 'VENDOR' ? 'PENDING' : 'APPROVED',
+            isEmailConfirmed: true // They just verified it
+        }
+    });
+
+    // Delete the pending record
+    await prisma.pendingUser.delete({ where: { email } });
+
+    return user;
+};
+
+module.exports = { startRegistration, finalizeRegistration };

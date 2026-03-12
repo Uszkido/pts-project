@@ -6,7 +6,7 @@ const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
 const { uploadFromUrl } = require('./imageUploader');
-const { registerUser } = require('./userService');
+const { startRegistration, finalizeRegistration } = require('./userService');
 
 let telegramBotInstance = null;
 
@@ -180,6 +180,18 @@ const initTelegramOracle = () => {
             return;
         }
 
+        if (session.state === 'AWAITING_REG_OTP') {
+            bot.sendMessage(chatId, "⏳ Verifying your OTP...");
+            try {
+                await finalizeRegistration(session.data.email, text);
+                bot.sendMessage(chatId, "✅ *Identity Verified & Account Registered!*\n\nYou can now use the *login* command to access your digital vault.", { parse_mode: 'Markdown' });
+                clearSession('TELEGRAM', chatId);
+            } catch (err) {
+                bot.sendMessage(chatId, `❌ Verification Failed: ${err.message}. Please send the correct 6-digit code.`);
+            }
+            return;
+        }
+
         // ORIGINAL LOGIC: RegEx to find any standalone 15-digit number
         const imeiMatch = text.match(/\b\d{15}\b/);
 
@@ -260,14 +272,14 @@ const initTelegramOracle = () => {
             if (session.state === 'AWAITING_REG_PHOTO') {
                 if (session.data.role === 'CONSUMER') {
                     // Finalize Consumer Registration
-                    bot.sendMessage(chatId, "⏳ Processing your registration. Please wait...");
+                    bot.sendMessage(chatId, "⏳ Preparing your registration...");
                     try {
-                        const { user, otp } = await registerUser({ ...session.data, facialDataUrl: cloudinaryUrl });
-                        const { sendOtpViaBots } = require('../routes/auth'); // Relative to here or absolute? Requiring from a different dir usually works in Node
-                        await sendOtpViaBots(user, otp, "verification");
+                        const { pending, otp } = await startRegistration({ ...session.data, facialDataUrl: cloudinaryUrl });
+                        const { sendOtpViaBots } = require('../routes/auth');
+                        await sendOtpViaBots(pending, otp, "verification");
 
-                        bot.sendMessage(chatId, `🎉 *Registration Successful!*\n\nA verification OTP has been sent to your email. You can now use the *"login"* command once confirmed.`, { parse_mode: 'Markdown' });
-                        clearSession('TELEGRAM', chatId);
+                        updateSession('TELEGRAM', chatId, 'AWAITING_REG_OTP', { email: pending.email });
+                        bot.sendMessage(chatId, `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to complete your registration.`, { parse_mode: 'Markdown' });
                     } catch (err) {
                         bot.sendMessage(chatId, `❌ Error: ${err.message}`);
                         clearSession('TELEGRAM', chatId);
@@ -289,14 +301,14 @@ const initTelegramOracle = () => {
 
             // == VENDOR CAC PHOTO ==
             if (session.state === 'AWAITING_REG_CAC_PHOTO') {
-                bot.sendMessage(chatId, "⏳ Finalizing your Vendor Application. Please wait...");
+                bot.sendMessage(chatId, "⏳ Preparing your Vendor Application...");
                 try {
-                    const { user, otp } = await registerUser({ ...session.data, cacCertificateUrl: cloudinaryUrl });
+                    const { pending, otp } = await startRegistration({ ...session.data, cacCertificateUrl: cloudinaryUrl });
                     const { sendOtpViaBots } = require('../routes/auth');
-                    await sendOtpViaBots(user, otp, "verification");
+                    await sendOtpViaBots(pending, otp, "verification");
 
-                    bot.sendMessage(chatId, `✅ *Application Submitted!*\n\nYour vendor profile is now under review. A verification OTP has been sent to your email. Admin will verify your documents shortly.`, { parse_mode: 'Markdown' });
-                    clearSession('TELEGRAM', chatId);
+                    updateSession('TELEGRAM', chatId, 'AWAITING_REG_OTP', { email: pending.email });
+                    bot.sendMessage(chatId, `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to verify your identity and submit your business for review.`, { parse_mode: 'Markdown' });
                 } catch (err) {
                     bot.sendMessage(chatId, `❌ Error: ${err.message}`);
                     clearSession('TELEGRAM', chatId);

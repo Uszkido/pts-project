@@ -7,7 +7,7 @@ const { detectClonedImeiAnomaly } = require('../services/fraudEngine');
 const { getSession, updateSession, clearSession } = require('../services/botState');
 const bcrypt = require('bcryptjs');
 const { uploadFromUrl } = require('../services/imageUploader');
-const { registerUser } = require('../services/userService');
+const { startRegistration, finalizeRegistration } = require('../services/userService');
 
 // 1. Webhook Verification (Meta requires this when you register your server URL)
 router.get('/webhook', (req, res) => {
@@ -205,13 +205,14 @@ router.post('/webhook', async (req, res) => {
             // CONSUMER SELFIE
             if (session.state === 'AWAITING_REG_PHOTO') {
                 if (session.data.role === 'CONSUMER') {
-                    replyText = "⏳ Processing your registration. Please wait...";
+                    replyText = "⏳ Preparing your registration...";
                     await sendWhatsAppMessage(phoneNumberId, from, replyText);
-                    const { user, otp } = await registerUser({ ...session.data, facialDataUrl: cloudinaryUrl });
+                    const { pending, otp } = await startRegistration({ ...session.data, facialDataUrl: cloudinaryUrl });
                     const { sendOtpViaBots } = require('./auth');
-                    await sendOtpViaBots(user, otp, "verification");
-                    replyText = `🎉 *Registration Successful!*\n\nA verification OTP has been sent to your email. You can now use the *"login"* command once confirmed.`;
-                    clearSession('WHATSAPP', from);
+                    await sendOtpViaBots(pending, otp, "verification");
+
+                    updateSession('WHATSAPP', from, 'AWAITING_REG_OTP', { email: pending.email });
+                    replyText = `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to complete your registration.`;
                 } else {
                     updateSession('WHATSAPP', from, 'AWAITING_REG_BIZ_NAME', { facialDataUrl: cloudinaryUrl });
                     replyText = "Great! Now let's set up your business. What is your *Shop/Company Name*?";
@@ -248,6 +249,18 @@ router.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
+    if (session.state === 'AWAITING_REG_OTP') {
+        try {
+            await finalizeRegistration(session.data.email, msgBody);
+            replyText = "✅ *Identity Verified & Account Registered!*\n\nYou can now use the *login* command to access your digital vault.";
+            clearSession('WHATSAPP', from);
+        } catch (err) {
+            replyText = `❌ Verification Failed: ${err.message}. Please send the correct 6-digit code.`;
+        }
+        await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        return res.sendStatus(200);
+    }
+
     // Media Handling for Vendor Shop and CAC
     if (msgType === 'image') {
         const mediaId = change.messages[0].image.id;
@@ -262,13 +275,14 @@ router.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
             if (session.state === 'AWAITING_REG_CAC_PHOTO') {
-                replyText = "⏳ Finalizing your Vendor Application. Please wait...";
+                replyText = "⏳ Preparing your Vendor Application...";
                 await sendWhatsAppMessage(phoneNumberId, from, replyText);
-                const { user, otp } = await registerUser({ ...session.data, cacCertificateUrl: cloudinaryUrl });
+                const { pending, otp } = await startRegistration({ ...session.data, cacCertificateUrl: cloudinaryUrl });
                 const { sendOtpViaBots } = require('./auth');
-                await sendOtpViaBots(user, otp, "verification");
-                replyText = `✅ *Application Submitted!*\n\nYour profile is under review. A verification OTP has been sent to your email.`;
-                clearSession('WHATSAPP', from);
+                await sendOtpViaBots(pending, otp, "verification");
+
+                updateSession('WHATSAPP', from, 'AWAITING_REG_OTP', { email: pending.email });
+                replyText = `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to verify your identity and submit your business for review.`;
                 await sendWhatsAppMessage(phoneNumberId, from, replyText);
                 return res.sendStatus(200);
             }

@@ -268,3 +268,23 @@ model MaintenanceRecord {
   device        Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   vendor        User     @relation("MaintenanceVendor", fields: [vendorId], references: [id])
 }
+model PendingUser {
+  id                    String   @id @default(uuid())
+  email                 String   @unique
+  password              String
+  role                  String
+  fullName              String?
+  nationalId            String?
+  companyName           String?
+  facialDataUrl         String?
+  phoneNumber           String?
+  address               String?
+  businessAddress       String?
+  businessRegNo         String?
+  shopPhotoUrl          String?
+  cacCertificateUrl     String?
+  shopLatitude          Float?
+  shopLongitude         Float?
+  otp                   String
+  createdAt             DateTime @default(now())
+}

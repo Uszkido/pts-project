@@ -11,7 +11,7 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 const { sendWhatsAppMessage } = require('./whatsapp');
 const { sendTelegramMessage } = require('../services/telegramOracle');
 const { generateAiOtpEmailContent } = require('../services/aiService');
-const { registerUser } = require('../services/userService');
+const { startRegistration, finalizeRegistration } = require('../services/userService');
 
 // Email Transporter (Lazy loaded to ensure env variables are loaded)
 let transporter = null;
@@ -99,18 +99,15 @@ const sendOtpViaBots = async (user, otp, mode = "verification") => {
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 router.post('/register', async (req, res) => {
-    console.log(`📥 Registration attempt: ${req.body.email}`);
+    console.log(`📥 Registration START: ${req.body.email}`);
     try {
-        const { user, otp } = await registerUser(req.body);
+        const { pending, otp } = await startRegistration(req.body);
 
         // 🤖 Send OTP via Bots
-        await sendOtpViaBots(user, otp, "verification");
+        await sendOtpViaBots(pending, otp, "verification");
 
         res.status(201).json({
-            message: user.role === 'VENDOR'
-                ? 'Vendor registration submitted. An OTP has been sent via WhatsApp/Telegram (if provided), or check with admin to verify your email.'
-                : 'User registered. An OTP has been sent via WhatsApp/Telegram, or check with admin to verify.',
-            userId: user.id,
+            message: 'Registration initiated. Please confirm the OTP sent to your Email/WhatsApp/Telegram to complete your account setup.',
             requiresOtp: true
         });
     } catch (error) {
@@ -192,20 +189,11 @@ router.post('/reset-password', async (req, res) => {
 router.post('/verify-email', async (req, res) => {
     try {
         const { email, otp } = req.body;
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await finalizeRegistration(email, otp);
 
-        if (!user || user.emailVerificationOtp !== otp) {
-            return res.status(400).json({ error: 'Invalid OTP' });
-        }
-
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { isEmailConfirmed: true, emailVerificationOtp: null }
-        });
-
-        res.json({ message: 'Email confirmed successfully. You can now log in.' });
+        res.json({ message: 'Identity confirmed and account registered successfully! You can now log in.', userId: user.id });
     } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(400).json({ error: error.message });
     }
 });
 
@@ -229,4 +217,5 @@ router.post('/verify-reset-otp', async (req, res) => {
     }
 });
 
+router.sendOtpViaBots = sendOtpViaBots;
 module.exports = router;
