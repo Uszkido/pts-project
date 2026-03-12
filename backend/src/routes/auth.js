@@ -10,57 +10,73 @@ const JWT_SECRET = 'supersecret_pts_dev_key';
 
 const { sendWhatsAppMessage } = require('./whatsapp');
 const { sendTelegramMessage } = require('../services/telegramOracle');
+const { generateAiOtpEmailContent } = require('../services/aiService');
 
 // Email Transporter (Update these with actual credentials in .env later)
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // Or your preferred email service
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     }
 });
 
-const sendOtpViaBots = async (user, otp) => {
+const sendOtpViaBots = async (user, otp, mode = "verification") => {
+    console.log(`📡 Attempting to send OTP (${otp}) to user ${user.email || user.id}`);
     const text = `🔐 *PTS National Registry*\n\nYour Verification OTP is: *${otp}*\n\nPlease use this to verify your account.`;
 
-    // 1. Send via WhatsApp
-    if (user.phoneNumber) {
-        let cleanNum = user.phoneNumber.replace(/[\+\s\-()]/g, '');
-        if (!cleanNum.startsWith('234') && cleanNum.startsWith('0')) {
-            cleanNum = '234' + cleanNum.substring(1);
+    try {
+        // 1. Send via WhatsApp
+        if (user.phoneNumber) {
+            console.log(`💬 WhatsApp: Cleaning phone ${user.phoneNumber}`);
+            let cleanNum = user.phoneNumber.replace(/[\+\s\-()]/g, '');
+            if (!cleanNum.startsWith('234') && cleanNum.startsWith('0')) {
+                cleanNum = '234' + cleanNum.substring(1);
+            }
+            console.log(`💬 WhatsApp: Sending to ${cleanNum}`);
+            await sendWhatsAppMessage(null, cleanNum, text);
         }
-        await sendWhatsAppMessage(null, cleanNum, text);
-    }
 
-    // 2. Send via Telegram
-    if (user.email && user.email.endsWith('@telegram.local')) {
-        const chatId = user.email.replace('@telegram.local', '');
-        await sendTelegramMessage(chatId, text);
-    }
+        // 2. Send via Telegram
+        if (user.email && user.email.endsWith('@telegram.local')) {
+            const chatId = user.email.replace('@telegram.local', '');
+            console.log(`🤖 Telegram: Sending to chat ${chatId}`);
+            await sendTelegramMessage(chatId, text);
+        }
 
-    // 3. 📧 Automatically Send via Email
-    if (user.email && !user.email.endsWith('.local')) {
-        const mailOptions = {
-            from: `"PTS National Registry" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: 'Verification OTP - PTS National Registry',
-            text: `Your Verification OTP is: ${otp}`,
-            html: `<div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
-                    <h2 style="color: #2e7d32;">PTS National Registry</h2>
-                    <p>Hello <b>${user.fullName || 'User'}</b>,</p>
-                    <p>Your Verification OTP is:</p>
-                    <div style="font-size: 24px; font-weight: bold; background: #f4f4f4; padding: 10px; display: inline-block; border-radius: 5px;">${otp}</div>
-                    <p>Please use this to verify your account. If you did not request this, please ignore this email.</p>
-                    <p style="color: #777; font-size: 12px; margin-top: 20px;">&copy; 2026 PTS National Registry Nigeria.</p>
-                   </div>`
-        };
+        // 3. 📧 Automatically Send via Email with AI Content
+        if (user.email && !user.email.endsWith('.local')) {
+            console.log(`📧 Email: Generating AI content for ${user.email}`);
+            const aiContent = await generateAiOtpEmailContent(user.fullName || "Valued User", otp, mode);
 
-        try {
+            const mailOptions = {
+                from: `"PTS National Registry AI Oracle" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: aiContent.subject,
+                text: aiContent.body,
+                html: `<div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 30px; border-radius: 12px; max-width: 600px; margin: auto; background-color: #ffffff; color: #333; text-align: center;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <h1 style="color: #2e7d32; font-size: 28px; margin: 0;">🇳🇬 PTS AI Oracle</h1>
+                            <p style="color: #666; font-size: 14px; margin: 5px 0;">Sovereign Device Security System</p>
+                        </div>
+                        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; border-left: 5px solid #2e7d32; margin-bottom: 20px;">
+                            <p style="font-size: 16px; line-height: 1.6; color: #444; margin: 0; text-align: left;">${aiContent.body}</p>
+                        </div>
+                        <div style="background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                            <p style="font-size: 14px; color: #2e7d32; margin: 0;"><b>Never share this code with anyone.</b> Authorities will never ask for your OTP.</p>
+                        </div>
+                        <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">🛡️ Managed by National Device Integrity Registry Nigeria</p>
+                       </div>`
+            };
+
+            console.log(`📧 Email: Sending SMTP request to ${user.email}`);
             await transporter.sendMail(mailOptions);
-            console.log(`✅ Email OTP sent to ${user.email}`);
-        } catch (error) {
-            console.error('❌ Failed to send email OTP:', error);
+            console.log(`✅ AI Personalized Email OTP sent to ${user.email}`);
         }
+    } catch (err) {
+        console.error('🛑 Critical Error in sendOtpViaBots:', err);
     }
 };
 
@@ -110,7 +126,7 @@ router.post('/register', async (req, res) => {
         });
 
         // 🤖 Send OTP via Bots
-        await sendOtpViaBots(user, otp);
+        await sendOtpViaBots(user, otp, "verification");
 
         res.status(201).json({
             message: finalRole === 'VENDOR'
@@ -145,7 +161,7 @@ router.post('/login', async (req, res) => {
                 where: { id: user.id },
                 data: { emailVerificationOtp: newOtp }
             });
-            await sendOtpViaBots(user, newOtp);
+            await sendOtpViaBots(user, newOtp, "verification");
 
             return res.status(403).json({ error: 'Please confirm your email. A new OTP has been sent to your WhatsApp/Telegram (or check with admin).', requiresOtp: true });
         }
@@ -186,7 +202,7 @@ router.post('/reset-password', async (req, res) => {
         });
 
         // 🤖 Send Reset OTP via Bots
-        await sendOtpViaBots(user, otp);
+        await sendOtpViaBots(user, otp, "reset");
 
         res.json({ message: 'Password reset request submitted. An OTP has been sent to your WhatsApp/Telegram, or contact your administrator.', requiresOtp: true });
     } catch (error) {

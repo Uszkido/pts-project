@@ -176,4 +176,55 @@ Respond with ONLY a strict JSON object (no markdown, no backticks, no other word
     }
 };
 
-module.exports = { generateLocalizedOracleResponse, analyzeReceiptForFraud, analyzeDeviceHardwareCondition };
+/**
+ * Generates dynamic, AI-localized email content for OTP delivery.
+ */
+const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") => {
+    if (!genAI) {
+        return {
+            subject: mode === "reset" ? "Password Reset OTP" : "Verification OTP",
+            text: `Your OTP is: ${otp}`
+        };
+    }
+
+    const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `You are the "PTS AI Oracle". Write a very short, premium, and friendly email body for a user named "${fullName}".
+    Action: ${mode === "reset" ? "Resetting their account password" : "Verifying their new account"}.
+    OTP: ${otp}
+
+    Instructions:
+    1. Greet them in a mix of Nigerian English and Hausa (e.g., Barka).
+    2. Tell them their verification code is ${otp}.
+    3. Add one short, helpful "Security Pro-Tip" about phone safety in Kano (e.g., checking IMEI before buying at Farm Centre).
+    4. Keep it under 60 words. No markdown like bold/italics.
+
+    Respond with ONLY a strict JSON object:
+    {
+      "subject": "A catchy, short email subject line",
+      "body": "The dynamic friendly message"
+    }`;
+
+    try {
+        const result = await aiModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8, responseMimeType: "application/json" }
+        });
+
+        const responseText = result.response.text();
+        const resultData = JSON.parse(responseText);
+        return resultData;
+    } catch (error) {
+        console.error("AI Email Generation Error:", error);
+        return {
+            subject: mode === "reset" ? "Password Reset OTP" : "Verification OTP",
+            body: `Sannu ${fullName}, your OTP is ${otp}. Keep your devices safe!`
+        };
+    }
+};
+
+module.exports = {
+    generateLocalizedOracleResponse,
+    analyzeReceiptForFraud,
+    analyzeDeviceHardwareCondition,
+    generateAiOtpEmailContent
+};
