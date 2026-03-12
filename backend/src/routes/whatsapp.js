@@ -295,7 +295,7 @@ router.post('/webhook', async (req, res) => {
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify a fairly used phone before you buy it at Farm Centre or anywhere else in Kano.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
+        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify the phone you are buying anywhere in Nigeria to ensure it is not stolen.\n\nCould you please send me the *15-digit IMEI* of the device? If you're not sure how to find it, just dial *#06#* on the phone.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready when you are! 😊`;
     } else {
         const imei = imeiMatch[0];
         try {

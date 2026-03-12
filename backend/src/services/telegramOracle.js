@@ -27,7 +27,7 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify fairly used phones before you buy them at Farm Centre or anywhere else in Kano, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen`;
+        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria, so you don't end up with a stolen device.\n\nJust send me the *15-digit IMEI* of the phone you want to check, and I'll take a look for you! 😊\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag your registered device as stolen`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
