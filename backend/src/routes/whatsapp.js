@@ -23,66 +23,68 @@ router.get('/webhook', (req, res) => {
 
 // 2. Receiving Messages from WhatsApp Users
 router.post('/webhook', async (req, res) => {
-    // Return 200 OK immediately so Meta doesn't retry sending the message
-    res.sendStatus(200);
-
     const body = req.body;
 
-    if (body.object === "whatsapp_business_account") {
-        if (
-            body.entry &&
-            body.entry[0].changes &&
-            body.entry[0].changes[0] &&
-            body.entry[0].changes[0].value.messages &&
-            body.entry[0].changes[0].value.messages[0]
-        ) {
-            const phoneNumberId = body.entry[0].changes[0].value.metadata.phone_number_id;
-            const from = body.entry[0].changes[0].value.messages[0].from; // Sender's phone number
-            const msgBody = body.entry[0].changes[0].value.messages[0].text.body;
+    if (
+        body.object !== "whatsapp_business_account" ||
+        !body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]
+    ) {
+        // Not a message event (e.g. a status update), just acknowledge it
+        return res.sendStatus(200);
+    }
 
-            console.log(`📩 Received WhatsApp message from ${from}: ${msgBody}`);
+    const change = body.entry[0].changes[0].value;
+    const phoneNumberId = change.metadata.phone_number_id;
+    const from = change.messages[0].from;
+    const msgBody = change.messages[0]?.text?.body;
 
-            // Scan message for a 15-digit IMEI
-            const imeiMatch = msgBody.match(/\b\d{15}\b/);
+    if (!msgBody) {
+        // Could be an image/audio message, not text — ignore for now
+        return res.sendStatus(200);
+    }
 
-            let replyText = "";
+    console.log(`📩 Received WhatsApp message from ${from}: ${msgBody}`);
 
-            if (!imeiMatch) {
-                replyText = "Barka da zuwa! Welcome to the PTS National Registry. 🇳🇬\n\nTo verify a fairly used phone before buying at Farm Centre or elsewhere, please reply with the *15-digit IMEI* (dial *#06#* to find it).\n\nDan Allah, tura IMEI mai lamba 15 don dubawa.";
+    // Scan message for a 15-digit IMEI
+    const imeiMatch = msgBody.match(/\b\d{15}\b/);
+    let replyText = "";
+
+    if (!imeiMatch) {
+        replyText = "Barka da zuwa! Welcome to the PTS National Registry. 🇳🇬\n\nTo verify a fairly used phone before buying at Farm Centre or elsewhere in Kano, please send the *15-digit IMEI* (dial *#06#* on the phone to find it).\n\nDan Allah, tura IMEI mai lamba 15 don dubawa.";
+    } else {
+        const imei = imeiMatch[0];
+        try {
+            const device = await prisma.device.findUnique({ where: { imei } });
+
+            if (!device) {
+                replyText = `❌ I did not find this IMEI (${imei}) in our National Registry.\n\nThis means the device is either unregistered or its IMEI has been tampered with. Please exercise caution.\n\nA kiyaye siyayya babu tabbaci (Do not buy without verification).`;
             } else {
-                const imei = imeiMatch[0];
-
-                try {
-                    // Check Database
-                    const device = await prisma.device.findUnique({ where: { imei } });
-
-                    if (!device) {
-                        replyText = `❌ I did not find this IMEI (${imei}) in our National Registry.\n\nThis means the device is either completely new and unregistered, or the IMEI has been compromised. A kiyaye siyayya babu tabbaci.`;
-                    } else {
-                        // Run through Gemini AI localization module
-                        replyText = await generateLocalizedOracleResponse(
-                            device.status,
-                            device.brand,
-                            device.model,
-                            device.riskScore,
-                            msgBody
-                        );
-                    }
-                } catch (error) {
-                    console.error("DB/AI Error in WhatsApp webhook:", error);
-                    replyText = "Connection error! Tuba, don Allah a sake jarrabawa an jima (Please try again later).";
-                }
+                replyText = await generateLocalizedOracleResponse(
+                    device.status,
+                    device.brand,
+                    device.model,
+                    device.riskScore,
+                    msgBody
+                );
             }
-
-            // Send Reply back to user via Meta Graph API
-            await sendWhatsAppMessage(phoneNumberId, from, replyText);
+        } catch (error) {
+            console.error("DB/AI Error in WhatsApp webhook:", error);
+            replyText = "Connection error! Our servers are temporarily busy. Tuba, don Allah a sake jarrabawa an jima (Please try again later).";
         }
     }
+
+    // Send reply BEFORE ending the response so Vercel doesn't kill the function
+    await sendWhatsAppMessage(phoneNumberId, from, replyText);
+
+    // Only AFTER the reply is sent, acknowledge Meta's webhook request
+    return res.sendStatus(200);
 });
 
-// Function to send the generated message via WhatsApp Cloud API
+// Function to send a message via WhatsApp Cloud API
 async function sendWhatsAppMessage(phoneNumberId, to, text) {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const numId = phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
     if (!token) {
         console.warn("⚠️ WHATSAPP_ACCESS_TOKEN is missing. Cannot send WhatsApp reply.");
         return;
@@ -104,7 +106,9 @@ async function sendWhatsAppMessage(phoneNumberId, to, text) {
 
         if (!response.ok) {
             const err = await response.json();
-            console.error('WhatsApp API Error:', err);
+            console.error('WhatsApp API Error:', JSON.stringify(err));
+        } else {
+            console.log(`✅ WhatsApp reply sent to ${to}`);
         }
     } catch (error) {
         console.error('Error sending WhatsApp message:', error);
