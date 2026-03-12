@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { initTelegramOracle } = require('./services/telegramOracle'); // Import AI Bot Initializer
 const authRoutes = require('./routes/auth');
 const deviceRoutes = require('./routes/devices');
 const policeRoutes = require('./routes/police');
@@ -16,6 +17,7 @@ const maintenanceRoutes = require('./routes/maintenance');
 const publicRoutes = require('./routes/public');
 const swapRoutes = require('./routes/swap');
 const guardianRoutes = require('./routes/guardian');
+const whatsappRoutes = require('./routes/whatsapp');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -39,10 +41,14 @@ app.use('/api/v1/maintenance', maintenanceRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/swap', swapRoutes);
 app.use('/api/v1/guardian', guardianRoutes);
+app.use('/api/v1/whatsapp', whatsappRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'PTS Backend is running' });
 });
+
+// Initialize AI and Telegram polling
+initTelegramOracle();
 
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
