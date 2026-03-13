@@ -65,4 +65,16 @@ Users interact with the system primarily via **Telegram** and **WhatsApp**.
 6.  **Trust Badges**: Reputation systems for verified market vendors.
 
 ---
+### 7. Deployment & Operations
+The system is optimized for **Vercel** serverless deployment.
+
+#### Deployment Prerequisites:
+*   **Vercel CLI**: Ensure version 50+ is installed.
+*   **Authentication**: If `vercel login` fails with "Method Not Allowed" on the device link, use the legacy authorization page: **[vercel.com/device](https://vercel.com/device)**.
+
+#### Build Configuration:
+*   **Backend**: Uses `@vercel/node` and Prisma. Requires `npx prisma generate` during the build step (`postinstall`).
+*   **Frontend**: Next.js App Router with environment variables for API connection.
+
+---
 **PTS Sentinel: Securing the Digital Heart of Nigeria.**
