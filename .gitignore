@@ -7,3 +7,4 @@ node_modules/
 backend/prisma/*.db
 frontend/.next/
 frontend/out/
+.vercel
