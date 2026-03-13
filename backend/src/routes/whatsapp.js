@@ -112,6 +112,31 @@ router.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
+    // == LEGAL ADVISOR ==
+    if (msgBody.toLowerCase().startsWith('legal')) {
+        const query = msgBody.substring(6).trim();
+        if (!query) {
+            await sendWhatsAppMessage(phoneNumberId, from, "⚖️ *Sentinel Legal Advisor*\n\nPlease provide a question. Example: 'legal punishments for stolen phones'");
+            return res.sendStatus(200);
+        }
+        const advice = await getLegalAdvice(query, session.data.language || 'ENGLISH');
+        await sendWhatsAppMessage(phoneNumberId, from, `⚖️ *Legal Guidance (PTS):*\n\n${advice}`);
+        return res.sendStatus(200);
+    }
+
+    // == SCAM SHIELD ==
+    if (msgBody.toLowerCase().startsWith('scam')) {
+        const scamMsg = msgBody.substring(5).trim();
+        if (!scamMsg) {
+            await sendWhatsAppMessage(phoneNumberId, from, "🛡️ *Security Shield*\n\nPlease paste the message to analyze.");
+            return res.sendStatus(200);
+        }
+        const result = await analyzePhishingMessage(scamMsg);
+        const statusEmoji = result.isScam ? '🚫' : '✅';
+        await sendWhatsAppMessage(phoneNumberId, from, `${statusEmoji} *Analysis Results:*\n\n*Scam Type:* ${result.scamType || 'None'}\n*Warning:* ${result.warning}\n\n💡 *Action:* ${result.action}`);
+        return res.sendStatus(200);
+    }
+
     // == SAFETY INSIGHTS ==
     if (msgBody.toLowerCase() === 'safety') {
         try {
@@ -247,20 +272,74 @@ router.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // == PANIC PROTOCOL ==
+    // == PANIC PROTOCOL (TARGETED LOCK) ==
     if (msgBody.toLowerCase() === 'panic') {
         if (session.state !== 'LOGGED_IN') {
             await sendWhatsAppMessage(phoneNumberId, from, "You need to be logged in to activate Panic Protocol.");
             return res.sendStatus(200);
         }
         try {
-            await prisma.device.updateMany({
-                where: { registeredOwnerId: session.data.userId },
-                data: { status: 'STOLEN' }
-            });
-            await sendWhatsAppMessage(phoneNumberId, from, "🚨 *PANIC PROTOCOL ACTIVATED!*\n\nAll your devices are now flagged as STOLEN NATIONWIDE. Digital Certificates revoked.");
+            const devices = await prisma.device.findMany({ where: { registeredOwnerId: session.data.userId } });
+            if (devices.length === 0) {
+                await sendWhatsAppMessage(phoneNumberId, from, "You have no registered devices in your vault.");
+                return res.sendStatus(200);
+            }
+
+            if (devices.length === 1) {
+                const dev = devices[0];
+                updateSession('WHATSAPP', from, 'PANIC_CONFIRM', { panicDeviceId: dev.id });
+                await sendWhatsAppMessage(phoneNumberId, from, `🚨 *Confirm Panic Protocol*\n\nDo you want to flag your *${dev.brand} ${dev.model}* (...${dev.imei.slice(-4)}) as STOLEN across the National Registry?\n\nType *CONFIRM* to proceed or *CANCEL*.`);
+            } else {
+                updateSession('WHATSAPP', from, 'PANIC_SELECT_DEVICE', { panicDeviceList: devices.map(d => ({ id: d.id, brand: d.brand, model: d.model, imei: d.imei })) });
+                let deviceListMsg = "🚨 *Panic Protocol: Select Device*\n\nWhich device was stolen? Reply with the number:\n";
+                devices.forEach((d, idx) => {
+                    deviceListMsg += `\n${idx + 1}. *${d.brand} ${d.model}* (...${d.imei.slice(-4)})`;
+                });
+                deviceListMsg += "\n\nType *CANCEL* to stop.";
+                await sendWhatsAppMessage(phoneNumberId, from, deviceListMsg);
+            }
         } catch (e) {
-            await sendWhatsAppMessage(phoneNumberId, from, "Panic Protocol failed.");
+            await sendWhatsAppMessage(phoneNumberId, from, "Panic Protocol access failed.");
+        }
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'PANIC_SELECT_DEVICE') {
+        if (msgBody.toLowerCase() === 'cancel') {
+            updateSession('WHATSAPP', from, 'LOGGED_IN');
+            await sendWhatsAppMessage(phoneNumberId, from, "✅ Panic Protocol cancelled.");
+            return res.sendStatus(200);
+        }
+        const index = parseInt(msgBody) - 1;
+        const devices = session.data.panicDeviceList;
+        if (devices && devices[index]) {
+            const dev = devices[index];
+            updateSession('WHATSAPP', from, 'PANIC_CONFIRM', { panicDeviceId: dev.id });
+            await sendWhatsAppMessage(phoneNumberId, from, `🚨 *Confirming Panic Protocol* for *${dev.brand} ${dev.model}*.\n\nType *CONFIRM* to flag this specific device as STOLEN across Nigeria, or *CANCEL*.`);
+        } else {
+            await sendWhatsAppMessage(phoneNumberId, from, "Invalid selection. Please type a number from the list or *CANCEL*.");
+        }
+        return res.sendStatus(200);
+    }
+
+    if (session.state === 'PANIC_CONFIRM') {
+        if (msgBody.toLowerCase() === 'confirm') {
+            try {
+                const deviceId = session.data.panicDeviceId;
+                const dev = await prisma.device.update({
+                    where: { id: deviceId },
+                    data: { status: 'STOLEN', riskScore: 0 }
+                });
+                await sendWhatsAppMessage(phoneNumberId, from, `🚨 *PANIC PROTOCOL ACTIVATED!*\n\nYour *${dev.brand} ${dev.model}* (${dev.imei}) has been flagged as STOLEN NATIONWIDE. Authority networks updated.`);
+            } catch (e) {
+                await sendWhatsAppMessage(phoneNumberId, from, "Failed to activate Panic Protocol. Please try the *report* command.");
+            }
+            updateSession('WHATSAPP', from, 'LOGGED_IN');
+        } else if (msgBody.toLowerCase() === 'cancel') {
+            updateSession('WHATSAPP', from, 'LOGGED_IN');
+            await sendWhatsAppMessage(phoneNumberId, from, "✅ Panic Protocol cancelled.");
+        } else {
+            await sendWhatsAppMessage(phoneNumberId, from, "Please type *CONFIRM* or *CANCEL*.");
         }
         return res.sendStatus(200);
     }
@@ -460,7 +539,7 @@ router.post('/webhook', async (req, res) => {
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify any phone in Nigeria.\n\nCommands:\n- Type *register* to create your identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to lock ALL your devices (One-Click)\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)\n- Type *safety* for AI security alerts\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready! 😊`;
+        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify any phone in Nigeria.\n\nCommands:\n- *register* / *login*\n- *report* (Flag stolen device)\n- *panic* (Selective device lock)\n- *legal [question]* (NPF Legal Guidance)\n- *scam [message]* (Check for fraud)\n- *safety* (AI security alerts)\n- *language* (ENG, HAU, YOR, IGB, PID)\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready! 😊`;
     } else {
         const imei = imeiMatch[0];
         try {
@@ -476,10 +555,29 @@ router.post('/webhook', async (req, res) => {
                 const anomalyWarning = await detectClonedImeiAnomaly(imei, "WHATSAPP", from);
 
                 // 1.6. Smuggling Detector
-                if (device.status === 'STOLEN' && device.lastKnownLocation) {
-                    const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
-                    if (smuggling.isSmuggled) {
-                        await sendWhatsAppMessage(phoneNumberId, from, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+                if (device.status === 'STOLEN') {
+                    // == AUTOMATIC PTS REPORTING ==
+                    try {
+                        const reporterId = session.data.userId || (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))?.id || (await prisma.user.findFirst())?.id;
+                        await prisma.incidentReport.create({
+                            data: {
+                                deviceId: device.id,
+                                reporterId: reporterId,
+                                type: 'STOLEN_PROBE',
+                                description: `🚨 *STOLEN DEVICE PROBE:* A user on WhatsApp (${from}) just queried this stolen ${device.brand} ${device.model}. Potential illegal sale in progress.`,
+                                status: 'OPEN'
+                            }
+                        });
+                        console.log(`🚩 Stolen device ${imei} (WA) queried. PTS Report created.`);
+                    } catch (reportErr) {
+                        console.error("Failed to create auto PTS report (WA):", reportErr);
+                    }
+
+                    if (device.lastKnownLocation) {
+                        const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
+                        if (smuggling.isSmuggled) {
+                            await sendWhatsAppMessage(phoneNumberId, from, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+                        }
                     }
                 }
 

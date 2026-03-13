@@ -31,11 +31,13 @@ User Interaction: "${userQuery}"
 
 Your response MUST:
 1. Greet them warmly and professionally. Respond in the requested language/tone: ${language} (Options are: ENGLISH, HAUSA, YORUBA, IGBO, PIDGIN).
-2. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snared). 
-3. Use the specific cultural tone of ${language} (e.g. if PIDGIN use "O boy", if YORUBA use "E nle", if IGBO use "Nno").
-4. IF CLEAN: You must act as the "National Price Oracle". Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition across major Nigerian hubs (Ikeja Computer Village, Farm Centre Kano, etc).
-5. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code.
-6. Keep it concise, authoritative, and friendly.
+2. IF CLEAN: Be VERY ENCOURAGING. Congratulate them on finding a genuine device. Use phrases like "This is a great find!" or "You're making a safe choice". 
+3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "bad news" and "criminal property". Use phrases like "Stay far away from this" or "This will only bring you trouble".
+4. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snared). 
+5. Use the specific cultural tone of ${language} (e.g. if PIDGIN use "O boy", if YORUBA use "E nle", if IGBO use "Nno").
+6. IF CLEAN: You must act as the "National Price Oracle". Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition across major Nigerian hubs (Ikeja Computer Village, Farm Centre Kano, etc).
+7. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code and they should report it immediately.
+8. Keep it concise, authoritative, and friendly.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
@@ -45,10 +47,14 @@ CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}
             generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
         });
 
-        return result.response.text();
+        if (result && result.response) {
+            return result.response.text();
+        } else {
+            throw new Error("Invalid AI response structure");
+        }
     } catch (error) {
-        console.error("AI Generation Error:", error);
-        return `System fallback. The ${deviceBrand} ${deviceModel} is currently marked as ${deviceStatus}. Risk Score: ${riskScore}%.`;
+        console.error("AI Generation Error:", error.message || error);
+        return `[Sentinel Shield Active] The ${deviceBrand} ${deviceModel} is currently marked as ${deviceStatus}. Safety Risk Score: ${riskScore}%. ${deviceStatus === 'CLEAN' ? 'Safe to buy.' : 'DANGER: Buying this is a crime.'}`;
     }
 };
 
@@ -187,6 +193,73 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
     } catch (e) { return { isSmuggled: false, warning: null }; }
 };
 
+/**
+ * AI Agent: Social Engineering & Phishing Shield
+ * Analyzes messages for scam patterns targeting Nigerian users.
+ */
+const analyzePhishingMessage = async (messageText) => {
+    if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe" };
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Analyze this message sent to a Nigerian mobile user. 
+        Detect phishing, scam, "fake alert", or social engineering patterns (e.g. impersonating PTS, Banks, or NPF).
+        Message: "${messageText}"
+        Respond with ONLY JSON: { "isScam": boolean, "confidence": 0-100, "scamType": "string", "warning": "string", "action": "string" }`;
+
+        const result = await model.generateContent(prompt);
+        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+    } catch (e) { return { isScam: false, confidence: 0, warning: "System busy." }; }
+};
+
+/**
+ * AI Agent: Sentinel Legal Advisor
+ * Trained on Nigerian Cybercrime Act and Criminal Code.
+ */
+const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
+    if (!genAI || !userQuery) return "Legal advisor is currently offline.";
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `You are the "Sentinel Legal AI". You are an expert on Nigerian Law, specifically the Cybercrime Act 2015 and the Criminal Code (Section 427 - Receiving Stolen Property).
+        A user is asking: "${userQuery}".
+        Provide a concise legal guidance in ${language}. 
+        Warn them clearly about the penalties for buying stolen phones (up to 14 years imprisonment).
+        Always advise them to cooperate with the Nigerian Police Force (NPF) and use the PTS Registry for safety.
+        Keep it under 150 words.`;
+
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+    } catch (e) { return "Please consult a qualified legal practitioner or visit the nearest NPF station."; }
+};
+
+/**
+ * AI Agent: Maintenance Integrity Auditor
+ * Scans serial numbers to detect harvested/stolen components.
+ */
+const analyzeMaintenanceParts = async (partsData) => {
+    const { evaluateLazarusProtocol } = require('./DeepSecurityAI');
+    const lazarusResult = await evaluateLazarusProtocol(
+        partsData.screenSerial,
+        partsData.batterySerial,
+        partsData.motherboardSerial,
+        partsData.cameraSerial
+    );
+
+    if (lazarusResult.isFrankenstein) {
+        return {
+            status: "REJECTED",
+            alert: "🚫 CRITICAL: This device contains harvested components from a stolen phone. Installation of these parts is a criminal offense.",
+            details: lazarusResult.reason
+        };
+    }
+
+    return {
+        status: "VERIFIED",
+        alert: "✅ INTEGRITY VERIFIED: All scanned serial numbers are original and clean in the National Registry.",
+        details: "No harvested stolen parts detected."
+    };
+};
+
 module.exports = {
     generateLocalizedOracleResponse,
     analyzeReceiptForFraud,
@@ -197,5 +270,8 @@ module.exports = {
     generateAffidavitSummary,
     extractImeiFromImage,
     generateVendorTrustSummary,
-    analyzeSmugglingRisk
+    analyzeSmugglingRisk,
+    analyzePhishingMessage,
+    getLegalAdvice,
+    analyzeMaintenanceParts
 };

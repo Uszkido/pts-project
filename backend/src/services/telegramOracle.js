@@ -12,6 +12,7 @@ let telegramBotInstance = null;
 
 const initTelegramOracle = () => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
+    console.log('Bot Token Length:', token ? token.length : 0);
 
     if (!token) {
         console.warn('⚠️ TELEGRAM_BOT_TOKEN not provided in .env. Skipping PTS Telegram AI Oracle startup.');
@@ -27,16 +28,18 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria.\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to lock ALL your devices (One-Click)\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)\n- Type *safety* to see AI security hotspots`;
+        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria.\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to selectively lock stolen devices\n- Type *legal [question]* for NPF Legal Guidance\n- Type *scam [message]* to check for phishing\n- Type *safety* to see AI security hotspots\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
     // Listen for any standard message and try to extract an IMEI inside it
     // Listen for any standard message or voice command
     bot.on('message', async (msg) => {
+        console.log('📩 Received message from:', msg.from?.username || msg.from?.id, '| Text:', msg.text);
         const chatId = msg.chat.id;
         let text = msg.text || '';
         const session = getSession('TELEGRAM', chatId);
+        console.log('Current session state:', session.state);
 
         // == VOICE COMMAND HANDLING ==
         if (msg.voice) {
@@ -164,7 +167,7 @@ const initTelegramOracle = () => {
             return;
         }
 
-        // == PANIC PROTOCOL (ONE-CLICK LOCK) ==
+        // == PANIC PROTOCOL (TARGETED LOCK) ==
         if (text.toLowerCase() === 'panic') {
             if (session.state !== 'LOGGED_IN') {
                 bot.sendMessage(chatId, "You need to be logged in to activate Panic Protocol.");
@@ -177,14 +180,28 @@ const initTelegramOracle = () => {
                     return;
                 }
 
-                await prisma.device.updateMany({
-                    where: { registeredOwnerId: session.data.userId },
-                    data: { status: 'STOLEN' }
-                });
+                if (devices.length === 1) {
+                    const dev = devices[0];
+                    bot.sendMessage(chatId, `🚨 *Confirm Panic Protocol*\n\nDo you want to flag your *${dev.brand} ${dev.model}* (${dev.imei.slice(-4)}) as STOLEN across the National Registry?`, {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🚩 YES - FLAG STOLEN', callback_data: `PANIC_LOCK_${dev.id}` }],
+                                [{ text: '❌ CANCEL', callback_data: 'PANIC_CANCEL' }]
+                            ]
+                        }
+                    });
+                } else {
+                    const keyboard = devices.map(d => ([{ text: `🚫 ${d.brand} ${d.model} (...${d.imei.slice(-4)})`, callback_data: `PANIC_CONFIRM_${d.id}` }]));
+                    keyboard.push([{ text: '❌ CANCEL', callback_data: 'PANIC_CANCEL' }]);
 
-                bot.sendMessage(chatId, `🚨 *PANIC PROTOCOL ACTIVATED!*\n\nAll your ${devices.length} registered devices have been flagged as STOLEN across the National Registry. All certificates are now VOID.`, { parse_mode: 'Markdown' });
+                    bot.sendMessage(chatId, "🚨 *Panic Protocol: Select Device*\n\nWhich of your registered devices was stolen? Select to flag it NATIONWIDE.", {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: keyboard }
+                    });
+                }
             } catch (e) {
-                bot.sendMessage(chatId, "Failed to activate Panic Protocol.");
+                bot.sendMessage(chatId, "Failed to access your vault for Panic Protocol.");
             }
             return;
         }
@@ -200,6 +217,55 @@ const initTelegramOracle = () => {
                     ]
                 }
             });
+            return;
+        }
+
+        // == LEGAL ADVISOR ==
+        if (text.toLowerCase().startsWith('legal')) {
+            const query = text.substring(6).trim();
+            if (!query) {
+                bot.sendMessage(chatId, "⚖️ *Sentinel Legal Advisor*\n\nPlease provide a question. Example: 'legal what happens if I buy a stolen phone?'", { parse_mode: 'Markdown' });
+                return;
+            }
+            bot.sendChatAction(chatId, 'typing');
+            const advice = await getLegalAdvice(query, session.data.language || 'ENGLISH');
+            bot.sendMessage(chatId, `⚖️ *Legal Guidance (PTS):*\n\n${advice}`, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // == SCAM / PHISHING SHIELD ==
+        if (text.toLowerCase().startsWith('scam')) {
+            const scamMsg = text.substring(5).trim();
+            if (!scamMsg) {
+                bot.sendMessage(chatId, "🛡️ *Security Shield*\n\nPlease paste the message you want me to analyze for fraud.", { parse_mode: 'Markdown' });
+                return;
+            }
+            bot.sendChatAction(chatId, 'typing');
+            const result = await analyzePhishingMessage(scamMsg);
+            const statusEmoji = result.isScam ? '🚫' : '✅';
+            bot.sendMessage(chatId, `${statusEmoji} *Analysis Results:*\n\n*Scam Type:* ${result.scamType || 'None'}\n*Confidence:* ${result.confidence}%\n*Warning:* ${result.warning}\n\n💡 *Action:* ${result.action}`, { parse_mode: 'Markdown' });
+            return;
+        }
+
+        // == MAINTENANCE AUDIT ==
+        if (text.toLowerCase() === 'audit') {
+            updateSession('TELEGRAM', chatId, 'AWAITING_AUDIT_DATA');
+            bot.sendMessage(chatId, "🔧 *Maintenance Integrity Auditor*\n\nPlease enter the component serials in this format:\n`Screen: [number], Battery: [number]`\n\nI will check if any are harvested from stolen devices.", { parse_mode: 'Markdown' });
+            return;
+        }
+
+        if (session.state === 'AWAITING_AUDIT_DATA') {
+            bot.sendChatAction(chatId, 'typing');
+            const screenMatch = text.match(/Screen:\s*(\w+)/i);
+            const batteryMatch = text.match(/Battery:\s*(\w+)/i);
+
+            const results = await analyzeMaintenanceParts({
+                screenSerial: screenMatch ? screenMatch[1] : null,
+                batterySerial: batteryMatch ? batteryMatch[1] : null
+            });
+
+            bot.sendMessage(chatId, `${results.alert}\n\n${results.details}`, { parse_mode: 'Markdown' });
+            updateSession('TELEGRAM', chatId, 'LOGGED_IN');
             return;
         }
 
@@ -386,10 +452,29 @@ const initTelegramOracle = () => {
             const anomalyWarning = await detectClonedImeiAnomaly(imei, "TELEGRAM", String(chatId));
 
             // 1.6. Smuggling Detector
-            if (device.status === 'STOLEN' && device.lastKnownLocation) {
-                const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
-                if (smuggling.isSmuggled) {
-                    bot.sendMessage(chatId, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+            if (device.status === 'STOLEN') {
+                // == AUTOMATIC PTS REPORTING ==
+                try {
+                    const reporterId = session.data.userId || (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))?.id || (await prisma.user.findFirst())?.id;
+                    await prisma.incidentReport.create({
+                        data: {
+                            deviceId: device.id,
+                            reporterId: reporterId,
+                            type: 'STOLEN_PROBE',
+                            description: `🚨 *STOLEN DEVICE PROBE:* A user on Telegram (@${msg.from?.username || msg.from?.id}) just queried this stolen ${device.brand} ${device.model}. Potential illegal sale in progress.`,
+                            status: 'OPEN'
+                        }
+                    });
+                    console.log(`🚩 Stolen device ${imei} queried. PTS Report created.`);
+                } catch (reportErr) {
+                    console.error("Failed to create auto PTS report:", reportErr);
+                }
+
+                if (device.lastKnownLocation) {
+                    const smuggling = await analyzeSmugglingRisk(device.lastKnownLocation, "Detected Terminal", device.status);
+                    if (smuggling.isSmuggled) {
+                        bot.sendMessage(chatId, `🚩 *SYNDICATE ALERT:* ${smuggling.warning}`);
+                    }
                 }
             }
 
@@ -527,6 +612,40 @@ const initTelegramOracle = () => {
             updateSession('TELEGRAM', chatId, session.state, { language: lang });
             bot.answerCallbackQuery(query.id);
             bot.sendMessage(chatId, `Oracle language set to: *${lang}* 🇳🇬`, { parse_mode: 'Markdown' });
+        }
+
+        if (data.startsWith('PANIC_CONFIRM_')) {
+            const deviceId = data.replace('PANIC_CONFIRM_', '');
+            bot.answerCallbackQuery(query.id);
+            prisma.device.findUnique({ where: { id: deviceId } }).then(dev => {
+                bot.sendMessage(chatId, `🚩 *Confirming Panic Protocol* for *${dev.brand} ${dev.model}*.\n\nAre you sure you want to flag this specific device as STOLEN?`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🚩 YES - FLAG NOW', callback_data: `PANIC_LOCK_${deviceId}` }],
+                            [{ text: '❌ CANCEL', callback_data: 'PANIC_CANCEL' }]
+                        ]
+                    }
+                });
+            });
+        }
+
+        if (data.startsWith('PANIC_LOCK_')) {
+            const deviceId = data.replace('PANIC_LOCK_', '');
+            bot.answerCallbackQuery(query.id, { text: "Activating Panic Protocol..." });
+            prisma.device.update({
+                where: { id: deviceId },
+                data: { status: 'STOLEN', riskScore: 0 }
+            }).then(dev => {
+                bot.sendMessage(chatId, `🚨 *PANIC PROTOCOL ACTIVATED!*\n\nYour *${dev.brand} ${dev.model}* (${dev.imei}) has been flagged as STOLEN across the National Registry. All authorities have been alerted.`, { parse_mode: 'Markdown' });
+            }).catch(err => {
+                bot.sendMessage(chatId, "⚠️ Failed to activate Panic Protocol. Please try using the *report* command.");
+            });
+        }
+
+        if (data === 'PANIC_CANCEL') {
+            bot.answerCallbackQuery(query.id, { text: "Panic Protocol cancelled." });
+            bot.sendMessage(chatId, "✅ Panic Protocol cancelled. No changes were made to your devices.");
         }
     });
 };
