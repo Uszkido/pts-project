@@ -10,6 +10,11 @@ const { startRegistration, finalizeRegistration } = require('./userService');
 
 let telegramBotInstance = null;
 
+const handleTelegramUpdate = async (update) => {
+    if (!telegramBotInstance) return;
+    return telegramBotInstance.processUpdate(update);
+};
+
 const initTelegramOracle = () => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     console.log('Bot Token Length:', token ? token.length : 0);
@@ -19,11 +24,15 @@ const initTelegramOracle = () => {
         return;
     }
 
-    // Uses polling to get updates. Safe for standard development.
-    const bot = new TelegramBot(token, { polling: true });
+    const isProduction = process.env.NODE_ENV === 'production';
+    const bot = new TelegramBot(token, { polling: !isProduction });
     telegramBotInstance = bot;
 
-    console.log('🤖 PTS Telegram AI Oracle is now active and polling for messages...');
+    if (isProduction) {
+        console.log('🤖 PTS Telegram AI Oracle is active in WEBHOOK mode.');
+    } else {
+        console.log('🤖 PTS Telegram AI Oracle is active and Polling for messages (Dev Mode)...');
+    }
 
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
@@ -662,4 +671,4 @@ const sendTelegramMessage = async (chatId, text) => {
     }
 };
 
-module.exports = { initTelegramOracle, sendTelegramMessage };
+module.exports = { initTelegramOracle, sendTelegramMessage, handleTelegramUpdate };

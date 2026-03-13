@@ -19,6 +19,7 @@ const publicRoutes = require('./routes/public');
 const swapRoutes = require('./routes/swap');
 const guardianRoutes = require('./routes/guardian');
 const whatsappRoutes = require('./routes/whatsapp');
+const telegramRoutes = require('./routes/telegram');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -43,6 +44,7 @@ app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/swap', swapRoutes);
 app.use('/api/v1/guardian', guardianRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
+app.use('/api/v1/telegram', telegramRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'PTS Backend is running' });
