@@ -20,7 +20,16 @@ const handleTelegramUpdate = async (update) => {
     if (!telegramBotInstance) return;
 
     console.log('🤖 Passing update to telegramBotInstance.processUpdate');
-    return telegramBotInstance.processUpdate(update);
+    await telegramBotInstance.processUpdate(update);
+
+    // == SERVERLESS: WAIT FOR ALL ASYNC BOT ACTIONS ==
+    while (telegramBotInstance._pendingPromises && telegramBotInstance._pendingPromises.length > 0) {
+        console.log(`⏳ Waiting for ${telegramBotInstance._pendingPromises.length} bot actions to complete...`);
+        const promisesToWait = [...telegramBotInstance._pendingPromises];
+        telegramBotInstance._pendingPromises = []; // Clear so new ones can be added during await
+        await Promise.all(promisesToWait);
+    }
+    console.log('✅ All Telegram bot actions completed.');
 };
 
 const initTelegramOracle = () => {
@@ -37,6 +46,21 @@ const initTelegramOracle = () => {
     const isProduction = process.env.NODE_ENV === 'production';
     const bot = new TelegramBot(token, { polling: !isProduction });
     telegramBotInstance = bot;
+
+    // == SERVERLESS ASYNC TRACKING ==
+    bot._pendingPromises = [];
+    const patchBotMethod = (methodName) => {
+        if (typeof bot[methodName] !== 'function') return;
+        const original = bot[methodName].bind(bot);
+        bot[methodName] = (...args) => {
+            const p = original(...args);
+            if (p && typeof p.then === 'function') {
+                bot._pendingPromises.push(p);
+            }
+            return p;
+        };
+    };
+    ['sendMessage', 'sendPhoto', 'sendChatAction', 'answerCallbackQuery', 'getFileLink', 'editMessageText'].forEach(patchBotMethod);
 
     if (isProduction) {
         console.log('🤖 PTS Telegram AI Oracle is active in WEBHOOK mode.');

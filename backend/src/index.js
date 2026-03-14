@@ -50,6 +50,14 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'PTS Backend is running' });
 });
 
+app.get('/debug-env', (req, res) => {
+    res.json({
+        envKeys: Object.keys(process.env),
+        telegramTokenLength: process.env.TELEGRAM_BOT_TOKEN ? process.env.TELEGRAM_BOT_TOKEN.length : 0,
+        nodeEnv: process.env.NODE_ENV
+    });
+});
+
 // Initialize AI and Telegram polling
 initTelegramOracle();
 
