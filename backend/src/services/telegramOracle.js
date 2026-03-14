@@ -11,13 +11,23 @@ const { startRegistration, finalizeRegistration } = require('./userService');
 let telegramBotInstance = null;
 
 const handleTelegramUpdate = async (update) => {
+    console.log('🔄 handleTelegramUpdate called with:', JSON.stringify(update));
+    if (!telegramBotInstance) {
+        console.error('❌ telegramBotInstance is NULL in handleTelegramUpdate!');
+        // Try to re-init if null
+        initTelegramOracle();
+    }
     if (!telegramBotInstance) return;
+
+    console.log('🤖 Passing update to telegramBotInstance.processUpdate');
     return telegramBotInstance.processUpdate(update);
 };
 
 const initTelegramOracle = () => {
+    console.log('🚀 initTelegramOracle starting...');
     const token = process.env.TELEGRAM_BOT_TOKEN;
     console.log('Bot Token Length:', token ? token.length : 0);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
 
     if (!token) {
         console.warn('⚠️ TELEGRAM_BOT_TOKEN not provided in .env. Skipping PTS Telegram AI Oracle startup.');
