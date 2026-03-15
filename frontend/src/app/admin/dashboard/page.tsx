@@ -339,22 +339,39 @@ export default function AdminDashboard() {
             setTimeout(async () => {
                 if (dossierRef.current) {
                     try {
-                        const canvas = await html2canvas(dossierRef.current, { scale: 2.5, useCORS: true, backgroundColor: '#ffffff' });
+                        // Pre-load images for html2canvas to ensure they capture
+                        const images = dossierRef.current.querySelectorAll('img');
+                        await Promise.all(Array.from(images).map(img => {
+                            if (img.complete) return Promise.resolve();
+                            return new Promise(resolve => {
+                                img.onload = resolve;
+                                img.onerror = resolve;
+                            });
+                        }));
+
+                        const canvas = await html2canvas(dossierRef.current, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#ffffff',
+                            windowWidth: 1200
+                        });
                         const imgData = canvas.toDataURL('image/png', 1.0);
                         const pdf = new jsPDF('p', 'mm', 'a4');
                         const pdfWidth = pdf.internal.pageSize.getWidth();
                         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
                         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
                         pdf.save(`PTS_FORENSIC_DOSSIER_${imei}.pdf`);
                     } catch (err) {
                         console.error('PDF generation error:', err);
-                        alert('Error assembling PDF. Ensure images are accessible.');
+                        alert('Digital signature verify failed. Protocol error (Rendering).');
                     } finally {
                         setIsGeneratingDossier(null);
                         setDossierData(null);
                     }
                 }
-            }, 800);
+            }, 1200);
         } catch (err: any) {
             alert(err.message);
             setIsGeneratingDossier(null);

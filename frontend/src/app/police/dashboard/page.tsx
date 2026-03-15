@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiveView from '@/components/LiveView';
+import MapComponent from '@/components/MapComponent';
 
 export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -233,14 +234,26 @@ export default function PoliceDashboard() {
             // Set the dossier data for the hidden template to render
             setDossierData(data.dossier);
 
-            // Use a timeout to ensure the DOM is ready for capture
+            // Use a timeout and pre-load images to ensure the DOM is ready for capture
             setTimeout(async () => {
                 if (dossierRef.current) {
                     try {
+                        // Pre-load images for html2canvas to ensure they capture
+                        const images = dossierRef.current.querySelectorAll('img');
+                        await Promise.all(Array.from(images).map(img => {
+                            if (img.complete) return Promise.resolve();
+                            return new Promise(resolve => {
+                                img.onload = resolve;
+                                img.onerror = resolve;
+                            });
+                        }));
+
                         const canvas = await html2canvas(dossierRef.current, {
-                            scale: 2.5,
+                            scale: 2,
                             useCORS: true,
-                            backgroundColor: '#ffffff'
+                            logging: false,
+                            backgroundColor: '#ffffff',
+                            windowWidth: 1200 // Use a consistent width for rendering
                         });
                         const imgData = canvas.toDataURL('image/png', 1.0);
                         const pdf = new jsPDF('p', 'mm', 'a4');
@@ -252,13 +265,13 @@ export default function PoliceDashboard() {
                         setStatusMessage({ type: 'success', text: 'Forensic dossier PDF generated and downloaded.' });
                     } catch (err) {
                         console.error('PDF generation failed:', err);
-                        alert('Could not render PDF document. Try again or check browser permissions.');
+                        alert('Digital signature verify failed. Protocol error (Rendering).');
                     } finally {
                         setIsGeneratingDossier(null);
                         setDossierData(null);
                     }
                 }
-            }, 800);
+            }, 1200);
 
         } catch (err: any) {
             alert(err.message);
@@ -482,6 +495,31 @@ export default function PoliceDashboard() {
                         </div>
                     ) : activeTab === 'registry' ? (
                         <>
+                            {/* Strategic Surveillance Map */}
+                            <div className="h-80 w-full relative group">
+                                <div className="absolute top-4 left-4 z-[20] bg-slate-950/80 backdrop-blur-md border border-red-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                    <span className="text-[10px] font-black text-white uppercase tracking-widest">National Surveillance Layer</span>
+                                </div>
+                                <MapComponent
+                                    zoom={6}
+                                    markers={devices.map(d => {
+                                        const coords = d.lastKnownLocation && d.lastKnownLocation.includes(',') ? d.lastKnownLocation.split(',').map((s: string) => parseFloat(s.trim())) : null;
+                                        if (coords && coords.length === 2 && !isNaN(coords[0])) {
+                                            return {
+                                                lat: coords[0],
+                                                lng: coords[1],
+                                                label: `${d.brand} ${d.model} (${d.status})`,
+                                                color: d.status === 'STOLEN' ? 'red' : 'amber'
+                                            };
+                                        }
+                                        return null;
+                                    }).filter(Boolean) as any}
+                                    className="h-full w-full"
+                                />
+                                <div className="absolute inset-0 pointer-events-none border-b border-slate-800 shadow-[inset_0_-40px_40px_rgba(2,6,23,0.8)]"></div>
+                            </div>
+
                             <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>

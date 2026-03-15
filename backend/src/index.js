@@ -18,6 +18,7 @@ const maintenanceRoutes = require('./routes/maintenance');
 const publicRoutes = require('./routes/public');
 const swapRoutes = require('./routes/swap');
 const guardianRoutes = require('./routes/guardian');
+const aiRoutes = require('./routes/ai');
 const whatsappRoutes = require('./routes/whatsapp');
 const telegramRoutes = require('./routes/telegram');
 
@@ -43,6 +44,7 @@ app.use('/api/v1/maintenance', maintenanceRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/swap', swapRoutes);
 app.use('/api/v1/guardian', guardianRoutes);
+app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/telegram', telegramRoutes);
 

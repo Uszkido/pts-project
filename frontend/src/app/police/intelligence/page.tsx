@@ -237,8 +237,8 @@ export default function PoliceIntelligence() {
                                 ]}
                             />
                         </div>
-                        <div className="absolute top-16 right-4 z-10 flex flex-col gap-2">
-                            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl shadow-xl max-w-[200px]">
+                        <div className="absolute bottom-4 left-4 z-[400] flex flex-col gap-2 pointer-events-none">
+                            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl shadow-xl max-w-[200px] pointer-events-auto">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Live Intel Legend</p>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">

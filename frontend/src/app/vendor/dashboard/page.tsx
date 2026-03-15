@@ -324,10 +324,23 @@ export default function Dashboard() {
         setTimeout(async () => {
             if (receiptRef.current) {
                 try {
+                    // Pre-load images for html2canvas to ensure they capture
+                    const images = receiptRef.current.querySelectorAll('img');
+                    await Promise.all(Array.from(images).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        });
+                    }));
+
                     const canvas = await html2canvas(receiptRef.current, {
                         scale: 3,
                         useCORS: true,
-                        backgroundColor: '#ffffff'
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                        windowWidth: 794,
+                        windowHeight: 1123
                     });
                     const imgData = canvas.toDataURL('image/png', 1.0);
                     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -338,12 +351,12 @@ export default function Dashboard() {
                     pdf.save(`PTS_RECEIPT_${sale.device.imei}.pdf`);
                 } catch (err) {
                     console.error('Failed to generate Receipt PDF:', err);
-                    alert('An error occurred while generating the receipt.');
+                    alert('Digital signature verify failed. Protocol error (Rendering).');
                 }
             }
             setIsGeneratingReceipt(null);
             setReceiptData(null);
-        }, 800);
+        }, 1200);
     };
 
     const handleLogRepair = async (e: React.FormEvent) => {

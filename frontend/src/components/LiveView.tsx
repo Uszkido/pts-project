@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import MapComponent from './MapComponent';
 
 export default function LiveView({ imei, onClose }: { imei: string, onClose: () => void }) {
     const [trackingData, setTrackingData] = useState<any>(null);
@@ -144,21 +145,35 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 overflow-hidden">
                 {/* Visual Map Mock/Placeholder */}
                 <div className="lg:col-span-3 bg-slate-900 relative group overflow-hidden border-r border-slate-800">
-                    {/* Simulated Radar/Map UI */}
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/10 via-slate-900 to-slate-950"></div>
-                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+                    {/* Real Map Component */}
+                    <div className="absolute inset-0 z-0">
+                        {(() => {
+                            const loc = trackingData?.lastKnownLocation;
+                            const coords = loc && loc.includes(',') ? loc.split(',').map((s: string) => parseFloat(s.trim())) : null;
+                            const lat = coords && coords.length === 2 && !isNaN(coords[0]) ? coords[0] : 6.5244; // Default to Lagos if unknown
+                            const lng = coords && coords.length === 2 && !isNaN(coords[1]) ? coords[1] : 3.3792;
 
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                        <div className="relative">
-                            <div className="w-64 h-64 rounded-full border border-blue-500/20 animate-[ping_3s_linear_infinite]"></div>
-                            <div className="absolute inset-0 w-64 h-64 rounded-full border border-blue-500/10 animate-[ping_5s_linear_infinite]"></div>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.8)]">
-                                <div className="absolute -top-12 -left-20 bg-slate-800/90 backdrop-blur-md border border-blue-500/50 p-2 rounded-lg text-[10px] whitespace-nowrap text-white font-bold shadow-2xl">
-                                    CURRENT TARGET POSITION<br />
-                                    <span className="text-blue-400 font-mono uppercase">{trackingData?.lastKnownLocation || 'GEO-SYNCING...'}</span>
-                                </div>
-                            </div>
-                        </div>
+                            return (
+                                <MapComponent
+                                    latitude={lat}
+                                    longitude={lng}
+                                    zoom={15}
+                                    markers={[{
+                                        lat,
+                                        lng,
+                                        label: `TARGET: ${trackingData?.brand} ${trackingData?.model}`,
+                                        color: 'red'
+                                    }]}
+                                    className="h-full w-full"
+                                />
+                            );
+                        })()}
+                    </div>
+
+                    {/* HUD Overlays */}
+                    <div className="absolute inset-0 pointer-events-none z-10">
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
+                        <div className="absolute inset-0 border-[20px] border-slate-950/20"></div>
                     </div>
 
                     <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
