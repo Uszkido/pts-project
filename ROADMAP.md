@@ -45,5 +45,6 @@ Making PTS the only safe way to buy and sell used devices.
 
 ---
 
-> [!NOTE]
-> Currently implementing **Device DNA Registry** and **Currency Transition (₦)**.
+> [!IMPORTANT]
+> **Echelon I (Foundation & Integrity) is now LIVE.** 
+> Features implemented: Device DNA Registry, National Currency (₦) Integration, AI Command Center, and Blockchain Chain-of-Custody.

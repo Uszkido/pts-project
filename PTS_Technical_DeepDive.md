@@ -23,6 +23,14 @@ PTS is built on a **Decoupled Architecture**. This means the Frontend (UI) and B
 - **Prisma Schema**: We define the system in a `schema.prisma` file. Prisma then generates a "Client" that lets the backend talk to the database in a language it understands perfectly.
 - **Migrations**: Every time we change the database (like adding device photos), we use "Prisma Migrate." This keeps a history of all database changes, similar to how Git tracks code changes.
 
+### **Intelligence Layer: Google Gemini AI**
+- **Sovereign Intel**: Automated intelligence synthesis. Gemini analyzes raw database metrics (incidents, recoveries, fraud alerts) to generate a "National Commanders Briefing" for admins.
+- **Hardware Appraisal**: Uses Vision AI to analyze device photos, detecting screen degradation or aftermarket parts with high precision.
+
+### **Integrity Layer: Blockchain Hashing**
+- **Immutable Ledger**: Every critical transaction (registration, handover, status change) is "sealed" using SHA-256 cryptographic hashing.
+- **Chain of Custody**: The `TransactionHistory` now mimics a blockchain, where each entry is cryptographically linked, making forensic tampering impossible to hide.
+
 ---
 
 ## 🚀 2. Deployment & Vercel (The Hosting)
@@ -64,3 +72,5 @@ To understand the system, let's follow a single "Stolen Phone" event:
 - **PostgreSQL/Prisma**: Reliable data ledger.
 - **Vercel**: Global reach and zero-downtime deployments.
 - **Cloudinary**: Secure forensic image management.
+- **Google Gemini**: AI-powered intelligence and fraud detection.
+- **Recharts**: High-performance cryptographic data visualization.
