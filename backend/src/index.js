@@ -48,8 +48,15 @@ app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/telegram', telegramRoutes);
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'PTS Backend is running' });
+app.get('/health', async (req, res) => {
+    try {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        await prisma.$queryRaw`SELECT 1`;
+        res.json({ status: 'ok', message: 'PTS Backend and Database are running' });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: 'Database connection failed', error: err.message });
+    }
 });
 
 app.get('/debug-env', (req, res) => {
