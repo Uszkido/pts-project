@@ -1,8 +1,19 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in Leaflet with Next.js
+const fixLeafletIcons = () => {
+    // @ts-ignore
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    });
+};
 
 interface MapComponentProps {
     latitude?: number;
@@ -19,79 +30,77 @@ interface MapComponentProps {
 }
 
 export default function MapComponent({
-    latitude = 6.5244, // Default to Lagos, Nigeria
-    longitude = 3.3792,
-    zoom = 12,
+    latitude = 9.0820, // Center of Nigeria
+    longitude = 8.6753,
+    zoom = 6,
     interactive = true,
     markers = [],
     className = "h-full w-full rounded-2xl"
 }: MapComponentProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
-    const map = useRef<maplibregl.Map | null>(null);
-    const markerRefs = useRef<maplibregl.Marker[]>([]);
+    const mapInstance = useRef<L.Map | null>(null);
+    const markerLayer = useRef<L.LayerGroup | null>(null);
 
     useEffect(() => {
-        if (map.current) return;
-        if (!mapContainer.current) return;
+        if (typeof window === 'undefined' || !mapContainer.current || mapInstance.current) return;
 
-        map.current = new maplibregl.Map({
-            container: mapContainer.current,
-            style: {
-                version: 8,
-                sources: {
-                    'osm': {
-                        type: 'raster',
-                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                        tileSize: 256,
-                        attribution: '&copy; OpenStreetMap Contributors'
-                    }
-                },
-                layers: [
-                    {
-                        id: 'osm',
-                        type: 'raster',
-                        source: 'osm',
-                        minzoom: 0,
-                        maxzoom: 19
-                    }
-                ]
-            },
-            center: [longitude, latitude],
+        fixLeafletIcons();
+
+        // Initialize Map
+        mapInstance.current = L.map(mapContainer.current, {
+            center: [latitude, longitude],
             zoom: zoom,
-            interactive: interactive
+            zoomControl: interactive,
+            dragging: interactive,
+            scrollWheelZoom: interactive,
+            attributionControl: true
         });
 
-        map.current.on('load', () => {
-            console.log('Map engine initialized with OSM raster layer');
-        });
+        // Add OSM Tile Layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(mapInstance.current);
 
-        map.current.on('error', (e) => {
-            console.error('Telemetric Map Error:', e.error);
-        });
+        // Initialize Marker Layer
+        markerLayer.current = L.layerGroup().addTo(mapInstance.current);
 
-        map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }, [latitude, longitude, zoom, interactive]);
+        // Force a resize fix for some layouts
+        setTimeout(() => {
+            if (mapInstance.current) mapInstance.current.invalidateSize();
+        }, 100);
 
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
+    }, []);
+
+    // Update markers dynamically
     useEffect(() => {
-        if (!map.current) return;
+        if (!mapInstance.current || !markerLayer.current) return;
 
         // Clear existing markers
-        markerRefs.current.forEach(m => m.remove());
-        markerRefs.current = [];
+        markerLayer.current.clearLayers();
 
         // Add new markers
         markers.forEach(marker => {
-            const m = new maplibregl.Marker({ color: marker.color || "#ef4444" })
-                .setLngLat([marker.lng, marker.lat])
-                .setPopup(marker.label ? new maplibregl.Popup().setHTML(`<b>${marker.label}</b>`) : undefined)
-                .addTo(map.current!);
-            markerRefs.current.push(m);
+            if (marker.lat && marker.lng) {
+                // Create a custom colored marker or default
+                const m = L.marker([marker.lat, marker.lng]);
+                if (marker.label) {
+                    m.bindPopup(`<b>${marker.label}</b>`);
+                }
+                m.addTo(markerLayer.current!);
+            }
         });
     }, [markers]);
 
     return (
-        <div className={`relative ${className}`}>
-            <div ref={mapContainer} className="absolute inset-0" />
+        <div className={`relative z-10 ${className}`} style={{ minHeight: '400px', background: '#0f172a' }}>
+            <div ref={mapContainer} className="h-full w-full" />
         </div>
     );
 }
