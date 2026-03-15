@@ -144,8 +144,10 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
         res.json({ token, role: user.role });
     } catch (error) {
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('LOGIN ERROR:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
+
 });
 
 router.post('/reset-password', async (req, res) => {
