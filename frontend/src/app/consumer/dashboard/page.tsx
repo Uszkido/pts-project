@@ -3,6 +3,17 @@ import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import MapComponent from '@/components/MapComponent';
+import {
+    AlertTriangle,
+    Smartphone,
+    History,
+    PlusCircle,
+    ShieldAlert,
+    Lock,
+    Radio,
+    Power,
+    Shield
+} from 'lucide-react';
 
 export default function ConsumerDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -59,6 +70,10 @@ export default function ConsumerDashboard() {
     const [buyerEmail, setBuyerEmail] = useState('');
     const [transferError, setTransferError] = useState('');
 
+    const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
+    const [emergencyProcessing, setEmergencyProcessing] = useState(false);
+    const [emergencySuccess, setEmergencySuccess] = useState(false);
+
     const fetchDashboardAndMessages = async () => {
         setLoading(true);
         try {
@@ -111,16 +126,42 @@ export default function ConsumerDashboard() {
                 },
                 body: JSON.stringify({ handoverCode })
             });
-
             const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.error || 'Transfer verification failed.');
-            }
-
-            alert('Transfer Verified! Device is now cryptographically bound to your portfolio.');
+            if (!res.ok) throw new Error(data.error);
+            alert("🛡️ Device Ownership Legally Transferred to Your Account.");
             fetchDashboardAndMessages();
         } catch (err: any) {
             alert(err.message);
+        }
+    };
+
+    const handleEmergencyReport = async (deviceImei: string) => {
+        setEmergencyProcessing(true);
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const headers = {
+                'Authorization': `Bearer ${localStorage.getItem('pts_token')}`,
+                'Content-Type': 'application/json'
+            };
+
+            const res = await fetch(`${apiUrl}/devices/${deviceImei}/report`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ status: 'STOLEN' })
+            });
+
+            if (res.ok) {
+                setEmergencySuccess(true);
+                fetchDashboardAndMessages();
+                setTimeout(() => {
+                    setIsEmergencyOpen(false);
+                    setEmergencySuccess(false);
+                }, 5000);
+            }
+        } catch (err) {
+            console.error('Emergency trigger failed');
+        } finally {
+            setEmergencyProcessing(false);
         }
     };
 
@@ -960,6 +1001,84 @@ export default function ConsumerDashboard() {
                     </div>
                 )}
             </main>
+
+            {/* EMERGENCY MODAL */}
+            {isEmergencyOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => !emergencyProcessing && setIsEmergencyOpen(false)}></div>
+                    <div className="relative bg-slate-900 border-2 border-red-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl shadow-red-500/20">
+                        {emergencySuccess ? (
+                            <div className="text-center space-y-4 py-6">
+                                <div className="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                                    <Shield className="text-emerald-500 w-10 h-10 animate-bounce" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-white">SENTINEL ALERT ACTIVE</h3>
+                                <p className="text-slate-400">Device has been frozen across all networks. Authorized vendors within 5km have been notified.</p>
+                                <div className="flex items-center justify-center space-x-3 text-xs font-mono text-indigo-400 pt-4">
+                                    <Radio size={14} className="animate-pulse" />
+                                    <span>NPF SIGNAL BROADCASTED</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center space-x-3 mb-6">
+                                    <div className="p-3 bg-red-500/10 rounded-2xl text-red-500">
+                                        <ShieldAlert />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">Rapid Response Trigger</h3>
+                                        <p className="text-xs text-slate-500">Select which device was stolen</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 max-h-60 overflow-y-auto mb-6 pr-2">
+                                    {devices.filter(d => d.status === 'CLEAN').map(device => (
+                                        <button
+                                            key={device.id}
+                                            onClick={() => handleEmergencyReport(device.imei)}
+                                            disabled={emergencyProcessing}
+                                            className="w-full flex items-center justify-between p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 rounded-2xl transition-all"
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <Smartphone className="text-slate-400" size={18} />
+                                                <div className="text-left">
+                                                    <p className="text-sm font-bold text-white">{device.brand} {device.model}</p>
+                                                    <p className="text-[10px] font-mono text-slate-500">IMEI: {device.imei}</p>
+                                                </div>
+                                            </div>
+                                            <div className="p-2 bg-red-500/10 rounded-xl text-red-500">
+                                                <Power size={14} />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl mb-6">
+                                    <p className="text-xs text-amber-300 leading-relaxed font-mono">
+                                        ⚠️ ACTION IS IRREVERSIBLE BY USER: Marked devices will be blacklisted across all Nigerian telecommunication hubs immediately.
+                                    </p>
+                                </div>
+
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={() => setIsEmergencyOpen(false)}
+                                        disabled={emergencyProcessing}
+                                        className="flex-1 px-6 py-3 rounded-2xl text-slate-400 font-bold hover:bg-slate-800 transition-colors"
+                                    >
+                                        CANCEL
+                                    </button>
+                                    <button
+                                        disabled={true}
+                                        className="flex-[2] bg-red-600 text-white rounded-2xl font-bold opacity-50 cursor-not-allowed flex items-center justify-center"
+                                    >
+                                        {emergencyProcessing ? 'PROCESSING...' : 'LOCK ENTIRE FLEET'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Invisible PDF Template Container */}
             <div style={{ position: 'fixed', top: '0', left: '200%', pointerEvents: 'none' }}>

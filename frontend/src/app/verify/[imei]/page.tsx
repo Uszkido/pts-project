@@ -186,8 +186,8 @@ export default function VerificationPage() {
                             <div className="flex justify-between items-center bg-slate-900/30 p-4 rounded-2xl border border-slate-800">
                                 <span className="text-xs font-bold text-slate-500 uppercase">Registry Ver</span>
                                 <span className="text-[10px] font-mono font-black text-slate-600 uppercase tracking-tighter flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isClean ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                                    NATIONAL-V4.2.1-IMMUTABLE
+                                    <div className={`w-1.5 h-1.5 rounded-full ${status.chainIntegrity === 'VERIFIED_IMMUTABLE' ? 'bg-indigo-500 animate-pulse' : 'bg-red-500 animate-bounce'}`}></div>
+                                    {status.chainIntegrity || 'NATIONAL-V4.2.1-SEALED'}
                                 </span>
                             </div>
                         </div>

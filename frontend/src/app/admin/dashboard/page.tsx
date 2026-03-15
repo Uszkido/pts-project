@@ -5,6 +5,18 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
+import IntelligenceView from '@/components/IntelligenceView';
+import {
+    LayoutDashboard,
+    Users as UsersIcon,
+    Smartphone,
+    AlertTriangle,
+    FileText,
+    MessageSquare,
+    UserX,
+    Key,
+    Brain
+} from 'lucide-react';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
@@ -13,7 +25,7 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
     // New feature states
@@ -543,11 +555,11 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests'] as const).map(tab => (
-                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-amber-600/20 text-amber-400 shadow-lg border border-amber-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests'] as const).map(tab => (
+                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-400 shadow-lg border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
                                 tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length})` :
-                                    tab}
+                                    tab === 'intelligence' ? 'AI Intelligence' : tab}
                         </button>
                     ))}
                 </div>
@@ -1680,6 +1692,9 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     </div>
+                )}
+                {activeTab === 'intelligence' && (
+                    <IntelligenceView apiUrl={apiUrl} headers={headers} />
                 )}
             </div>
         </div>
