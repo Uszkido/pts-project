@@ -29,9 +29,10 @@ export default function MapComponent({
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
     const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
+    console.log('Map Layer Key Probe:', apiKey ? `${apiKey.substring(0, 4)}...` : 'MISSING');
 
     useEffect(() => {
-        if (map.current) return; // stops map from intializing more than once
+        if (map.current) return;
         if (!mapContainer.current) return;
 
         map.current = new maplibregl.Map({
@@ -43,16 +44,26 @@ export default function MapComponent({
         });
 
         map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
+    }, [apiKey, latitude, longitude, zoom, interactive]);
 
-        // Add markers
+    const markerRefs = useRef<maplibregl.Marker[]>([]);
+
+    useEffect(() => {
+        if (!map.current) return;
+
+        // Clear existing markers
+        markerRefs.current.forEach(m => m.remove());
+        markerRefs.current = [];
+
+        // Add new markers
         markers.forEach(marker => {
-            new maplibregl.Marker({ color: marker.color || "#ef4444" })
+            const m = new maplibregl.Marker({ color: marker.color || "#ef4444" })
                 .setLngLat([marker.lng, marker.lat])
                 .setPopup(marker.label ? new maplibregl.Popup().setHTML(`<b>${marker.label}</b>`) : undefined)
                 .addTo(map.current!);
+            markerRefs.current.push(m);
         });
-
-    }, [apiKey, latitude, longitude, zoom, interactive, markers]);
+    }, [markers]);
 
     return (
         <div className={`relative ${className}`}>
