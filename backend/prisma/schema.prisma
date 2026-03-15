@@ -194,6 +194,8 @@ model TransactionHistory {
   type        String
   description String
   metadata    String?
+  hash        String?  // SHA-256 integrity seal
+  isSealed    Boolean  @default(false)
   createdAt   DateTime @default(now())
   actor       User?    @relation("ActionsPerformed", fields: [actorId], references: [id])
   device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)

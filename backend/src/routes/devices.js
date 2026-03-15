@@ -123,17 +123,26 @@ router.post('/', authenticateToken, async (req, res) => {
         });
 
         // --- AI HARDWARE DEGRADATION ANALYZER ---
+        const { sealTransaction } = require('../utils/Blockchain');
+        let initialHash = null;
+
         if (devicePhotos && devicePhotos.length > 0) {
             const hardwareGrade = await analyzeDeviceHardwareCondition(devicePhotos, brand, model);
 
-            // Log the visual trust grade to the transaction history ledger
             if (hardwareGrade.grade !== "Unknown") {
+                const desc = `Visual Grade: ${hardwareGrade.grade}. AI Notes: ${hardwareGrade.notes}. Aftermarket Parts Detected: ${hardwareGrade.hasAftermarketScreen ? 'YES' : 'NO'}`;
+                const ts = new Date();
+                initialHash = sealTransaction('0', "AI_HARDWARE_APPRAISAL", { data: desc }, ts);
+
                 await prisma.transactionHistory.create({
                     data: {
                         deviceId: device.id,
                         actorId: req.user.id,
                         type: "AI_HARDWARE_APPRAISAL",
-                        description: `Visual Grade: ${hardwareGrade.grade}. AI Notes: ${hardwareGrade.notes}. Aftermarket Parts Detected: ${hardwareGrade.hasAftermarketScreen ? 'YES' : 'NO'}`
+                        description: desc,
+                        hash: initialHash,
+                        isSealed: true,
+                        createdAt: ts
                     }
                 });
             }
@@ -186,6 +195,9 @@ router.get('/verify/:imei', async (req, res) => {
                         buyer: { select: { id: true, companyName: true, email: true, role: true, fullName: true } }
                     },
                     orderBy: { transferDate: 'asc' }
+                },
+                history: {
+                    orderBy: { createdAt: 'desc' }
                 }
             }
         });
@@ -213,6 +225,10 @@ router.get('/verify/:imei', async (req, res) => {
         const RiskEngine = require('../services/RiskEngine');
         const riskScore = await RiskEngine.calculateDeviceTrustIndex(imei);
 
+        // Verify Chain Integrity
+        const { verifyChainIntegrity } = require('../utils/Blockchain');
+        const chainStatus = verifyChainIntegrity(device.history || []);
+
         res.json({
             device: {
                 imei: device.imei,
@@ -220,6 +236,7 @@ router.get('/verify/:imei', async (req, res) => {
                 model: device.model,
                 status: device.status,
                 riskScore,
+                chainIntegrity: chainStatus.valid ? 'VERIFIED_IMMUTABLE' : 'TAMPERED_WARNING',
                 registeredBy: device.registeredOwner.companyName || 'Private Owner',
                 devicePhotos: device.devicePhotos,
                 estimatedValue: calculateValuation({ ...device, riskScore }),

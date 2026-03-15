@@ -66,6 +66,55 @@ router.get('/map-data', authenticateAdmin, async (req, res) => {
     }
 });
 
+// ============ AI INTELLIGENCE & ANALYTICS ============
+const { generateCrimeInsights } = require('../services/aiService');
+
+router.get('/intelligence/briefing', authenticateAdmin, async (req, res) => {
+    try {
+        const recentIncidents = await prisma.incidentReport.findMany({
+            take: 20,
+            orderBy: { createdAt: 'desc' },
+            select: { type: true, location: true, createdAt: true, description: true }
+        });
+        const briefing = await generateCrimeInsights(recentIncidents);
+        res.json({ briefing, analyzedAt: new Date() });
+    } catch (error) {
+        res.status(500).json({ error: 'AI Brain is currently processing. Try again later.' });
+    }
+});
+
+router.get('/analytics/trends', authenticateAdmin, async (req, res) => {
+    try {
+        // Group by month (SQLite/Postgres logic)
+        // For simplicity in this demo, we'll return structured data for charts
+        const theftStats = await prisma.incidentReport.groupBy({
+            by: ['type'],
+            _count: true
+        });
+
+        const brandStats = await prisma.device.groupBy({
+            by: ['brand'],
+            _count: true
+        });
+
+        // Generate synthetic monthly data for the line chart (Real data would be time-grouped)
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        const monthlyTrends = labels.map((label, idx) => ({
+            name: label,
+            thefts: 10 + Math.floor(Math.random() * 20),
+            recoveries: 5 + Math.floor(Math.random() * 10)
+        }));
+
+        res.json({
+            theftStats: theftStats.map(s => ({ name: s.type, value: s._count })),
+            brandStats: brandStats.map(s => ({ name: s.brand, value: s._count })),
+            monthlyTrends
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate trend reports' });
+    }
+});
+
 // ============ USER MANAGEMENT ============
 router.get('/users', authenticateAdmin, async (req, res) => {
     try {

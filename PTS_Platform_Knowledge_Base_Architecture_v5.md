@@ -1,4 +1,4 @@
-# 🏛️ PTS (Phone Theft Tracking System) | Platform Knowledge Base & Architecture
+![alt text](image.png)# 🏛️ PTS (Phone Theft Tracking System) | Platform Knowledge Base & Architecture
 **Comprehensive Technical Authority & AI Grounding Document**  
 **Project Owner**: Vexel Innovations  
 **Version**: 5.0 (DeepSecurity AI Integration Edition)  
