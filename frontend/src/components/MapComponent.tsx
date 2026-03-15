@@ -1,19 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
-// Fix for default marker icons in Leaflet with Next.js
-const fixLeafletIcons = () => {
-    // @ts-ignore
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-    });
-};
 
 interface MapComponentProps {
     latitude?: number;
@@ -38,37 +26,52 @@ export default function MapComponent({
     className = "h-full w-full rounded-2xl"
 }: MapComponentProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<L.Map | null>(null);
-    const markerLayer = useRef<L.LayerGroup | null>(null);
+    const mapInstance = useRef<any>(null);
+    const markerLayer = useRef<any>(null);
 
     useEffect(() => {
         if (typeof window === 'undefined' || !mapContainer.current || mapInstance.current) return;
 
-        fixLeafletIcons();
+        const initMap = async () => {
+            const L = (await import('leaflet')).default;
 
-        // Initialize Map
-        mapInstance.current = L.map(mapContainer.current, {
-            center: [latitude, longitude],
-            zoom: zoom,
-            zoomControl: interactive,
-            dragging: interactive,
-            scrollWheelZoom: interactive,
-            attributionControl: true
-        });
+            // Fix for default marker icons
+            // @ts-ignore
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            });
 
-        // Add OSM Tile Layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(mapInstance.current);
+            if (!mapContainer.current) return;
 
-        // Initialize Marker Layer
-        markerLayer.current = L.layerGroup().addTo(mapInstance.current);
+            // Initialize Map
+            mapInstance.current = L.map(mapContainer.current, {
+                center: [latitude, longitude],
+                zoom: zoom,
+                zoomControl: interactive,
+                dragging: interactive,
+                scrollWheelZoom: interactive,
+                attributionControl: true
+            });
 
-        // Force a resize fix for some layouts
-        setTimeout(() => {
-            if (mapInstance.current) mapInstance.current.invalidateSize();
-        }, 100);
+            // Add OSM Tile Layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(mapInstance.current);
+
+            // Initialize Marker Layer
+            markerLayer.current = L.layerGroup().addTo(mapInstance.current);
+
+            // Force a resize fix
+            setTimeout(() => {
+                if (mapInstance.current) mapInstance.current.invalidateSize();
+            }, 200);
+        };
+
+        initMap();
 
         return () => {
             if (mapInstance.current) {
@@ -82,20 +85,21 @@ export default function MapComponent({
     useEffect(() => {
         if (!mapInstance.current || !markerLayer.current) return;
 
-        // Clear existing markers
-        markerLayer.current.clearLayers();
-
-        // Add new markers
-        markers.forEach(marker => {
-            if (marker.lat && marker.lng) {
-                // Create a custom colored marker or default
-                const m = L.marker([marker.lat, marker.lng]);
-                if (marker.label) {
-                    m.bindPopup(`<b>${marker.label}</b>`);
+        const updateMarkers = async () => {
+            const L = (await import('leaflet')).default;
+            markerLayer.current.clearLayers();
+            markers.forEach(marker => {
+                if (marker.lat && marker.lng) {
+                    const m = L.marker([marker.lat, marker.lng]);
+                    if (marker.label) {
+                        m.bindPopup(`<b>${marker.label}</b>`);
+                    }
+                    m.addTo(markerLayer.current!);
                 }
-                m.addTo(markerLayer.current!);
-            }
-        });
+            });
+        };
+
+        updateMarkers();
     }, [markers]);
 
     return (
