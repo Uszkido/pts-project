@@ -4,6 +4,9 @@ const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+const { verifyImeiRegistry } = require('../services/imeiService');
+const { generateLocalizedOracleResponse } = require('../services/aiService');
+
 const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
@@ -26,6 +29,15 @@ router.post('/register', authenticateToken, async (req, res) => {
 
         if (!imei || !brand || !model) {
             return res.status(400).json({ error: 'IMEI, brand, and model are required' });
+        }
+
+        // 0. Global Registry Check (External API)
+        const globalCheck = await verifyImeiRegistry(imei);
+        if (globalCheck.isBlacklisted) {
+            return res.status(403).json({
+                error: 'Global Interdiction: This IMEI is blacklisted by international manufacturers/authorities.',
+                details: globalCheck.specs
+            });
         }
 
         // 1. Conflict Check / Duplicate Prevention

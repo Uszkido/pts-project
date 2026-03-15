@@ -648,4 +648,38 @@ router.post('/devices/:imei/unbrick', authenticatePolice, async (req, res) => {
     }
 });
 
+// ============ GEOSPATIAL DATA ============
+router.get('/map-data', authenticatePolice, async (req, res) => {
+    try {
+        const vendors = await prisma.user.findMany({
+            where: {
+                role: 'VENDOR',
+                shopLatitude: { not: null },
+                shopLongitude: { not: null }
+            },
+            select: {
+                id: true,
+                email: true,
+                companyName: true,
+                shopLatitude: true,
+                shopLongitude: true,
+                vendorTier: true
+            }
+        });
+
+        const observations = await prisma.observationReport.findMany({
+            include: {
+                device: { select: { imei: true, brand: true, model: true, status: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        });
+
+        res.json({ vendors, observations });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

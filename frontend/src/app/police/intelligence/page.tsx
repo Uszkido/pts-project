@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import MapComponent from '@/components/MapComponent';
 
 export default function PoliceIntelligence() {
     const [incidents, setIncidents] = useState<any[]>([]);
@@ -24,6 +25,7 @@ export default function PoliceIntelligence() {
     const [trackingLogs, setTrackingLogs] = useState<any[]>([]);
     const [showLogs, setShowLogs] = useState(false);
     const [isTriangulating, setIsTriangulating] = useState<string | null>(null);
+    const [mapData, setMapData] = useState<{ vendors: any[], observations: any[] }>({ vendors: [], observations: [] });
 
     const fetchIntelligence = async () => {
         setLoading(true);
@@ -48,6 +50,12 @@ export default function PoliceIntelligence() {
             setIncidents(incidentsData.reports);
             setAlerts(alertsData.alerts);
             setSuspects(suspectsData.suspects || []);
+
+            // Fetch Map Data
+            const mapRes = await fetch(`${apiUrl}/police/map-data`, { headers });
+            const mapJson = await mapRes.json();
+            if (mapRes.ok) setMapData(mapJson);
+
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -194,6 +202,60 @@ export default function PoliceIntelligence() {
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Intelligence & Enforcement Portal</h1>
                         <p className="text-slate-400 text-sm mt-1">Live feed of consumer incident reports and vendor suspicious activity alerts.</p>
+                    </div>
+                </div>
+
+                {/* Geospatial Intelligence Mesh */}
+                <div className="mb-8 group">
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-300">Strategic Asset Tracking Map</h3>
+                            </div>
+                            <div className="flex gap-4 text-[10px] font-bold">
+                                <span className="flex items-center gap-1 text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div> VENDORS ({mapData.vendors.length})</span>
+                                <span className="flex items-center gap-1 text-red-500"><div className="w-1.5 h-1.5 rounded-full bg-red-500 border border-white/20"></div> ACTIVE PINGS ({mapData.observations.length})</span>
+                            </div>
+                        </div>
+                        <div className="h-[400px] w-full bg-slate-950">
+                            <MapComponent
+                                zoom={11}
+                                markers={[
+                                    ...mapData.vendors.map(v => ({
+                                        lat: v.shopLatitude,
+                                        lng: v.shopLongitude,
+                                        label: `VENDOR: ${v.companyName || v.email}`,
+                                        color: "#10b981"
+                                    })),
+                                    ...mapData.observations.map(o => ({
+                                        lat: o.latitude,
+                                        lng: o.longitude,
+                                        label: `PING: ${o.device.brand} ${o.device.model} (${o.device.imei})`,
+                                        color: "#ef4444"
+                                    }))
+                                ]}
+                            />
+                        </div>
+                        <div className="absolute top-16 right-4 z-10 flex flex-col gap-2">
+                            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl shadow-xl max-w-[200px]">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Live Intel Legend</p>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                                        <span className="text-[10px] text-slate-200">Registered Vendor Node</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                        <span className="text-[10px] text-slate-200">Stolen Device Signal</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                                        <span className="text-[10px] text-slate-200">Suspicious Activity Hotspot</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

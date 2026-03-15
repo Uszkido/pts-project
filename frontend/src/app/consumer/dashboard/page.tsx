@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import MapComponent from '@/components/MapComponent';
 
 export default function ConsumerDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -594,6 +595,22 @@ export default function ConsumerDashboard() {
                                                                 </span>
                                                                 {device.lastKnownLocation || 'Awaiting exact coordinates...'}
                                                             </div>
+                                                            {device.observationReports && device.observationReports.length > 0 && (
+                                                                <div className="mt-3 h-32 w-full rounded-xl overflow-hidden border border-purple-500/20 shadow-inner">
+                                                                    <MapComponent
+                                                                        zoom={14}
+                                                                        interactive={false}
+                                                                        latitude={device.observationReports[0].latitude}
+                                                                        longitude={device.observationReports[0].longitude}
+                                                                        markers={[{
+                                                                            lat: device.observationReports[0].latitude,
+                                                                            lng: device.observationReports[0].longitude,
+                                                                            label: "Last Seen",
+                                                                            color: "#ef4444"
+                                                                        }]}
+                                                                    />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>

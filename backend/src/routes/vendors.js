@@ -219,4 +219,36 @@ router.get('/messages', authenticateToken, verifyVendorRole, async (req, res) =>
     }
 });
 
+router.get('/nearby-risks', authenticateToken, verifyVendorRole, async (req, res) => {
+    try {
+        const vendor = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { shopLatitude: true, shopLongitude: true }
+        });
+
+        if (!vendor || !vendor.shopLatitude) {
+            return res.json({ risks: [] });
+        }
+
+        // Simplistic nearby search (square bounding box)
+        const range = 0.5; // roughly 50km
+        const observations = await prisma.observationReport.findMany({
+            where: {
+                latitude: { gte: vendor.shopLatitude - range, lte: vendor.shopLatitude + range },
+                longitude: { gte: vendor.shopLongitude - range, lte: vendor.shopLongitude + range }
+            },
+            include: {
+                device: { select: { imei: true, brand: true, model: true, status: true } }
+            },
+            take: 20,
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({ risks: observations });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import LiveView from '@/components/LiveView';
+import MapComponent from '@/components/MapComponent';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
@@ -19,6 +20,7 @@ export default function AdminDashboard() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<{ users: any[], devices: any[] } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
+    const [mapData, setMapData] = useState<{ vendors: any[], pings: any[] }>({ vendors: [], pings: [] });
 
     const [documents, setDocuments] = useState<{ userDocuments: any[], deviceDocuments: any[] }>({ userDocuments: [], deviceDocuments: [] });
     const [messages, setMessages] = useState<any[]>([]);
@@ -74,7 +76,8 @@ export default function AdminDashboard() {
                 fetch(`${apiUrl}/admin/documents`, { headers }),
                 fetch(`${apiUrl}/admin/messages`, { headers }),
                 fetch(`${apiUrl}/admin/suspects`, { headers }),
-                fetch(`${apiUrl}/admin/password-reset-requests`, { headers })
+                fetch(`${apiUrl}/admin/password-reset-requests`, { headers }),
+                fetch(`${apiUrl}/admin/map-data`, { headers })
             ]);
 
             // Handle cascading errors with precision
@@ -91,7 +94,8 @@ export default function AdminDashboard() {
                 docsRes.ok ? docsRes.json() : Promise.resolve({ userDocuments: [], deviceDocuments: [] }),
                 msgsRes.ok ? msgsRes.json() : Promise.resolve({ messages: [] }),
                 suspectRes.ok ? suspectRes.json() : Promise.resolve({ suspects: [] }),
-                authRes.ok ? authRes.json() : Promise.resolve({ requests: [] })
+                authRes.ok ? authRes.json() : Promise.resolve({ requests: [] }),
+                fetch(`${apiUrl}/admin/map-data`, { headers }).then(r => r.ok ? r.json() : { vendors: [], pings: [] })
             ]);
 
             // Fail-safe State Population
@@ -103,6 +107,8 @@ export default function AdminDashboard() {
             setMessages(msgsData.messages || []);
             setSuspects(suspectsData.suspects || []);
             setAuthRequests(authData.requests || []);
+            const mData = await (await fetch(`${apiUrl}/admin/map-data`, { headers })).json();
+            setMapData(mData || { vendors: [], pings: [] });
 
             // Specific error warning if non-critical routes fail
             if (!docsRes.ok) console.warn('Administrative Intelligence document registry failed to sync.');
@@ -571,6 +577,38 @@ export default function AdminDashboard() {
                                             <span className="bg-slate-800 px-3 py-1 rounded-full text-sm font-bold text-white">{d.count}</span>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                            <div className="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                        National Assets Surveillance Map
+                                    </h3>
+                                    <span className="text-[10px] text-slate-500 font-mono">LIVE TELEMETRY FEED</span>
+                                </div>
+                                <div className="h-[500px] w-full relative">
+                                    <MapComponent
+                                        zoom={6}
+                                        markers={[
+                                            ...mapData.vendors.map(v => ({
+                                                lat: v.shopLatitude,
+                                                lng: v.shopLongitude,
+                                                label: `VENDOR: ${v.companyName}`,
+                                                color: "#10b981"
+                                            })),
+                                            ...mapData.pings.map(p => ({
+                                                lat: p.latitude,
+                                                lng: p.longitude,
+                                                label: `PING: ${p.device.brand} ${p.device.model} (${p.device.status})`,
+                                                color: "#ef4444"
+                                            }))
+                                        ]}
+                                    />
+                                    <div className="absolute bottom-4 left-4 bg-slate-950/80 backdrop-blur-md p-3 rounded-xl border border-slate-700 text-[10px] space-y-2 z-[40]">
+                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> <span className="text-slate-300">Authorized Vendors</span></div>
+                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> <span className="text-slate-300">Target Asset Pings</span></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

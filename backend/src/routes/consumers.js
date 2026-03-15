@@ -29,6 +29,10 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
                         },
                         incidents: {
                             orderBy: { createdAt: 'desc' }
+                        },
+                        observationReports: {
+                            orderBy: { createdAt: 'desc' },
+                            take: 10
                         }
                     }
                 },

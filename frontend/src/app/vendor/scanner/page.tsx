@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import MapComponent from '@/components/MapComponent';
 
 export default function VendorScanner() {
     const [imei, setImei] = useState('');
@@ -9,11 +10,25 @@ export default function VendorScanner() {
     const [sellerEmail, setSellerEmail] = useState('');
     const [description, setDescription] = useState('');
     const [reportStatus, setReportStatus] = useState<string | null>(null);
+    const [nearbyRisks, setNearbyRisks] = useState<any[]>([]);
 
     useEffect(() => {
         if (!localStorage.getItem('pts_token')) {
             window.location.href = '/vendor/login';
+            return;
         }
+
+        const fetchRisks = async () => {
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                const res = await fetch(`${apiUrl}/vendors/nearby-risks`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) setNearbyRisks(data.risks || []);
+            } catch (e) { }
+        };
+        fetchRisks();
     }, []);
 
     const handleScan = async (e: React.FormEvent) => {
@@ -81,6 +96,29 @@ export default function VendorScanner() {
                         </button>
                     </form>
                 </div>
+
+                {nearbyRisks.length > 0 && (
+                    <div className="mb-8 bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                        <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-red-950/20">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping"></div>
+                                High-Risk Radar: Local Reported Pings
+                            </h3>
+                        </div>
+                        <div className="h-48 w-full">
+                            <MapComponent
+                                zoom={10}
+                                interactive={false}
+                                markers={nearbyRisks.map(r => ({
+                                    lat: r.latitude,
+                                    lng: r.longitude,
+                                    label: `Ping: ${r.device.brand} ${r.device.model}`,
+                                    color: "#ef4444"
+                                }))}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {result && (
                     <div className={`p-[1px] rounded-3xl bg-gradient-to-b ${result.status === 'CLEAN' && result.riskScore >= 50 ? 'from-emerald-500/50 via-emerald-500/10' : 'from-red-600/60 via-red-600/20'}`}>

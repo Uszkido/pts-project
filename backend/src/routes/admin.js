@@ -45,6 +45,27 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
     }
 });
 
+router.get('/map-data', authenticateAdmin, async (req, res) => {
+    try {
+        const [vendors, pings] = await Promise.all([
+            prisma.user.findMany({
+                where: { role: 'VENDOR', shopLatitude: { not: null } },
+                select: { id: true, companyName: true, shopLatitude: true, shopLongitude: true, vendorTier: true }
+            }),
+            prisma.observationReport.findMany({
+                take: 100,
+                orderBy: { createdAt: 'desc' },
+                include: { device: { select: { brand: true, model: true, imei: true, status: true } } }
+            })
+        ]);
+
+        res.json({ vendors, pings });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch map surveillance data' });
+    }
+});
+
 // ============ USER MANAGEMENT ============
 router.get('/users', authenticateAdmin, async (req, res) => {
     try {
