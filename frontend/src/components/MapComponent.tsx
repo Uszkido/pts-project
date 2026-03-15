@@ -56,11 +56,49 @@ export default function MapComponent({
                 attributionControl: true
             });
 
-            // Add OSM Tile Layer
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            }).addTo(mapInstance.current);
+            // Add Base Layers
+            const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            });
+
+            const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            });
+
+            const googleHybrid = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            });
+
+            const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            });
+
+            const googleTerrain = L.tileLayer('http://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            });
+
+            // Add the default layer
+            googleStreets.addTo(mapInstance.current);
+
+            // Add layer control if interactive
+            if (interactive) {
+                const baseMaps = {
+                    "Google Streets": googleStreets,
+                    "Google Satellite": googleSat,
+                    "Google Hybrid": googleHybrid,
+                    "Google Terrain": googleTerrain,
+                    "OpenStreetMap": osm
+                };
+                L.control.layers(baseMaps).addTo(mapInstance.current);
+            }
 
             // Initialize Marker Layer
             markerLayer.current = L.layerGroup().addTo(mapInstance.current);
