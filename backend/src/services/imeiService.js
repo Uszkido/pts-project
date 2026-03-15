@@ -1,4 +1,4 @@
-const axios = require('axios');
+// axios is not used in the current simulated mode
 
 /**
  * PTS IMEI Sentinel Service
