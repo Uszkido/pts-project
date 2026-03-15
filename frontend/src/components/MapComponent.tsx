@@ -28,30 +28,43 @@ export default function MapComponent({
 }: MapComponentProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
-    const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
-    console.log('Map Layer Key Probe:', apiKey ? `${apiKey.substring(0, 4)}...` : 'MISSING');
+    const markerRefs = useRef<maplibregl.Marker[]>([]);
 
     useEffect(() => {
         if (map.current) return;
         if (!mapContainer.current) return;
 
-        if (!apiKey) {
-            console.error('CRITICAL: MapTiler API Key is missing from environment variables.');
-            return;
-        }
-
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
+            style: {
+                version: 8,
+                sources: {
+                    'osm': {
+                        type: 'raster',
+                        tiles: [
+                            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        ],
+                        tileSize: 256,
+                        attribution: '&copy; OpenStreetMap Contributors'
+                    }
+                },
+                layers: [
+                    {
+                        id: 'osm',
+                        type: 'raster',
+                        source: 'osm'
+                    }
+                ]
+            },
             center: [longitude, latitude],
             zoom: zoom,
             interactive: interactive
         });
 
         map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }, [apiKey, latitude, longitude, zoom, interactive]);
-
-    const markerRefs = useRef<maplibregl.Marker[]>([]);
+    }, [latitude, longitude, zoom, interactive]);
 
     useEffect(() => {
         if (!map.current) return;
