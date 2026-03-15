@@ -41,11 +41,7 @@ export default function MapComponent({
                 sources: {
                     'osm': {
                         type: 'raster',
-                        tiles: [
-                            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                        ],
+                        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
                         tileSize: 256,
                         attribution: '&copy; OpenStreetMap Contributors'
                     }
@@ -54,13 +50,23 @@ export default function MapComponent({
                     {
                         id: 'osm',
                         type: 'raster',
-                        source: 'osm'
+                        source: 'osm',
+                        minzoom: 0,
+                        maxzoom: 19
                     }
                 ]
             },
             center: [longitude, latitude],
             zoom: zoom,
             interactive: interactive
+        });
+
+        map.current.on('load', () => {
+            console.log('Map engine initialized with OSM raster layer');
+        });
+
+        map.current.on('error', (e) => {
+            console.error('Telemetric Map Error:', e.error);
         });
 
         map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
