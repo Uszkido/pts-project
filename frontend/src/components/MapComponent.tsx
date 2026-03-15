@@ -35,9 +35,14 @@ export default function MapComponent({
         if (map.current) return;
         if (!mapContainer.current) return;
 
+        if (!apiKey) {
+            console.error('CRITICAL: MapTiler API Key is missing from environment variables.');
+            return;
+        }
+
         map.current = new maplibregl.Map({
             container: mapContainer.current,
-            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${apiKey}`,
+            style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
             center: [longitude, latitude],
             zoom: zoom,
             interactive: interactive

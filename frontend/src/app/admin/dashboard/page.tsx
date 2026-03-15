@@ -86,7 +86,7 @@ export default function AdminDashboard() {
                 return;
             }
 
-            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData, suspectsData, authData] = await Promise.all([
+            const [dashData, usersData, devicesData, incidentsData, docsData, msgsData, suspectsData, authData, mData] = await Promise.all([
                 dashRes.ok ? dashRes.json() : Promise.resolve(null),
                 usersRes.ok ? usersRes.json() : Promise.resolve({ users: [] }),
                 devicesRes.ok ? devicesRes.json() : Promise.resolve({ devices: [] }),
@@ -107,7 +107,6 @@ export default function AdminDashboard() {
             setMessages(msgsData.messages || []);
             setSuspects(suspectsData.suspects || []);
             setAuthRequests(authData.requests || []);
-            const mData = await (await fetch(`${apiUrl}/admin/map-data`, { headers })).json();
             setMapData(mData || { vendors: [], pings: [] });
 
             // Specific error warning if non-critical routes fail
