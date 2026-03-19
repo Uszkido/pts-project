@@ -2,12 +2,15 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "vercel-build": "npx prisma generate && npx prisma migrate deploy",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "postinstall": "npx prisma generate",
-    "build": "npx prisma generate"
+    "build": "npx prisma generate && npx prisma migrate deploy"
   },
   "keywords": [],
   "author": "",

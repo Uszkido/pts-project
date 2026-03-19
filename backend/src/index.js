@@ -6,7 +6,7 @@ process.on('unhandledRejection', (reason) => console.error('🌊 UNHANDLED:', re
 
 const express = require('express');
 const cors = require('cors');
-const { initTelegramOracle } = require('./services/telegramOracle'); // Import AI Bot Initializer
+// const { initTelegramOracle } = require('./services/telegramOracle'); // Moved below for better safety in production
 const authRoutes = require('./routes/auth');
 const deviceRoutes = require('./routes/devices');
 const policeRoutes = require('./routes/police');
@@ -71,14 +71,20 @@ app.get('/debug-env', (req, res) => {
     });
 });
 
-// Initialize Telegram Oracle in local dev mode only.
-// In production (Vercel), the bot runs in webhook mode — no polling needed at startup.
+// Initialize Telegram Oracle ONLY in local dev mode.
+// On Vercel (Production), the Telegram Bot must be triggered by webhooks, not polling.
 if (process.env.NODE_ENV !== 'production') {
-    initTelegramOracle();
+    try {
+        const { initTelegramOracle } = require('./services/telegramOracle');
+        initTelegramOracle();
+    } catch (e) {
+        console.warn('⚠️ Skipping Telegram Oracle startup:', e.message);
+    }
     app.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
     });
 }
+
 
 module.exports = app;
 
