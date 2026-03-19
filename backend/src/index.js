@@ -1,4 +1,9 @@
 require('dotenv').config();
+
+// Global Crash Handlers for Vercel Stability
+process.on('uncaughtException', (err) => console.error('🔥 UNCAUGHT:', err.message, err.stack));
+process.on('unhandledRejection', (reason) => console.error('🌊 UNHANDLED:', reason));
+
 const express = require('express');
 const cors = require('cors');
 const { initTelegramOracle } = require('./services/telegramOracle'); // Import AI Bot Initializer
