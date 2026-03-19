@@ -445,55 +445,122 @@ export default function ConsumerDashboard() {
             return;
         }
 
-        setCertificateData({
-            brand: device.brand,
-            model: device.model,
-            imei: device.imei,
-            serial: device.serialNumber || 'N/A',
-            owner: user?.fullName || user?.email || 'Registered Owner',
-            date: new Date(activeCert.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-            hash: activeCert.qrHash,
-            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://pts-registry.vercel.app/verify/${device.imei}`
-        });
+        try {
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth();
+            const H = pdf.internal.pageSize.getHeight();
+            const owner = user?.fullName || user?.email || 'Registered Owner';
+            const issueDate = new Date(activeCert.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            const verifyUrl = `https://pts-vexel.vercel.app/verify/${device.imei}`;
 
-        // Use a longer delay to ensure React renders the invisible template
-        setTimeout(async () => {
-            if (certificateRef.current) {
-                try {
-                    // Pre-load images for html2canvas to ensure they capture
-                    const images = certificateRef.current.querySelectorAll('img');
-                    await Promise.all(Array.from(images).map(img => {
-                        if (img.complete) return Promise.resolve();
-                        return new Promise(resolve => {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                        });
-                    }));
+            // Navy background
+            pdf.setFillColor(2, 8, 23);
+            pdf.rect(0, 0, W, H, 'F');
 
-                    const canvas = await html2canvas(certificateRef.current, {
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#ffffff',
-                        windowWidth: 794,
-                        windowHeight: 1123
-                    });
-                    const imgData = canvas.toDataURL('image/png', 1.0);
+            // Emerald top bar
+            pdf.setFillColor(16, 185, 129);
+            pdf.rect(0, 0, W, 8, 'F');
 
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            // Bottom bar
+            pdf.setFillColor(16, 185, 129);
+            pdf.rect(0, H - 8, W, 8, 'F');
 
-                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-                    pdf.save(`PTS_CERTIFICATE_${device.brand}_${device.imei}.pdf`);
-                } catch (err) {
-                    console.error('Failed to generate PDF:', err);
-                    alert('Digital signature verify failed. Protocol error.');
-                }
-            }
+            // LEFT gold stripe
+            pdf.setFillColor(16, 185, 129);
+            pdf.rect(0, 0, 4, H, 'F');
+
+            // Header
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('POLICE TRACKING SYSTEM — SOVEREIGN REGISTRY OF NIGERIA', W / 2, 20, { align: 'center' });
+
+            pdf.setFontSize(6);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('DIGITAL DEVICE OWNERSHIP CERTIFICATE (DDOC)', W / 2, 26, { align: 'center' });
+
+            // Title
+            pdf.setFontSize(26);
+            pdf.setTextColor(16, 185, 129);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('CERTIFICATE OF', W / 2, 44, { align: 'center' });
+            pdf.text('OWNERSHIP', W / 2, 54, { align: 'center' });
+
+            // Divider line
+            pdf.setDrawColor(16, 185, 129);
+            pdf.setLineWidth(0.4);
+            pdf.line(20, 60, W - 20, 60);
+
+            // Owner name
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('THIS IS TO CERTIFY THAT', W / 2, 70, { align: 'center' });
+
+            pdf.setFontSize(18);
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(owner.toUpperCase(), W / 2, 82, { align: 'center' });
+
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('IS THE REGISTERED AND LEGALLY VERIFIED OWNER OF THE FOLLOWING DEVICE', W / 2, 90, { align: 'center' });
+
+            // Device info box
+            pdf.setFillColor(15, 23, 42);
+            pdf.setDrawColor(30, 41, 59);
+            pdf.setLineWidth(0.5);
+            pdf.roundedRect(20, 96, W - 40, 52, 3, 3, 'FD');
+
+            const fields = [
+                ['DEVICE', `${device.brand} ${device.model}`],
+                ['IMEI NUMBER', device.imei],
+                ['SERIAL NUMBER', device.serialNumber || 'N/A'],
+                ['REGISTRATION DATE', issueDate],
+                ['CERTIFICATE HASH', activeCert.qrHash?.substring(0, 32) + '...'],
+                ['STATUS', 'ACTIVE — CLEAN REGISTRY'],
+            ];
+            let y = 108;
+            fields.forEach(([label, value]) => {
+                pdf.setFontSize(7);
+                pdf.setTextColor(100, 116, 139);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(label, 28, y);
+                pdf.setFontSize(9);
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(String(value), 28, y + 5);
+                y += 14;
+            });
+
+            // Verification URL
+            pdf.setDrawColor(16, 185, 129);
+            pdf.setLineWidth(0.3);
+            pdf.line(20, 156, W - 20, 156);
+
+            pdf.setFontSize(7);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('VERIFY THIS CERTIFICATE ONLINE AT:', W / 2, 163, { align: 'center' });
+            pdf.setFontSize(8);
+            pdf.setTextColor(16, 185, 129);
+            pdf.text(verifyUrl, W / 2, 169, { align: 'center' });
+
+            // Footer
+            pdf.setFontSize(6);
+            pdf.setTextColor(71, 85, 105);
+            pdf.text('This document is digitally signed and registered within the PTS National Blockchain Ledger. Any tampering voids its legal standing.', W / 2, H - 14, { align: 'center' });
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('© VEXEL INNOVATIONS 2026 — POWERED BY SENTINEL AI', W / 2, H - 10, { align: 'center' });
+
+            pdf.save(`PTS_CERTIFICATE_${device.brand}_${device.imei}.pdf`);
+        } catch (err) {
+            console.error('Failed to generate PDF:', err);
+            alert('Certificate generation failed. Please try again.');
+        } finally {
             setIsGeneratingPdf(null);
             setCertificateData(null);
-        }, 1500);
+        }
     };
 
     return (
