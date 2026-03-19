@@ -1,6 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary, analyzeSmugglingRisk } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');

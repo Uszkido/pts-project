@@ -208,17 +208,17 @@ export default function Home() {
 
             {/* Footer */}
             <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Powered by</p>
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mb-1">Powered by</p>
                     {/* Vexel Innovations Logo */}
-                    <div className="text-white w-16 h-16 flex items-center justify-center">
-                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-16 h-16 object-contain" />
+                    <div className="text-white w-14 h-14 flex items-center justify-center mb-1">
+                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-full h-full object-contain" />
                     </div>
                     <div className="text-center">
-                        <p className="text-xl font-bold tracking-widest text-white uppercase">Vexel</p>
-                        <p className="text-xs font-medium tracking-[0.3em] text-slate-400 uppercase mt-0.5">Innovations</p>
+                        <p className="text-lg font-bold tracking-[0.2em] text-white uppercase">Vexel</p>
+                        <p className="text-[9px] font-bold tracking-[0.4em] text-slate-500 uppercase mt-0.5">Innovations</p>
                     </div>
-                    <p className="text-sm text-slate-500 font-medium mt-2">
+                    <p className="text-[10px] text-slate-600 font-medium mt-4 tracking-wider">
                         &copy; Vexel Innovations 2026. All rights reserved.
                     </p>
                 </div>
