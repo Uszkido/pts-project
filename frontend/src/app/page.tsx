@@ -212,7 +212,7 @@ export default function Home() {
                     <p className="text-sm font-semibold text-slate-500 uppercase tracking-widest">Powered by</p>
                     {/* Vexel Innovations Logo */}
                     <div className="text-white w-16 h-16 flex items-center justify-center">
-                        <img src="/vvex.svg" alt="Vexel Innovations" className="w-16 h-16 object-contain" />
+                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-16 h-16 object-contain" />
                     </div>
                     <div className="text-center">
                         <p className="text-xl font-bold tracking-widest text-white uppercase">Vexel</p>
