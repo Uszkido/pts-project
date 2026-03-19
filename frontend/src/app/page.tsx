@@ -210,12 +210,12 @@ export default function Home() {
             <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-4">Powered by</p>
-                    {/* Vexel Innovations Logo */}
-                    <div className="text-white w-20 h-20 flex items-center justify-center">
-                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-full h-full object-contain scale-110" />
+                    {/* Vexel Innovations Logo Container */}
+                    <div className="text-white w-24 h-24 bg-white/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] mb-1">
+                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-16 h-16 object-contain" />
                     </div>
-                    <div className="text-center -mt-2">
-                        <p className="text-xl font-bold tracking-[0.2em] text-white uppercase leading-none">Vexel</p>
+                    <div className="text-center">
+                        <p className="text-2xl font-bold tracking-widest text-white uppercase leading-none">Vexel</p>
                         <p className="text-[10px] font-bold tracking-[0.4em] text-slate-500 uppercase mt-1">Innovations</p>
                     </div>
                     <p className="text-[10px] text-slate-600 font-medium mt-4 tracking-wider">
