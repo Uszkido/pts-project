@@ -53,6 +53,10 @@ app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/telegram', telegramRoutes);
 
+app.get('/ping', (req, res) => {
+    res.json({ status: 'ok', message: 'Pong!' });
+});
+
 app.get('/health', async (req, res) => {
     try {
         const prisma = require('./src/db');
