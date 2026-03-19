@@ -334,47 +334,110 @@ export default function AdminDashboard() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to fetch forensic data');
 
-            setDossierData(data.dossier);
+            const d = data.dossier;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth();
+            const H = pdf.internal.pageSize.getHeight();
 
-            setTimeout(async () => {
-                if (dossierRef.current) {
-                    try {
-                        // Pre-load images for html2canvas to ensure they capture
-                        const images = dossierRef.current.querySelectorAll('img');
-                        await Promise.all(Array.from(images).map(img => {
-                            if (img.complete) return Promise.resolve();
-                            return new Promise(resolve => {
-                                img.onload = resolve;
-                                img.onerror = resolve;
-                            });
-                        }));
+            pdf.setFillColor(2, 8, 23);
+            pdf.rect(0, 0, W, H, 'F');
+            pdf.setFillColor(220, 38, 38);
+            pdf.rect(0, 0, W, 8, 'F');
+            pdf.rect(0, H - 8, W, 8, 'F');
+            pdf.rect(0, 0, 4, H, 'F');
 
-                        const canvas = await html2canvas(dossierRef.current, {
-                            scale: 2,
-                            useCORS: true,
-                            logging: false,
-                            backgroundColor: '#ffffff',
-                            windowWidth: 1200
-                        });
-                        const imgData = canvas.toDataURL('image/png', 1.0);
-                        const pdf = new jsPDF('p', 'mm', 'a4');
-                        const pdfWidth = pdf.internal.pageSize.getWidth();
-                        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(9); pdf.setFont('helvetica', 'bold');
+            pdf.text('POLICE TRACKING SYSTEM — ADMIN DIVISION', W / 2, 18, { align: 'center' });
+            pdf.setFontSize(20); pdf.setTextColor(220, 38, 38);
+            pdf.text('FORENSIC ASSET DOSSIER', W / 2, 30, { align: 'center' });
+            pdf.setFontSize(7); pdf.setTextColor(239, 68, 68); pdf.setFont('helvetica', 'bold');
+            pdf.text(`REPORT ID: ${d.reportId}   |   CLASSIFICATION: ADMIN RESTRICTED`, W / 2, 37, { align: 'center' });
+            pdf.setDrawColor(220, 38, 38); pdf.setLineWidth(0.4);
+            pdf.line(14, 41, W - 14, 41);
 
-                        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-                        pdf.save(`PTS_FORENSIC_DOSSIER_${imei}.pdf`);
-                    } catch (err) {
-                        console.error('PDF generation error:', err);
-                        alert('Digital signature verify failed. Protocol error (Rendering).');
-                    } finally {
-                        setIsGeneratingDossier(null);
-                        setDossierData(null);
-                    }
-                }
-            }, 1200);
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'normal');
+            pdf.text(`Generated: ${new Date(d.generatedAt).toLocaleString()}   |   Admin: ${d.generatedBy}`, 14, 48);
+
+            pdf.setFontSize(8); pdf.setTextColor(220, 38, 38); pdf.setFont('helvetica', 'bold');
+            pdf.text('§1 ASSET PROFILE', 14, 56);
+            pdf.setFillColor(15, 23, 42); pdf.setDrawColor(30, 41, 59);
+            pdf.roundedRect(14, 59, W - 28, 44, 2, 2, 'FD');
+
+            const assetFields = [
+                ['DEVICE', `${d.asset.brand} ${d.asset.model}`],
+                ['IMEI', d.asset.imei],
+                ['SERIAL', d.asset.serial || 'N/A'],
+                ['STATUS', d.asset.status],
+                ['RISK SCORE', `${d.asset.riskScore}/100`],
+            ];
+            let aY = 68;
+            assetFields.forEach(([label, value]) => {
+                pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
+                pdf.text(label, 20, aY);
+                pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
+                pdf.text(String(value), 20, aY + 4);
+                aY += 11;
+            });
+
+            pdf.setFontSize(8); pdf.setTextColor(220, 38, 38); pdf.setFont('helvetica', 'bold');
+            pdf.text('§2 OWNERSHIP CHAIN', 14, 110);
+            pdf.setFillColor(15, 23, 42); pdf.setDrawColor(30, 41, 59);
+            pdf.roundedRect(14, 113, W - 28, 22, 2, 2, 'FD');
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'normal');
+            pdf.text('Current Owner: ', 20, 121);
+            pdf.setTextColor(255, 255, 255);
+            pdf.text(d.ownership.current, 50, 121);
+            pdf.setTextColor(100, 116, 139);
+            pdf.text(`Transfers: ${d.ownership.chain.length === 0 ? 'None recorded' : d.ownership.chain.map((c: any) => `${c.from} → ${c.to}`).join('; ')}`, 20, 129);
+
+            pdf.setFontSize(8); pdf.setTextColor(220, 38, 38); pdf.setFont('helvetica', 'bold');
+            pdf.text('§3 INCIDENT LOG', 14, 143);
+            if (d.incidents.length === 0) {
+                pdf.setFontSize(7); pdf.setTextColor(71, 85, 105); pdf.setFont('helvetica', 'italic');
+                pdf.text('No criminal incidents recorded against this device.', 20, 150);
+            } else {
+                let incY = 148;
+                d.incidents.slice(0, 4).forEach((inc: any) => {
+                    pdf.setFillColor(40, 10, 10); pdf.setDrawColor(60, 20, 20);
+                    pdf.roundedRect(14, incY - 4, W - 28, 10, 1, 1, 'FD');
+                    pdf.setFontSize(6); pdf.setTextColor(239, 68, 68); pdf.setFont('helvetica', 'bold');
+                    pdf.text(`[${inc.type}]`, 18, incY + 1);
+                    pdf.setTextColor(200, 200, 200); pdf.setFont('helvetica', 'normal');
+                    pdf.text((inc.desc || 'N/A').substring(0, 90), 38, incY + 1);
+                    pdf.setTextColor(71, 85, 105);
+                    pdf.text(new Date(inc.date).toLocaleDateString(), W - 20, incY + 1, { align: 'right' });
+                    incY += 13;
+                });
+            }
+
+            const ledgerStartY = d.incidents.length === 0 ? 160 : Math.min(148 + (d.incidents.slice(0, 4).length * 13) + 6, 195);
+            pdf.setFontSize(8); pdf.setTextColor(220, 38, 38); pdf.setFont('helvetica', 'bold');
+            pdf.text('§4 TRANSACTION LEDGER', 14, ledgerStartY);
+            let ledgerY = ledgerStartY + 5;
+            if (d.ledger.length === 0) {
+                pdf.setFontSize(7); pdf.setTextColor(71, 85, 105); pdf.setFont('helvetica', 'italic');
+                pdf.text('No ledger entries recorded.', 20, ledgerY + 2);
+            } else {
+                d.ledger.slice(0, 5).forEach((entry: any) => {
+                    if (ledgerY > H - 30) return;
+                    pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'normal');
+                    pdf.text(`• [${entry.type}] ${(entry.details || '').substring(0, 80)}`, 18, ledgerY);
+                    ledgerY += 6;
+                });
+            }
+
+            pdf.setFontSize(6); pdf.setTextColor(71, 85, 105);
+            pdf.text('ADMIN COPY — PTS NATIONAL TRACKING SYSTEM', W / 2, H - 14, { align: 'center' });
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('© VEXEL INNOVATIONS 2026 — PTS ADMIN DIVISION', W / 2, H - 10, { align: 'center' });
+
+            pdf.save(`PTS_FORENSIC_DOSSIER_${imei}.pdf`);
         } catch (err: any) {
             alert(err.message);
+        } finally {
             setIsGeneratingDossier(null);
+            setDossierData(null);
         }
     };
 

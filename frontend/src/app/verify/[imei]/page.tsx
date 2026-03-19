@@ -41,38 +41,101 @@ export default function VerificationPage() {
     const [isPrinting, setIsPrinting] = useState(false);
 
     const printVerification = async () => {
+        if (!status) return;
         setIsPrinting(true);
         try {
-            if (certificateRef.current) {
-                // Pre-load images for html2canvas to ensure they capture
-                const images = certificateRef.current.querySelectorAll('img');
-                await Promise.all(Array.from(images).map(img => {
-                    if (img.complete) return Promise.resolve();
-                    return new Promise(resolve => {
-                        img.onload = resolve;
-                        img.onerror = resolve;
-                    });
-                }));
+            const isClean = status.status === 'CLEAN';
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth();
+            const H = pdf.internal.pageSize.getHeight();
 
-                const canvas = await html2canvas(certificateRef.current, {
-                    scale: 3,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#000000',
-                    windowWidth: 794,
-                    windowHeight: 1123
-                });
-                const imgData = canvas.toDataURL('image/png', 1.0);
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            // Background
+            pdf.setFillColor(0, 0, 0);
+            pdf.rect(0, 0, W, H, 'F');
 
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-                pdf.save(`PTS_VERIFICATION_${status.imei}.pdf`);
-            }
+            // Accent bars
+            const r = isClean ? 16 : 220, g = isClean ? 185 : 38, b = isClean ? 129 : 38;
+            pdf.setFillColor(r, g, b);
+            pdf.rect(0, 0, W, 8, 'F');
+            pdf.rect(0, H - 8, W, 8, 'F');
+            pdf.rect(0, 0, 4, H, 'F');
+
+            // Header
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('POLICE TRACKING SYSTEM — NATIONAL DEVICE REGISTRY', W / 2, 18, { align: 'center' });
+
+            pdf.setFontSize(24);
+            pdf.setTextColor(r, g, b);
+            pdf.text(`DEVICE ${isClean ? 'VERIFIED CLEAN' : 'FLAGGED — DO NOT BUY'}`, W / 2, 32, { align: 'center' });
+
+            pdf.setDrawColor(r, g, b);
+            pdf.setLineWidth(0.4);
+            pdf.line(14, 37, W - 14, 37);
+
+            // Status badge
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 116, 139);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`REGISTRY STATUS: ${status.status}   |   TRUST INDEX: ${status.riskScore}/100`, W / 2, 45, { align: 'center' });
+
+            // Device info box
+            pdf.setFillColor(15, 23, 42);
+            pdf.setDrawColor(30, 41, 59);
+            pdf.setLineWidth(0.5);
+            pdf.roundedRect(14, 52, W - 28, 60, 2, 2, 'FD');
+
+            const fields = [
+                ['DEVICE', `${status.brand} ${status.model}`],
+                ['IMEI NUMBER', status.imei],
+                ['RESPONSIBLE ENTITY', status.registeredBy || 'N/A'],
+                ['ESTIMATED VALUE', `₦${status.estimatedValue?.toLocaleString() || '0'} NGN`],
+                ['REGISTRY SIGNATURE', status.chainIntegrity || 'NATIONAL-V4.2.1-SEALED'],
+                ['VERIFICATION DATE', new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })],
+            ];
+            let y = 64;
+            fields.forEach(([label, value]) => {
+                pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
+                pdf.text(label, 20, y);
+                pdf.setFontSize(9); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
+                pdf.text(String(value), 20, y + 5);
+                y += 13;
+            });
+
+            // Advisory
+            pdf.setFontSize(8);
+            pdf.setTextColor(r, g, b);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('OFFICIAL DIRECTIVE:', 14, 122);
+            pdf.setFontSize(7);
+            pdf.setTextColor(200, 200, 200);
+            pdf.setFont('helvetica', 'normal');
+            const directive = isClean
+                ? 'This device is verified CLEAN and available for legitimate ownership transfer. Ensure 2FA Handover Code is used for physical delivery.'
+                : 'This device is flagged in the National Tracking System. Acquisition is illegal and will trigger a geolocation signal to local authorities.';
+            const lines = pdf.splitTextToSize(directive, W - 28);
+            pdf.text(lines, 14, 129);
+
+            // Verify URL
+            pdf.setDrawColor(r, g, b);
+            pdf.setLineWidth(0.3);
+            pdf.line(14, 148, W - 14, 148);
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139);
+            pdf.text('VERIFY ONLINE AT:', W / 2, 154, { align: 'center' });
+            pdf.setFontSize(8); pdf.setTextColor(r, g, b);
+            pdf.text(`https://pts-vexel.vercel.app/verify/${status.imei}`, W / 2, 160, { align: 'center' });
+
+            // Footer
+            pdf.setFontSize(6); pdf.setTextColor(71, 85, 105);
+            pdf.text('Cryptographically signed by PTS Central Authority. Any tampering voids this document.', W / 2, H - 14, { align: 'center' });
+            pdf.setTextColor(100, 116, 139);
+            pdf.text('© VEXEL INNOVATIONS 2026 — SENTINEL AI REGISTRY', W / 2, H - 10, { align: 'center' });
+
+            pdf.save(`PTS_VERIFICATION_${status.imei}.pdf`);
         } catch (err) {
             console.error('Print failed:', err);
-            alert('Digital signature verify failed. Protocol error (Rendering).');
+            alert('PDF generation failed. Please try again.');
         } finally {
             setIsPrinting(false);
         }

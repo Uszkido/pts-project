@@ -305,58 +305,98 @@ export default function Dashboard() {
 
     const printReceipt = async (sale: any) => {
         setIsGeneratingReceipt(sale.id);
-        const receiptData = {
-            id: sale.id.split('-')[0].toUpperCase(),
-            date: new Date(sale.transferDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-            vendor: profile?.companyName,
-            vendorEmail: profile?.email,
-            device: {
-                brand: sale.device.brand,
-                model: sale.device.model,
-                imei: sale.device.imei,
-            },
-            buyer: sale.buyer.email,
-            verificationUrl: `https://pts-registry.vercel.app/verify/${sale.device.imei}`
-        };
-        setReceiptData(receiptData);
+        try {
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth();
+            const H = pdf.internal.pageSize.getHeight();
 
-        // Small delay to allow React to render the invisible template
-        setTimeout(async () => {
-            if (receiptRef.current) {
-                try {
-                    // Pre-load images for html2canvas to ensure they capture
-                    const images = receiptRef.current.querySelectorAll('img');
-                    await Promise.all(Array.from(images).map(img => {
-                        if (img.complete) return Promise.resolve();
-                        return new Promise(resolve => {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                        });
-                    }));
+            // Background
+            pdf.setFillColor(2, 8, 23);
+            pdf.rect(0, 0, W, H, 'F');
 
-                    const canvas = await html2canvas(receiptRef.current, {
-                        scale: 3,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#ffffff',
-                        windowWidth: 794,
-                        windowHeight: 1123
-                    });
-                    const imgData = canvas.toDataURL('image/png', 1.0);
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            // Blue top/bottom bar (Vendor)
+            pdf.setFillColor(59, 130, 246);
+            pdf.rect(0, 0, W, 8, 'F');
+            pdf.rect(0, H - 8, W, 8, 'F');
+            pdf.rect(0, 0, 4, H, 'F');
 
-                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-                    pdf.save(`PTS_RECEIPT_${sale.device.imei}.pdf`);
-                } catch (err) {
-                    console.error('Failed to generate Receipt PDF:', err);
-                    alert('Digital signature verify failed. Protocol error (Rendering).');
-                }
-            }
+            // Header
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('POLICE TRACKING SYSTEM — OFFICIAL PROOF OF SALE', W / 2, 18, { align: 'center' });
+            pdf.setFontSize(22);
+            pdf.setTextColor(59, 130, 246);
+            pdf.text('SALES RECEIPT', W / 2, 30, { align: 'center' });
+
+            const saleId = sale.id.split('-')[0].toUpperCase();
+            pdf.setFontSize(7);
+            pdf.setTextColor(239, 68, 68);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`RECEIPT ID: ${saleId}   |   DATE: ${new Date(sale.transferDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, W / 2, 37, { align: 'center' });
+
+            pdf.setDrawColor(59, 130, 246);
+            pdf.setLineWidth(0.4);
+            pdf.line(14, 41, W - 14, 41);
+
+            // Vendor & Buyer info
+            pdf.setFontSize(8); pdf.setTextColor(59, 130, 246); pdf.setFont('helvetica', 'bold');
+            pdf.text('§1 VENDOR DETAILS', 14, 50);
+            pdf.setFillColor(15, 23, 42); pdf.setDrawColor(30, 41, 59);
+            pdf.roundedRect(14, 53, W - 28, 20, 2, 2, 'FD');
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
+            pdf.text('COMPANY NAME', 20, 60);
+            pdf.setFontSize(9); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
+            pdf.text(profile?.companyName || 'Registered Vendor', 20, 66);
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139);
+            pdf.text(profile?.email || '', W - 20, 63, { align: 'right' });
+
+            pdf.setFontSize(8); pdf.setTextColor(59, 130, 246); pdf.setFont('helvetica', 'bold');
+            pdf.text('§2 DEVICE DETAILS', 14, 82);
+            pdf.setFillColor(15, 23, 42); pdf.setDrawColor(30, 41, 59);
+            pdf.roundedRect(14, 85, W - 28, 36, 2, 2, 'FD');
+
+            const deviceFields: [string, string][] = [
+                ['BRAND & MODEL', `${sale.device.brand} ${sale.device.model}`],
+                ['IMEI NUMBER', sale.device.imei],
+                ['BUYER IDENTITY', sale.buyer.email],
+            ];
+            let y = 95;
+            deviceFields.forEach(([label, value]) => {
+                pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
+                pdf.text(label, 20, y);
+                pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
+                pdf.text(value, 20, y + 4);
+                y += 11;
+            });
+
+            // Verification URL
+            pdf.setDrawColor(59, 130, 246);
+            pdf.setLineWidth(0.3);
+            pdf.line(14, 128, W - 14, 128);
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139);
+            pdf.text('VERIFY OWNERSHIP AT:', W / 2, 135, { align: 'center' });
+            pdf.setFontSize(8); pdf.setTextColor(59, 130, 246);
+            pdf.text(`https://pts-vexel.vercel.app/verify/${sale.device.imei}`, W / 2, 141, { align: 'center' });
+
+            // Legal note
+            pdf.setFontSize(7); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'italic');
+            const legalText = 'This document serves as official proof of sale and device ownership transfer registered within the PTS National Ledger. The buyer is advised to complete 2FA Handover verification before taking possession.';
+            const legalLines = pdf.splitTextToSize(legalText, W - 28);
+            pdf.text(legalLines, 14, 152);
+
+            // Footer
+            pdf.setFontSize(6); pdf.setTextColor(71, 85, 105); pdf.setFont('helvetica', 'normal');
+            pdf.text('© VEXEL INNOVATIONS 2026 — PTS VENDOR NETWORK', W / 2, H - 10, { align: 'center' });
+
+            pdf.save(`PTS_RECEIPT_${sale.device.imei}.pdf`);
+        } catch (err) {
+            console.error('Failed to generate Receipt PDF:', err);
+            alert('Receipt generation failed. Please try again.');
+        } finally {
             setIsGeneratingReceipt(null);
             setReceiptData(null);
-        }, 1200);
+        }
     };
 
     const handleLogRepair = async (e: React.FormEvent) => {
