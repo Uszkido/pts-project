@@ -210,12 +210,16 @@ export default function Home() {
             <footer className="border-t border-slate-900 bg-slate-950 mt-auto py-12 flex flex-col items-center justify-center">
                 <div className="flex flex-col items-center">
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-4">Powered by</p>
-                    <img src="/logo_white.svg" alt="Vexel Innovations" className="w-10 h-10 mb-2" />
-                    <div className="text-center">
-                        <p className="text-3xl font-black tracking-widest text-white uppercase leading-none">VEXEL</p>
-                        <p className="text-[10px] font-bold tracking-[0.5em] text-slate-500 uppercase mt-0.5">INNOVATIONS</p>
+
+                    {/* Massive Logo, perfectly aligned with text */}
+                    <img src="/logo_white.svg" alt="Vexel Innovations" className="w-28 h-28 object-contain z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+
+                    <div className="text-center -mt-4 relative z-20">
+                        <p className="text-4xl font-black tracking-widest text-white uppercase leading-none">VEXEL</p>
+                        <p className="text-[11px] font-bold tracking-[0.55em] text-slate-500 uppercase mt-1">INNOVATIONS</p>
                     </div>
-                    <p className="text-[10px] text-slate-700 font-medium mt-6 tracking-wider">
+
+                    <p className="text-[10px] text-slate-700 font-medium mt-8 tracking-wider">
                         &copy; Vexel Innovations 2026. All rights reserved.
                     </p>
                 </div>
