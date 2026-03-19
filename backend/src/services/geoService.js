@@ -1,4 +1,4 @@
-const fetch = require('node-fetch') || global.fetch;
+// Using native Node 18+ fetch
 
 const GEOAPIFY_API_KEY = process.env.GEOAPIFY_API_KEY || 'a9f6de70b0b543199e90d853c0e2145e';
 

@@ -1,4 +1,4 @@
-const fetch = require('node-fetch') || global.fetch;
+// Using native Node 18+ fetch
 
 const MONO_SEC_KEY = process.env.MONO_SEC_KEY || '';
 
