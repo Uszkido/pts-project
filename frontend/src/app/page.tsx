@@ -207,18 +207,15 @@ export default function Home() {
             </main>
 
             {/* Footer */}
-            <footer className="border-t border-slate-800/60 bg-slate-950/80 mt-auto py-10 flex flex-col items-center justify-center">
-                <div className="flex flex-col items-center">
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-4">Powered by</p>
-                    {/* Vexel Innovations Logo Container - High Vis Scale */}
-                    <div className="text-white w-28 h-28 bg-white/[0.03] backdrop-blur-md rounded-[2rem] flex items-center justify-center border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.02)] overflow-hidden">
-                        <img src="/logo_white.svg" alt="Vexel Innovations" className="w-full h-full p-3 object-contain" />
+            <footer className="border-t border-slate-900 bg-slate-950 mt-auto py-16 flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.5em] opacity-60">Powered by</p>
+                    <img src="/logo_white.svg" alt="Vexel Innovations" className="w-10 h-10 my-1 grayscale brightness-200" />
+                    <div className="text-center">
+                        <p className="text-4xl font-black tracking-tighter text-white uppercase leading-none">VEXEL</p>
+                        <p className="text-[10px] font-bold tracking-[0.6em] text-slate-500 uppercase mt-1">INNOVATIONS</p>
                     </div>
-                    <div className="text-center -mt-2">
-                        <p className="text-3xl font-black tracking-widest text-white uppercase leading-none">Vexel</p>
-                        <p className="text-[10px] font-bold tracking-[0.5em] text-slate-500 uppercase mt-0.5">Innovations</p>
-                    </div>
-                    <p className="text-[10px] text-slate-600 font-medium mt-4 tracking-wider">
+                    <p className="text-[10px] text-slate-700 font-medium mt-10 tracking-widest opacity-40">
                         &copy; Vexel Innovations 2026. All rights reserved.
                     </p>
                 </div>

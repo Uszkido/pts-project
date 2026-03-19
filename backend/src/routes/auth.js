@@ -1,11 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-
-const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 const { sendWhatsAppMessage } = require('./whatsapp');

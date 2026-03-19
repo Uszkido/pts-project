@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 // Admin auth middleware

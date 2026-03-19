@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db');
 const jwt = require('jsonwebtoken');
-
-const prisma = new PrismaClient();
 const { calculateValuation } = require('../utils/valuation');
 const { analyzeReceiptForFraud, analyzeDeviceHardwareCondition, extractImeiFromImage, generateVendorTrustSummary } = require('../services/aiService');
 const { calculateDeviceTrustIndex } = require('../services/RiskEngine');

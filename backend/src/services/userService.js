@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const bcrypt = require('bcryptjs');
 const { verifyCAC, verifyNIN } = require('./monoService');
 const { verifyFacialIdentityLiveness } = require('./aiService');
