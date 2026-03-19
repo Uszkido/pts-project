@@ -128,7 +128,19 @@ export default function MapComponent({
             markerLayer.current.clearLayers();
             markers.forEach(marker => {
                 if (marker.lat && marker.lng) {
-                    const m = L.marker([marker.lat, marker.lng]);
+                    let m;
+                    if (marker.color) {
+                        const customIcon = L.divIcon({
+                            className: 'custom-colored-pin',
+                            html: `<div style="background-color: ${marker.color}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8]
+                        });
+                        m = L.marker([marker.lat, marker.lng], { icon: customIcon });
+                    } else {
+                        m = L.marker([marker.lat, marker.lng]);
+                    }
+
                     if (marker.label) {
                         m.bindPopup(`<b>${marker.label}</b>`);
                     }
