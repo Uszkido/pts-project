@@ -6,26 +6,26 @@ process.on('unhandledRejection', (reason) => console.error('🌊 UNHANDLED:', re
 
 const express = require('express');
 const cors = require('cors');
-// const { initTelegramOracle } = require('./services/telegramOracle'); // Moved below for better safety in production
-const authRoutes = require('./routes/auth');
-const deviceRoutes = require('./routes/devices');
-const policeRoutes = require('./routes/police');
-const consumerRoutes = require('./routes/consumers');
-const transferRoutes = require('./routes/transfers');
-const telecomRoutes = require('./routes/telecom');
-const incidentRoutes = require('./routes/incidents');
-const vendorRoutes = require('./routes/vendors');
-const registryRoutes = require('./routes/registry');
-const passportRoutes = require('./routes/passports');
-const uploadRoutes = require('./routes/upload');
-const adminRoutes = require('./routes/admin');
-const maintenanceRoutes = require('./routes/maintenance');
-const publicRoutes = require('./routes/public');
-const swapRoutes = require('./routes/swap');
-const guardianRoutes = require('./routes/guardian');
-const aiRoutes = require('./routes/ai');
-const whatsappRoutes = require('./routes/whatsapp');
-const telegramRoutes = require('./routes/telegram');
+// const { initTelegramOracle } = require('./src/services/telegramOracle'); // Moved below for better safety in production
+const authRoutes = require('./src/routes/auth');
+const deviceRoutes = require('./src/routes/devices');
+const policeRoutes = require('./src/routes/police');
+const consumerRoutes = require('./src/routes/consumers');
+const transferRoutes = require('./src/routes/transfers');
+const telecomRoutes = require('./src/routes/telecom');
+const incidentRoutes = require('./src/routes/incidents');
+const vendorRoutes = require('./src/routes/vendors');
+const registryRoutes = require('./src/routes/registry');
+const passportRoutes = require('./src/routes/passports');
+const uploadRoutes = require('./src/routes/upload');
+const adminRoutes = require('./src/routes/admin');
+const maintenanceRoutes = require('./src/routes/maintenance');
+const publicRoutes = require('./src/routes/public');
+const swapRoutes = require('./src/routes/swap');
+const guardianRoutes = require('./src/routes/guardian');
+const aiRoutes = require('./src/routes/ai');
+const whatsappRoutes = require('./src/routes/whatsapp');
+const telegramRoutes = require('./src/routes/telegram');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -55,7 +55,7 @@ app.use('/api/v1/telegram', telegramRoutes);
 
 app.get('/health', async (req, res) => {
     try {
-        const prisma = require('./db');
+        const prisma = require('./src/db');
         await prisma.$queryRaw`SELECT 1`;
         res.json({ status: 'ok', message: 'PTS Backend and Database are running' });
     } catch (err) {
@@ -75,7 +75,7 @@ app.get('/debug-env', (req, res) => {
 // On Vercel (Production), the Telegram Bot must be triggered by webhooks, not polling.
 if (process.env.NODE_ENV !== 'production') {
     try {
-        const { initTelegramOracle } = require('./services/telegramOracle');
+        const { initTelegramOracle } = require('./src/services/telegramOracle');
         initTelegramOracle();
     } catch (e) {
         console.warn('⚠️ Skipping Telegram Oracle startup:', e.message);
