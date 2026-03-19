@@ -646,7 +646,7 @@ export default function AdminDashboard() {
                 {/* TAB: AI Intelligence */}
                 {
                     activeTab === 'intelligence' && (
-                        <IntelligenceView />
+                        <IntelligenceView apiUrl={apiUrl} headers={headers} />
                     )
                 }
 
