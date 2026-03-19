@@ -67,10 +67,10 @@ app.get('/debug-env', (req, res) => {
     });
 });
 
-// Initialize AI and Telegram polling
-initTelegramOracle();
-
+// Initialize Telegram Oracle in local dev mode only.
+// In production (Vercel), the bot runs in webhook mode — no polling needed at startup.
 if (process.env.NODE_ENV !== 'production') {
+    initTelegramOracle();
     app.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
     });
