@@ -1,6 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
+const { verifyCAC, verifyNIN } = require('./monoService');
+const { verifyFacialIdentityLiveness } = require('./aiService');
 
 /**
  * Stage 1: Store registration data in PendingUser and generate OTP
@@ -13,10 +15,55 @@ const startRegistration = async (data) => {
         shopPhotoUrl, cacCertificateUrl, shopLatitude, shopLongitude
     } = data;
 
+    if (phoneNumber) {
+        try {
+            const numverifyResponse = await fetch(`http://apilayer.net/api/validate?access_key=43130b833cf0ab9e02ed0ce9c830eda1&number=${encodeURIComponent(phoneNumber)}&format=1`);
+            const numverifyData = await numverifyResponse.json();
+            if (numverifyData.valid === false) {
+                // If it's outright invalid according to Numverify, reject the registration
+                throw new Error('Invalid phone number format detected. Please verify your number.');
+            }
+        } catch (err) {
+            console.error('Numverify API error:', err.message);
+            if (err.message.includes('Invalid phone number')) {
+                throw err;
+            }
+            // Otherwise, continue registration even if the API fails
+        }
+    }
+
     // Check if user already exists in real table
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
         throw new Error('User already exists in the registry.');
+    }
+
+    // --- MONO API CAC REGISTRATION VERIFICATION ---
+    if (role === 'VENDOR' && businessRegNo) {
+        const cacCheck = await verifyCAC(businessRegNo);
+        if (!cacCheck.valid) {
+            throw new Error(`CAC Verification Failed: ${cacCheck.reason}`);
+        }
+
+        // Ensure the registry company name aligns with the official CAC database name if found
+        // data.companyName is what they entered. We can accept it, but note CAC validation passed
+    }
+
+    // --- MONO API NIN IDENTITY VERIFICATION ---
+    if (nationalId) {
+        const ninCheck = await verifyNIN(nationalId);
+        if (!ninCheck.valid) {
+            throw new Error(`Identity Verification Failed: ${ninCheck.reason}`);
+        }
+    }
+
+    // --- BIOMETRIC LIVENESS & IDENTITY CHECK ---
+    if (facialDataUrl) {
+        const faceCheck = await verifyFacialIdentityLiveness(facialDataUrl);
+        if (!faceCheck.isValid) {
+            // High security block: If AI detects a spoof (photo of a screen, mask, etc.)
+            throw new Error(`Biometric Security Rejected: ${faceCheck.reason}`);
+        }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

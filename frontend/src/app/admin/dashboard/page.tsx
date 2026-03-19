@@ -643,6 +643,13 @@ export default function AdminDashboard() {
                     )
                 }
 
+                {/* TAB: AI Intelligence */}
+                {
+                    activeTab === 'intelligence' && (
+                        <IntelligenceView />
+                    )
+                }
+
                 {/* TAB: Vendor Approvals */}
                 {
                     activeTab === 'vendors' && (

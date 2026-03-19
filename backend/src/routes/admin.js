@@ -47,17 +47,39 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
 
 router.get('/map-data', authenticateAdmin, async (req, res) => {
     try {
-        const [vendors, pings] = await Promise.all([
+        const [vendors, obsPings, trackingLogs] = await Promise.all([
             prisma.user.findMany({
                 where: { role: 'VENDOR', shopLatitude: { not: null } },
                 select: { id: true, companyName: true, shopLatitude: true, shopLongitude: true, vendorTier: true }
             }),
             prisma.observationReport.findMany({
-                take: 100,
                 orderBy: { createdAt: 'desc' },
                 include: { device: { select: { brand: true, model: true, imei: true, status: true } } }
+            }),
+            prisma.deviceTrackingLog.findMany({
+                orderBy: { createdAt: 'desc' }
             })
         ]);
+
+        const pings = [...obsPings];
+
+        // Deduplicate tracking logs per IMEI so we only show the latest known location
+        const seenImeis = new Set(obsPings.map(p => p.device?.imei));
+
+        for (const log of trackingLogs) {
+            if (!seenImeis.has(log.deviceImei)) {
+                // Parse "lat, lng" out of the string like "6.5244, 3.3792 (GPS Node)"
+                const match = log.location && log.location.match(/([+-]?[0-9]*\.?[0-9]+)\s*,\s*([+-]?[0-9]*\.?[0-9]+)/);
+                if (match) {
+                    pings.push({
+                        latitude: parseFloat(match[1]),
+                        longitude: parseFloat(match[2]),
+                        device: { brand: "Device", model: "Log", imei: log.deviceImei, status: "KNOWN" }
+                    });
+                    seenImeis.add(log.deviceImei);
+                }
+            }
+        }
 
         res.json({ vendors, pings });
     } catch (error) {

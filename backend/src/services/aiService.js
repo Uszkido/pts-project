@@ -260,6 +260,38 @@ const analyzeMaintenanceParts = async (partsData) => {
     };
 };
 
+/**
+ * AI Biometric Liveness & Identity Validator
+ * Analyzes the uploaded face capture to ensure it's a real human, not a photo of a photo, screenshot, or mask.
+ */
+const verifyFacialIdentityLiveness = async (facialImageUrl) => {
+    if (!genAI || !facialImageUrl) return { isValid: true, reason: "Bypassed (No AI or missing Image)" };
+
+    try {
+        const response = await fetch(facialImageUrl);
+        if (!response.ok) throw new Error("Could not fetch facial image");
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `You are a strict, top-tier Government Biometric AI Security System for the National Device Registry.
+        Analyze this facial capture.
+        1. Ensure there is exactly one human face visible and clearly identifiable.
+        2. Perform strict LIVENESS detection: Look for screen glare (indicating a photo of a phone), reflections, borders of a photo frame, moiré patterns (pixels from scanning a monitor), or a printed mask.
+        3. Ensure it is NOT a cartoon, drawing, or AI-generated avatar.
+        
+        Respond with ONLY a JSON object: 
+        { "isValid": boolean, "confidenceScore": 0-100, "reason": "Detailed string explaining why it passed or failed" }`;
+
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, prompt]);
+        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Biometric AI Error:", e);
+        return { isValid: false, reason: "Biometric AI System unavailable or image format unsupported." };
+    }
+};
+
 module.exports = {
     generateLocalizedOracleResponse,
     analyzeReceiptForFraud,
@@ -273,5 +305,6 @@ module.exports = {
     analyzeSmugglingRisk,
     analyzePhishingMessage,
     getLegalAdvice,
-    analyzeMaintenanceParts
+    analyzeMaintenanceParts,
+    verifyFacialIdentityLiveness
 };

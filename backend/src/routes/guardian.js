@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { reverseGeocode } = require('../services/geoService');
+const { sendPushNotification } = require('../services/pushService');
 
 // Guardian Mesh: Report a proximity detection
 router.post('/report', async (req, res) => {
@@ -28,19 +30,30 @@ router.post('/report', async (req, res) => {
         });
 
         // Update device's last known mesh signature
+        let newLocation = device.lastKnownLocation;
+        if (latitude && longitude) {
+            newLocation = await reverseGeocode(latitude, longitude);
+        }
+
         await prisma.device.update({
             where: { id: device.id },
             data: {
                 lastBluetoothSig: signalType === 'BT' ? observerId : device.lastBluetoothSig,
                 lastWifiSig: signalType === 'WIFI' ? observerId : device.lastWifiSig,
                 lastObservationDate: new Date(),
-                lastKnownLocation: latitude && longitude ? `${latitude}, ${longitude}` : device.lastKnownLocation
+                lastKnownLocation: newLocation
             }
         });
 
         // If device is STOLEN or LOST, trigger an alert (logic can be expanded)
         if (['STOLEN', 'LOST'].includes(device.status)) {
-            // Potential for push notifications or live socket updates
+            // Send instant PUSH notification directly to owner's phone app
+            await sendPushNotification(
+                device.registeredOwnerId,
+                `🚨 GUARDIAN DETECTED: ${device.brand} ${device.model}`,
+                `A nearby Sentinel Node just verified your stolen device at ${newLocation}. Do not intervene yourself. Check live map now!`,
+                { deviceId: device.id, route: '/app/map', alarm: true, type: 'MESH_PULSE' }
+            );
             console.log(`[GUARDIAN ALERT] Stolen device ${deviceImei} detected by node ${observerId}`);
         }
 

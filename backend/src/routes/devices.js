@@ -13,6 +13,8 @@ const {
     evaluateBloodhoundState,
     predictSmugglingTrajectory
 } = require('../services/DeepSecurityAI');
+const { reverseGeocode } = require('../services/geoService');
+const { sendPushNotification } = require('../services/pushService');
 const JWT_SECRET = 'supersecret_pts_dev_key';
 
 // Middleware to verify JWT
@@ -304,10 +306,18 @@ router.post('/:imei/track', async (req, res) => {
         const device = await prisma.device.findUnique({ where: { imei } });
         if (!device) return res.status(404).json({ error: 'Device not found' });
 
+        const { batteryLevel = 50, speedKmH = 0, isMovingFast = false, latitude, longitude } = req.body;
+
+        let finalLocation = location;
+        if (latitude && longitude) {
+            const readableAddress = await reverseGeocode(latitude, longitude);
+            finalLocation = `${readableAddress} (Raw: ${location})`;
+        }
+
         const updatedDevice = await prisma.device.update({
             where: { imei },
             data: {
-                lastKnownLocation: location,
+                lastKnownLocation: finalLocation,
                 lastKnownIp: ip || req.ip,
                 lastLocationUpdate: new Date()
             }
@@ -315,7 +325,7 @@ router.post('/:imei/track', async (req, res) => {
 
         // --- DIGITAL BLOODHOUND (BATTERY / TRACKING STATE AI) ---
         // Assume battery is sent in body, default to 50% if not
-        const { batteryLevel = 50, speedKmH = 0, isMovingFast = false, latitude, longitude } = req.body;
+
 
         const bloodhoundState = evaluateBloodhoundState(updatedDevice.status, batteryLevel, isMovingFast || speedKmH > 20);
 
@@ -336,6 +346,14 @@ router.post('/:imei/track', async (req, res) => {
                     }
                 });
             }
+
+            // --- 🚨 CRITICAL PUSH NOTIFICATION ---
+            await sendPushNotification(
+                updatedDevice.registeredOwnerId,
+                `🚨 STOLEN DEVICE DETECTED: ${updatedDevice.brand} ${updatedDevice.model}`,
+                `Your stolen device was just tracked near ${finalLocation}. A Forensic report has been updated. Do not confront suspects yourself.`,
+                { deviceId: updatedDevice.id, route: '/app/map', alarm: true }
+            );
         }
 
         res.json({
@@ -394,6 +412,14 @@ router.post('/transfer', authenticateToken, async (req, res) => {
         await prisma.certificate.create({
             data: { deviceId, ownerId: buyer.id, qrHash: ddocHash }
         });
+
+        // Notify Buyer of new registered ownership via Push!
+        await sendPushNotification(
+            buyer.id,
+            `🔗 REGISTRY UPDATE: Digital Transfer Complete`,
+            `The ${device.brand} ${device.model} has been safely transferred to your personal registry in the PTS Database. It is fully covered.`,
+            { route: '/app/registry', refresh: true }
+        );
 
         res.json({ message: '🛡️ Safe-Hand Transfer Successful. Ownership is now legally moved.', transfer });
     } catch (error) {
