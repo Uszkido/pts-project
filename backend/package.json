@@ -7,8 +7,8 @@
   },
   "scripts": {
     "vercel-build": "npx prisma generate && npx prisma migrate deploy",
-    "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
+    "dev": "nodemon index.js",
+    "start": "node index.js",
     "postinstall": "npx prisma generate",
     "build": "npx prisma generate && npx prisma migrate deploy"
   },
