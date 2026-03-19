@@ -212,9 +212,9 @@ export default function Home() {
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-4">Powered by</p>
 
                     {/* Massive Logo, perfectly aligned with text */}
-                    <img src="/logo_white.svg" alt="Vexel Innovations" className="w-28 h-28 object-contain z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+                    <img src="/logo_white.svg" alt="Vexel Innovations" className="w-32 h-auto object-contain z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
 
-                    <div className="text-center -mt-4 relative z-20">
+                    <div className="text-center -mt-10 relative z-20">
                         <p className="text-4xl font-black tracking-widest text-white uppercase leading-none">VEXEL</p>
                         <p className="text-[11px] font-bold tracking-[0.55em] text-slate-500 uppercase mt-1">INNOVATIONS</p>
                     </div>
