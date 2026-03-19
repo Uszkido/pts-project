@@ -1,0 +1,28 @@
+﻿≡ƒÜÇ Starting PTS Golden Path E2E Test on API: https://pts-backend-api.vercel.app/api/v1
+--------------------------------------------------
+[1] Registering test user: e2e_tester_d2869df6@pts.local
+    Response: 201 - {"message":"Registration initiated. Please confirm the OTP sent to your Email/WhatsApp/Telegram to complete your account setup.","requiresOtp":true}
+[2] Extracting OTP from Database...
+node : Γ¥î E2E EXACT 
+EXECUTION FAILED: Error: 
+User not found in database 
+after registration!
+At line:1 char:1
++ node -r dotenv/config 
+test_golden_path.mjs 2>&1 | 
+Out-File -Encoding  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (Γ¥î E2E  
+   EXACT E...r registratio   
+ n!:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+    at runE2ETest (file:///C:
+/Users/COMPUTER%2013/.gemini/
+antigravity/scratch/pts/backe
+nd/test_golden_path.mjs:37:30
+)

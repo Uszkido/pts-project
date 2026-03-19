@@ -1,0 +1,20 @@
+﻿≡ƒÜÇ Starting PTS Golden Path E2E Test on API: https://pts-backend-api.vercel.app/api/v1
+--------------------------------------------------
+[1] Registering test user: e2e_tester_aa087597@pts.local
+    Response: 201 - {"message":"Registration initiated. Please confirm the OTP sent to your Email/WhatsApp/Telegram to complete your account setup.","requiresOtp":true}
+[2] Extracting OTP from Database...
+    Extracted OTP: 832746
+    Response: 200 - {"message":"Identity confirmed and account registered successfully! You can now log in.","userId":"3f346db2-d81c-4188-bf64-d10dae659a5e"}
+[4] Logging in...
+    Login SUCCESS. Token acquired.
+[5] Registering new device (IMEI: 351514185813596)...
+    Response: 201 - Device ID: 912f547e-6a8b-4640-ba69-600529015bb2
+[6] Public Verification Scan of IMEI...
+    Scan Result: Valid = true. Device Status: CLEAN
+[7] Reporting device as STOLEN...
+    Response: 200 - Status now: STOLEN
+[8] Second Public Scan (Checking Risk Engine)...
+    Final Risk Score: 0/100
+    Listed Status: STOLEN
+--------------------------------------------------
+Γ£à ALL GOLDEN PATH TESTS PASSED SUCCESSFULLY! Γ£à

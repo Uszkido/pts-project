@@ -57,8 +57,10 @@ export default function MapComponent({
             });
 
             // Add Base Layers
-            const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+            const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
             });
 
             const googleStreets = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -85,17 +87,17 @@ export default function MapComponent({
                 attribution: '&copy; Google Maps'
             });
 
-            // Add the default layer
-            googleStreets.addTo(mapInstance.current);
+            // Add the default layer - Dark Mode for PTS Surveillance Aesthetic
+            cartoDark.addTo(mapInstance.current);
 
             // Add layer control if interactive
             if (interactive) {
                 const baseMaps = {
-                    "Google Streets": googleStreets,
-                    "Google Satellite": googleSat,
+                    "Surveillance Dark View": cartoDark,
                     "Google Hybrid": googleHybrid,
-                    "Google Terrain": googleTerrain,
-                    "OpenStreetMap": osm
+                    "Google Satellite": googleSat,
+                    "Google Streets": googleStreets,
+                    "Google Terrain": googleTerrain
                 };
                 L.control.layers(baseMaps).addTo(mapInstance.current);
             }
@@ -130,11 +132,19 @@ export default function MapComponent({
                 if (marker.lat && marker.lng) {
                     let m;
                     if (marker.color) {
+                        const isAlert = marker.color === "#ef4444";
+                        const pulseHtml = isAlert
+                            ? `<div class="absolute inset-0 rounded-full animate-ping" style="background-color: ${marker.color}; opacity: 0.75; transform: scale(2);"></div>`
+                            : '';
+
                         const customIcon = L.divIcon({
-                            className: 'custom-colored-pin',
-                            html: `<div style="background-color: ${marker.color}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);"></div>`,
-                            iconSize: [16, 16],
-                            iconAnchor: [8, 8]
+                            className: 'custom-colored-pin relative',
+                            html: `<div class="relative flex items-center justify-center w-full h-full">
+                                     ${pulseHtml}
+                                     <div class="relative z-10" style="background-color: ${marker.color}; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #1e293b; box-shadow: 0 0 10px ${marker.color};"></div>
+                                   </div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
                         });
                         m = L.marker([marker.lat, marker.lng], { icon: customIcon });
                     } else {

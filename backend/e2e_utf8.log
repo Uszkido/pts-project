@@ -1,0 +1,5 @@
+﻿≡ƒÜÇ Starting PTS Golden Path E2E Test on API: https://pts-backend-api.vercel.app/api/v1
+--------------------------------------------------
+[1] Registering test user: e2e_tester_aa108a63@pts.local
+    Response: 201 - {"message":"Registration initiated. Please confirm the OTP sent to your Email/WhatsApp/Telegram to complete your account setup.","requiresOtp":true}
+[2] Extracting OTP from Database...
