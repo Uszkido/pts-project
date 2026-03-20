@@ -1,16 +1,51 @@
 {
-    "name": "Phone Tracking System",
-    "short_name": "PTS Registry",
-    "description": "National Digital Device Registry & Tracking System",
-    "start_url": "/",
+    "name": "PTS — Police Tracking System",
+    "short_name": "PTS Scanner",
+    "description": "Nigeria's National Device Registry. Scan IMEIs, verify ownership, and report stolen devices — even offline.",
+    "start_url": "/vendor/scanner",
     "display": "standalone",
-    "background_color": "#020617",
-    "theme_color": "#ef4444",
+    "orientation": "portrait",
+    "background_color": "#020817",
+    "theme_color": "#10b981",
+    "categories": [
+        "security",
+        "utilities",
+        "government"
+    ],
+    "lang": "en-NG",
     "icons": [
         {
             "src": "/icon.svg",
             "sizes": "512x512",
-            "type": "image/svg+xml"
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
         }
-    ]
+    ],
+    "shortcuts": [
+        {
+            "name": "Scan IMEI",
+            "short_name": "Scan",
+            "description": "Quickly scan a device IMEI",
+            "url": "/vendor/scanner",
+            "icons": [
+                {
+                    "src": "/icon.svg",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Verify Device",
+            "short_name": "Verify",
+            "description": "Public device verification",
+            "url": "/verify",
+            "icons": [
+                {
+                    "src": "/icon.svg",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ],
+    "prefer_related_applications": false
 }

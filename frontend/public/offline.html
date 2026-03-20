@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTS — Offline</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+            background: #020817;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 2px solid rgba(245, 158, 11, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin: 0 auto 24px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.6
+            }
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #64748b;
+            font-size: 15px;
+            line-height: 1.7;
+            max-width: 340px;
+            margin: 0 auto 24px;
+        }
+
+        .badge {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 100px;
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #f59e0b;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 32px;
+            display: inline-block;
+        }
+
+        .tip {
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            padding: 20px 24px;
+            max-width: 380px;
+            margin: 0 auto;
+            text-align: left;
+        }
+
+        .tip h3 {
+            font-size: 13px;
+            color: #10b981;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
+        }
+
+        .tip ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tip li {
+            font-size: 13px;
+            color: #94a3b8;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .tip li::before {
+            content: '→';
+            color: #10b981;
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+
+        .retry {
+            background: #f59e0b;
+            color: black;
+            font-weight: 800;
+            font-size: 14px;
+            padding: 14px 32px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 24px;
+        }
+
+        .retry:hover {
+            background: #fbbf24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="badge">📡 No Internet Connection</div>
+    <div class="icon">📵</div>
+    <h1>You're Offline</h1>
+    <p>The PTS Vendor Scanner still works offline using your locally cached blacklist. Navigate to the scanner to check
+        IMEIs without data.</p>
+
+    <div class="tip">
+        <h3>✅ Works Offline</h3>
+        <ul>
+            <li>Check any IMEI against your cached stolen device blacklist</li>
+            <li>View previous scan results</li>
+            <li>Queue suspicious reports — they'll sync when connected</li>
+        </ul>
+    </div>
+
+    <button class="retry" onclick="window.location.href='/vendor/scanner'">
+        🔍 Open Offline Scanner
+    </button>
+    <button class="retry" style="background:#1e293b;color:#94a3b8;margin-left:8px;margin-top:0"
+        onclick="window.location.reload()">
+        ↺ Retry Connection
+    </button>
+</body>
+
+</html>

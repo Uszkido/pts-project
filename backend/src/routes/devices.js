@@ -486,4 +486,36 @@ router.get('/vendor-trust/:vendorId', async (req, res) => {
     }
 });
 
+// ============================================================
+// PUBLIC BLACKLIST — No auth required (for offline SW sync)
+// Returns only IMEIs + status so vendors can cache locally
+// ============================================================
+router.get('/public/blacklist', async (req, res) => {
+    try {
+        const flaggedDevices = await prisma.device.findMany({
+            where: {
+                status: { in: ['STOLEN', 'FLAGGED', 'BLACKLISTED'] }
+            },
+            select: {
+                imei: true,
+                status: true,
+                brand: true,
+                model: true,
+            },
+            take: 50000, // cap at 50k for payload size
+        });
+
+        res.set('Cache-Control', 'public, max-age=300'); // 5 min CDN cache
+        res.json({
+            blacklist: flaggedDevices,
+            count: flaggedDevices.length,
+            generatedAt: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error('Public blacklist error:', error);
+        res.status(500).json({ error: 'Failed to fetch blacklist' });
+    }
+});
+
 module.exports = router;
+
