@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { generateCapSign } from '@/lib/capsign';
 import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
 
@@ -280,20 +281,25 @@ export default function PoliceDashboard() {
             pdf.setDrawColor(30, 41, 59);
             pdf.roundedRect(14, 59, W - 28, 44, 2, 2, 'FD');
 
+            const sig = await generateCapSign({ imei: d.asset.imei, timestamp: Date.now(), type: 'DOSSIER' });
+
             const assetFields = [
                 ['DEVICE', `${d.asset.brand} ${d.asset.model}`],
                 ['IMEI', d.asset.imei],
                 ['SERIAL', d.asset.serial || 'N/A'],
                 ['STATUS', d.asset.status],
                 ['RISK SCORE', `${d.asset.riskScore}/100`],
+                ['CAP-SIGNATURE', sig],
             ];
             let col1Y = 68;
             assetFields.forEach(([label, value]) => {
                 pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
                 pdf.text(label, 20, col1Y);
-                pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
-                pdf.text(String(value), 20, col1Y + 4);
-                col1Y += 11;
+                pdf.setFontSize(label === 'CAP-SIGNATURE' ? 6 : 8); 
+                pdf.setTextColor(label === 'CAP-SIGNATURE' ? 220 : 255, label === 'CAP-SIGNATURE' ? 38 : 255, label === 'CAP-SIGNATURE' ? 38 : 255); 
+                pdf.setFont('helvetica', label === 'CAP-SIGNATURE' ? 'bold' : 'normal');
+                pdf.text(String(value), 20, col1Y + 3.5);
+                col1Y += label === 'CAP-SIGNATURE' ? 9 : 10;
             });
 
             // Ownership

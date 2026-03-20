@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { generateCapSign } from '@/lib/capsign';
 
 type VendorProfile = {
     id: string;
@@ -356,18 +357,23 @@ export default function Dashboard() {
             pdf.setFillColor(15, 23, 42); pdf.setDrawColor(30, 41, 59);
             pdf.roundedRect(14, 85, W - 28, 36, 2, 2, 'FD');
 
+            const sig = await generateCapSign({ imei: sale.device.imei, holder: sale.buyer.email, timestamp: new Date(sale.transferDate).getTime(), type: 'RECEIPT' });
+
             const deviceFields: [string, string][] = [
                 ['BRAND & MODEL', `${sale.device.brand} ${sale.device.model}`],
                 ['IMEI NUMBER', sale.device.imei],
                 ['BUYER IDENTITY', sale.buyer.email],
+                ['CAP-SIGNATURE', sig],
             ];
             let y = 95;
             deviceFields.forEach(([label, value]) => {
                 pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
                 pdf.text(label, 20, y);
-                pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(label === 'CAP-SIGNATURE' ? 6 : 8);
+                pdf.setTextColor(label === 'CAP-SIGNATURE' ? 59 : 255, label === 'CAP-SIGNATURE' ? 130 : 255, label === 'CAP-SIGNATURE' ? 246 : 255);
+                pdf.setFont('helvetica', label === 'CAP-SIGNATURE' ? 'bold' : 'normal');
                 pdf.text(value, 20, y + 4);
-                y += 11;
+                y += label === 'CAP-SIGNATURE' ? 9 : 11;
             });
 
             // Verification URL

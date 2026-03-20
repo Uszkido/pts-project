@@ -14,6 +14,7 @@ import {
     Power,
     Shield
 } from 'lucide-react';
+import { generateCapSign } from '@/lib/capsign';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -513,12 +514,15 @@ export default function ConsumerDashboard() {
             pdf.setLineWidth(0.5);
             pdf.roundedRect(20, 96, W - 40, 52, 3, 3, 'FD');
 
+            const sig = await generateCapSign({ imei: device.imei, holder: user?.email, timestamp: activeCert.createdAt, type: 'CERTIFICATE' });
+
             const fields = [
                 ['DEVICE', `${device.brand} ${device.model}`],
                 ['IMEI NUMBER', device.imei],
                 ['SERIAL NUMBER', device.serialNumber || 'N/A'],
                 ['REGISTRATION DATE', issueDate],
                 ['CERTIFICATE HASH', activeCert.qrHash?.substring(0, 32) + '...'],
+                ['NATIONAL SIGNATURE', sig],
                 ['STATUS', 'ACTIVE — CLEAN REGISTRY'],
             ];
             let y = 108;
@@ -527,9 +531,9 @@ export default function ConsumerDashboard() {
                 pdf.setTextColor(100, 116, 139);
                 pdf.setFont('helvetica', 'bold');
                 pdf.text(label, 28, y);
-                pdf.setFontSize(9);
-                pdf.setTextColor(255, 255, 255);
-                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(label === 'NATIONAL SIGNATURE' ? 7 : 9);
+                pdf.setTextColor(label === 'NATIONAL SIGNATURE' ? 16 : 255, label === 'NATIONAL SIGNATURE' ? 185 : 255, label === 'NATIONAL SIGNATURE' ? 129 : 255);
+                pdf.setFont('helvetica', label === 'NATIONAL SIGNATURE' ? 'bold' : 'normal');
                 pdf.text(String(value), 28, y + 5);
                 y += 14;
             });
