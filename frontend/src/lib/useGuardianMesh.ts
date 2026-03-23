@@ -82,7 +82,7 @@ export function useGuardianMesh(enabled: boolean = true) {
             latitude: 6.5244,            // Requires `@capacitor/geolocation` (Simulated Lagos)
             longitude: 3.3792,
             signalType: 'BT',
-            signalStrength: target.rssi.toString(),
+            signalStrength: (target.rssi || 0).toString(),
             observerId: 'POLICE-HQ-NODE-' + Math.floor(Math.random() * 1000)
         };
 
