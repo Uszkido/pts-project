@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import { generateCapSign } from '@/lib/capsign';
 import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
+import MeshScanner from '@/components/MeshScanner';
 
 export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -44,6 +45,9 @@ export default function PoliceDashboard() {
 
     // Live Tracking
     const [liveTrackingImei, setLiveTrackingImei] = useState<string | null>(null);
+
+    // Guardian Mesh Scanner
+    const [isMeshScannerOpen, setIsMeshScannerOpen] = useState(false);
 
     const handleBrick = async (imei: string, reason: string) => {
         if (!window.confirm(`⚠️ WARNING: You are about to BRICK this device (${imei}) permanentely. This will disable all hardware functionality via the National Kill-Switch API. Proceed?`)) return;
@@ -295,8 +299,8 @@ export default function PoliceDashboard() {
             assetFields.forEach(([label, value]) => {
                 pdf.setFontSize(6); pdf.setTextColor(100, 116, 139); pdf.setFont('helvetica', 'bold');
                 pdf.text(label, 20, col1Y);
-                pdf.setFontSize(label === 'CAP-SIGNATURE' ? 6 : 8); 
-                pdf.setTextColor(label === 'CAP-SIGNATURE' ? 220 : 255, label === 'CAP-SIGNATURE' ? 38 : 255, label === 'CAP-SIGNATURE' ? 38 : 255); 
+                pdf.setFontSize(label === 'CAP-SIGNATURE' ? 6 : 8);
+                pdf.setTextColor(label === 'CAP-SIGNATURE' ? 220 : 255, label === 'CAP-SIGNATURE' ? 38 : 255, label === 'CAP-SIGNATURE' ? 38 : 255);
                 pdf.setFont('helvetica', label === 'CAP-SIGNATURE' ? 'bold' : 'normal');
                 pdf.text(String(value), 20, col1Y + 3.5);
                 col1Y += label === 'CAP-SIGNATURE' ? 9 : 10;
@@ -451,6 +455,12 @@ export default function PoliceDashboard() {
                     <div>
                         <h1 className="text-3xl font-bold text-white tracking-tight">Command Center</h1>
                         <p className="text-slate-400 text-sm mt-1">National Device Registry and Threat Monitoring</p>
+                    </div>
+                    <div className="ml-auto hidden sm:block">
+                        <button onClick={() => setIsMeshScannerOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] border border-emerald-400/50 text-white text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl transition-all flex items-center gap-2">
+                            <svg className="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                            Guardian Radar <span className="text-[8px] bg-slate-950/30 px-1.5 py-0.5 rounded ml-1">BETA</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1279,6 +1289,14 @@ export default function PoliceDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Guardian Mesh Scanner Modal */}
+            {isMeshScannerOpen && (
+                <MeshScanner
+                    observerId="POL-CMD-HQ"
+                    onClose={() => setIsMeshScannerOpen(false)}
+                />
+            )}
         </div>
     );
 }

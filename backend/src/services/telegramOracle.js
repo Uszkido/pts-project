@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const prisma = require('../db');
-const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary, analyzeSmugglingRisk } = require('./aiService');
+const { generateLocalizedOracleResponse, transcribeAudio, generateCrimeInsights, generateAffidavitSummary, extractImeiFromImage, generateVendorTrustSummary, analyzeSmugglingRisk, getLegalAdvice, analyzePhishingMessage, analyzeMaintenanceParts } = require('./aiService');
 const { detectClonedImeiAnomaly } = require('./fraudEngine');
 const { getSession, updateSession, clearSession } = require('./botState');
 const bcrypt = require('bcryptjs');
@@ -12,11 +12,13 @@ let telegramBotInstance = null;
 const handleTelegramUpdate = async (update) => {
     console.log('🔄 handleTelegramUpdate called with:', JSON.stringify(update));
     if (!telegramBotInstance) {
-        console.error('❌ telegramBotInstance is NULL in handleTelegramUpdate!');
-        // Try to re-init if null
+        console.log('ℹ️ telegramBotInstance is NULL - initializing for this request...');
         initTelegramOracle();
     }
-    if (!telegramBotInstance) return;
+    if (!telegramBotInstance) {
+        console.error('❌ Failed to initialize telegramBotInstance. Check TELEGRAM_BOT_TOKEN env var.');
+        return;
+    }
 
     console.log('🤖 Passing update to telegramBotInstance.processUpdate');
     await telegramBotInstance.processUpdate(update);
@@ -641,6 +643,7 @@ const initTelegramOracle = () => {
     bot.on('callback_query', (query) => {
         const chatId = query.message.chat.id;
         const data = query.data;
+        const session = getSession('TELEGRAM', chatId); // ✅ FIX: session was undefined in this scope
 
         if (data.startsWith('REG_ROLE_')) {
             const role = data.replace('REG_ROLE_', '');
@@ -651,7 +654,7 @@ const initTelegramOracle = () => {
 
         if (data.startsWith('LANG_')) {
             const lang = data.replace('LANG_', '');
-            updateSession('TELEGRAM', chatId, session.state, { language: lang });
+            updateSession('TELEGRAM', chatId, session.state, { language: lang }); // ✅ Now session is defined
             bot.answerCallbackQuery(query.id);
             bot.sendMessage(chatId, `Oracle language set to: *${lang}* 🇳🇬`, { parse_mode: 'Markdown' });
         }

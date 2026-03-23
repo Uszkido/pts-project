@@ -6,7 +6,25 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:dev": "electron electron/main.js",
+    "electron:build": "electron-builder build --win --publish never"
+  },
+  "build": {
+    "appId": "com.vexel.pts",
+    "productName": "PTS Command",
+    "directories": {
+      "output": "release-windows"
+    },
+    "files": [
+      "out/**/*",
+      "electron/main.js",
+      "public/**",
+      "!node_modules"
+    ],
+    "win": {
+      "target": "nsis"
+    }
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
@@ -28,6 +46,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

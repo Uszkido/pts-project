@@ -7,6 +7,14 @@ if (process.env.GEMINI_API_KEY) {
     console.warn("AI WARNING: GEMINI_API_KEY is not defined in .env. Falling back to plain text responses.");
 }
 
+const generateGeminiText = async (prompt) => {
+    if (!genAI) throw new Error("No AI available. Check GEMINI_API_KEY.");
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(prompt);
+    if (result && result.response) return result.response.text();
+    throw new Error("Invalid Gemini response structure");
+};
+
 /**
  * Generates a localized response using Google's Gemini AI.
  * Translates the structured PTS device data into conversational Nigerian English/Pidgin.
@@ -42,16 +50,7 @@ Your response MUST:
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
     try {
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 250 }
-        });
-
-        if (result && result.response) {
-            return result.response.text();
-        } else {
-            throw new Error("Invalid AI response structure");
-        }
+        return await generateGeminiText(prompt);
     } catch (error) {
         console.error("AI Generation Error:", error.message || error);
         return `[Sentinel Shield Active] The ${deviceBrand} ${deviceModel} is currently marked as ${deviceStatus}. Safety Risk Score: ${riskScore}%. ${deviceStatus === 'CLEAN' ? 'Safe to buy.' : 'DANGER: Buying this is a crime.'}`;
@@ -100,12 +99,10 @@ const analyzeDeviceHardwareCondition = async (photoUrls, brand, model) => {
 const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") => {
     if (!genAI) return { subject: "OTP", body: `Your OTP is ${otp}` };
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Write a premium, friendly email body for ${fullName}. Action: ${mode}. OTP: ${otp}. Mix in Nigerian English/Hausa. Keep under 60 words. 
         Respond with ONLY a JSON object: { "subject": "String", "body": "String" }`;
-
-        const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } });
-        return JSON.parse(result.response.text());
+        const resText = await generateGeminiText(prompt);
+        return JSON.parse(resText.replace(/```json/gi, '').replace(/```/g, '').trim());
     } catch (e) { return { subject: "Security OTP", body: `Hello ${fullName}, your OTP is ${otp}.` }; }
 };
 
@@ -127,9 +124,8 @@ const transcribeAudio = async (audioBuffer, mimeType) => {
 const generateCrimeInsights = async (reports) => {
     if (!genAI || !reports?.length) return "Hotspot data is being updated.";
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`Analyze these reports and summarize hotspots/methods: ${JSON.stringify(reports)}. Be brief.`);
-        return result.response.text();
+        const prompt = `Analyze these reports and summarize hotspots/methods: ${JSON.stringify(reports)}. Be brief.`;
+        return await generateGeminiText(prompt);
     } catch (e) { return "Stay vigilant in high-traffic zones."; }
 };
 
@@ -139,9 +135,8 @@ const generateCrimeInsights = async (reports) => {
 const generateAffidavitSummary = async (reportData) => {
     if (!genAI) return "Incident reported to National Registry.";
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`Generate a formal, authoritative affidavit summary for: ${JSON.stringify(reportData)}`);
-        return result.response.text();
+        const prompt = `Generate a formal, authoritative affidavit summary for: ${JSON.stringify(reportData)}`;
+        return await generateGeminiText(prompt);
     } catch (e) { return "Digital record created in PTS Registry."; }
 }
 
@@ -166,9 +161,8 @@ const extractImeiFromImage = async (imageUrl) => {
 const generateVendorTrustSummary = async (vendorData) => {
     if (!genAI) return "Verified Sentinel Merchant.";
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`Summarize trust for vendor: ${JSON.stringify(vendorData)}. Professional/Nigerian tone.`);
-        return result.response.text();
+        const prompt = `Summarize trust for vendor: ${JSON.stringify(vendorData)}. Professional/Nigerian tone.`;
+        return await generateGeminiText(prompt);
     } catch (e) { return "Registry Verified Dealer."; }
 };
 
@@ -180,15 +174,13 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
     if (!genAI || status !== 'STOLEN') return { isSmuggled: false, warning: null };
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Analyze this stolen device movement in Nigeria. 
         Last Scan City: ${lastLocation}
         Current Scan City: ${currentLocation}
         Does this move suggest professional smuggling or a syndicate (crossing state lines rapidly while stolen)?
         Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Professional alert message" }`;
-
-        const result = await model.generateContent(prompt);
-        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const rawText = await generateGeminiText(prompt);
+        const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
     } catch (e) { return { isSmuggled: false, warning: null }; }
 };
@@ -200,14 +192,12 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
 const analyzePhishingMessage = async (messageText) => {
     if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe" };
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Analyze this message sent to a Nigerian mobile user. 
         Detect phishing, scam, "fake alert", or social engineering patterns (e.g. impersonating PTS, Banks, or NPF).
         Message: "${messageText}"
         Respond with ONLY JSON: { "isScam": boolean, "confidence": 0-100, "scamType": "string", "warning": "string", "action": "string" }`;
-
-        const result = await model.generateContent(prompt);
-        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const rawText = await generateGeminiText(prompt);
+        const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
     } catch (e) { return { isScam: false, confidence: 0, warning: "System busy." }; }
 };
@@ -219,16 +209,13 @@ const analyzePhishingMessage = async (messageText) => {
 const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
     if (!genAI || !userQuery) return "Legal advisor is currently offline.";
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `You are the "Sentinel Legal AI". You are an expert on Nigerian Law, specifically the Cybercrime Act 2015 and the Criminal Code (Section 427 - Receiving Stolen Property).
         A user is asking: "${userQuery}".
         Provide a concise legal guidance in ${language}. 
         Warn them clearly about the penalties for buying stolen phones (up to 14 years imprisonment).
         Always advise them to cooperate with the Nigerian Police Force (NPF) and use the PTS Registry for safety.
         Keep it under 150 words.`;
-
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        return await generateGeminiText(prompt);
     } catch (e) { return "Please consult a qualified legal practitioner or visit the nearest NPF station."; }
 };
 

@@ -1,4 +1,4 @@
-package com.vexel.pts;
+package com.vexel.pts.passport;
 
 import com.getcapacitor.BridgeActivity;
 

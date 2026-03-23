@@ -1,12 +1,39 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { APP_CONFIG } from '@/lib/pts.config';
 
 export default function Home() {
+    const router = useRouter();
     const [imei, setImei] = useState('');
     const [result, setResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [systemStatus, setSystemStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+    useEffect(() => {
+        if (APP_CONFIG.TYPE === 'MERCHANT') {
+            router.replace('/vendor/login');
+        } else if (APP_CONFIG.TYPE === 'SENTINEL') {
+            router.replace('/police/login');
+        } else if (APP_CONFIG.TYPE === 'COMMAND') {
+            router.replace('/admin/login');
+        } else if (APP_CONFIG.TYPE === 'CONSUMER') {
+            router.replace('/consumer/login');
+        }
+    }, [router]);
+
+    if (APP_CONFIG.TYPE !== 'LANDING') {
+        return (
+            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-12 text-center">
+                <div className="w-20 h-20 bg-blue-600 rounded-3xl animate-pulse mb-8 flex items-center justify-center shadow-2xl shadow-blue-500/20">
+                    <span className="text-3xl font-black italic">PTS</span>
+                </div>
+                <h1 className="text-2xl font-black uppercase tracking-widest mb-2">PTS {APP_CONFIG.TYPE}</h1>
+                <p className="text-slate-500 font-mono text-sm tracking-tighter animate-pulse">Initializing decentralized registry uplink...</p>
+            </div>
+        );
+    }
 
     // System Health Check
     useEffect(() => {

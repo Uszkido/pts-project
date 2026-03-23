@@ -75,15 +75,18 @@ app.get('/debug-env', (req, res) => {
     });
 });
 
-// Initialize Telegram Oracle ONLY in local dev mode.
-// On Vercel (Production), the Telegram Bot must be triggered by webhooks, not polling.
+// Initialize Telegram Oracle in ALL environments.
+// In production (Vercel), it runs in webhook mode (no polling).
+// In dev, it runs with polling.
+try {
+    const { initTelegramOracle } = require('./src/services/telegramOracle');
+    initTelegramOracle();
+} catch (e) {
+    console.warn('⚠️ Skipping Telegram Oracle startup:', e.message);
+}
+
+// Start the HTTP server only in local development (not on Vercel).
 if (process.env.NODE_ENV !== 'production') {
-    try {
-        const { initTelegramOracle } = require('./src/services/telegramOracle');
-        initTelegramOracle();
-    } catch (e) {
-        console.warn('⚠️ Skipping Telegram Oracle startup:', e.message);
-    }
     app.listen(PORT, () => {
         console.log(`Server running on http://localhost:${PORT}`);
     });
