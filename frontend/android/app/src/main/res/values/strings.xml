@@ -1,7 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">PTS Passport</string>
+    <string name="app_name">PTS Admin Hub</string>
     <string name="title_activity_main">PTS Passport</string>
     <string name="package_name">com.vexel.pts.passport</string>
     <string name="custom_url_scheme">com.vexel.pts.passport</string>
 </resources>
+
+
+
+

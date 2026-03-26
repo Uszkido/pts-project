@@ -3,6 +3,7 @@
 import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
 import { Network } from '@capacitor/network';
+import { Capacitor } from '@capacitor/core';
 
 const PTS_API = import.meta.env.VITE_PTS_API_URL || 'https://pts-backend-main-project.onrender.com/api/v1';
 
@@ -51,11 +52,18 @@ class BeaconService {
     ) {
         if (this.isActive) return;
 
-        // Check permissions
-        const perm = await Geolocation.checkPermissions();
-        if (perm.location !== 'granted') {
-            const req = await Geolocation.requestPermissions();
-            if (req.location !== 'granted') throw new Error('Location Permission Required');
+        // Only explicitly check native permissions if running on mobile Android/iOS
+        // The web browser handles permissions automatically via prompts
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const perm = await Geolocation.checkPermissions();
+                if (perm.location !== 'granted') {
+                    const req = await Geolocation.requestPermissions();
+                    if (req.location !== 'granted') throw new Error('Location Permission Required');
+                }
+            } catch (e) {
+                console.warn('Native permission check skipped or failed:', e);
+            }
         }
 
         this.onUpdate = onUpdate;
