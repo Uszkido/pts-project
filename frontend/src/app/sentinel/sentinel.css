@@ -1,0 +1,87 @@
+/* ─── PTS SENTINEL HUD STYLES (NEXT.JS ISOLATED) ─── */
+
+.sentinel-root {
+    --col-bg: #000000;
+    --col-surface: #080d14;
+    --col-card: #0a1220;
+    --col-border: #1a2840;
+    --col-primary: #00f0ff;
+    --col-secondary: #0a84ff;
+    --col-danger: #ff3b30;
+    --col-warning: #ffcc00;
+    --col-success: #30d158;
+    --col-text: #e2e8f0;
+    --col-muted: #4a5568;
+    --col-dim: #1e2d45;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-ui: system-ui, sans-serif;
+    --font-head: 'Orbitron', sans-serif;
+
+    background: var(--col-bg);
+    color: var(--col-text);
+    font-family: var(--font-ui);
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sentinel-root * {
+    box-sizing: border-box;
+}
+
+@keyframes pulse-ring {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.4);
+    }
+
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 16px rgba(0, 240, 255, 0);
+    }
+
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(0, 240, 255, 0);
+    }
+}
+
+@keyframes radar-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+@keyframes slide-up {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
