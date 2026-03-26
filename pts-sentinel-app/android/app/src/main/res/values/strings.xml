@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PTS Sentinel</string>
+    <string name="title_activity_main">PTS Sentinel</string>
+    <string name="package_name">com.vexel.pts.sentinel</string>
+    <string name="custom_url_scheme">com.vexel.pts.sentinel</string>
+</resources>

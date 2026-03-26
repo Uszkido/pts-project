@@ -1,0 +1,80 @@
+/* ─── PTS SENTINEL GLOBAL STYLES ────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --col-bg:        #000000;
+  --col-surface:   #080d14;
+  --col-card:      #0a1220;
+  --col-border:    #1a2840;
+  --col-primary:   #00f0ff;
+  --col-secondary: #0a84ff;
+  --col-danger:    #ff3b30;
+  --col-warning:   #ffcc00;
+  --col-success:   #30d158;
+  --col-text:      #e2e8f0;
+  --col-muted:     #4a5568;
+  --col-dim:       #1e2d45;
+  --font-mono:     'Share Tech Mono', monospace;
+  --font-ui:       'Rajdhani', sans-serif;
+  --font-head:     'Orbitron', sans-serif;
+}
+
+html, body {
+  background: var(--col-bg);
+  color: var(--col-text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── SCROLLBARS ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--col-border); border-radius: 2px; }
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.4); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 16px rgba(0, 240, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); }
+}
+@keyframes danger-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.5); }
+  70%  { box-shadow: 0 0 0 20px rgba(255, 59, 48, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+}
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes flash-green {
+  0%   { background: rgba(48, 209, 88, 0.2); }
+  100% { background: transparent; }
+}
+@keyframes scan-line {
+  0%   { top: 0%; }
+  100% { top: 100%; }
+}
+
+.pulse        { animation: pulse-ring 2s infinite; }
+.danger-pulse { animation: danger-ring 1.5s infinite; }
+.blink        { animation: blink 1.2s ease-in-out infinite; }
+.slide-up     { animation: slide-up 0.35s ease-out forwards; }
