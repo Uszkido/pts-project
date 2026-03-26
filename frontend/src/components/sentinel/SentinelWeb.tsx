@@ -140,8 +140,8 @@ export default function SentinelWeb() {
 
             const payload = {
                 deviceImei: targetImei, // The detected device
-                latitude: pos.latitude,
-                longitude: pos.longitude,
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
                 signalType: sigType,
                 signalStrength: Math.floor(Math.random() * -50) - 30, // -30 to -80 dBm
                 observerId: observerId.current
@@ -155,12 +155,12 @@ export default function SentinelWeb() {
 
             // The backend geoService automatically handles reverse geocoding inside the Guardian route,
             // but we resolve it here just for the HUD UI.
-            const addressRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}`);
+            const addressRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
             const addressData = await addressRes.json();
-            const resolvedAddress = addressData.display_name?.split(',').slice(0, 3).join(', ') || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+            const resolvedAddress = addressData.display_name?.split(',').slice(0, 3).join(', ') || `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
 
             setLogs(p => p.map(l => l.id === logId ? {
-                ...l, latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy,
+                ...l, latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy,
                 address: resolvedAddress,
                 signature: targetImei,
                 type: sigType,
