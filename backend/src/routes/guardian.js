@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { reverseGeocode } = require('../services/geoService');
+const { reverseGeocode, checkGeofence } = require('../services/geoService');
 const { sendPushNotification } = require('../services/pushService');
 
 // Guardian Mesh: Report a proximity detection
@@ -45,16 +45,22 @@ router.post('/report', async (req, res) => {
             }
         });
 
-        // If device is STOLEN or LOST, trigger an alert (logic can be expanded)
+        // Geofence detection — escalate if spotted in a known high-risk market
+        const geofence = checkGeofence(latitude, longitude);
+
+        // If device is STOLEN or LOST, trigger an alert
         if (['STOLEN', 'LOST'].includes(device.status)) {
-            // Send instant PUSH notification directly to owner's phone app
+            const zoneWarning = geofence.isHighRisk
+                ? `⚠️ HIGH-RISK ZONE: ${geofence.zoneName} (${geofence.distanceMeters}m from centre). `
+                : '';
+
             await sendPushNotification(
                 device.registeredOwnerId,
                 `🚨 GUARDIAN DETECTED: ${device.brand} ${device.model}`,
-                `A nearby Sentinel Node just verified your stolen device at ${newLocation}. Do not intervene yourself. Check live map now!`,
-                { deviceId: device.id, route: '/app/map', alarm: true, type: 'MESH_PULSE' }
+                `${zoneWarning}A nearby Sentinel Node just verified your stolen device at ${newLocation}. Do not intervene yourself. Check live map now!`,
+                { deviceId: device.id, route: '/app/map', alarm: true, type: 'MESH_PULSE', isHighRiskZone: geofence.isHighRisk }
             );
-            console.log(`[GUARDIAN ALERT] Stolen device ${deviceImei} detected by node ${observerId}`);
+            console.log(`[GUARDIAN ALERT] Stolen device ${deviceImei} detected by node ${observerId}${geofence.isHighRisk ? ` — HIGH RISK ZONE: ${geofence.zoneName}` : ''}`);
         }
 
         res.status(201).json({ message: 'Observation reported successfully', reportId: report.id });

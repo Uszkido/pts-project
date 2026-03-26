@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { getHighAccuracyLocation, reverseGeocode } from '@/lib/ptsGeolocation';
 import FaceCapture from '@/components/FaceCapture';
 
 export default function VendorRegister() {
@@ -28,6 +29,9 @@ export default function VendorRegister() {
     const [businessRegNo, setBusinessRegNo] = useState('');
     const [shopLatitude, setShopLatitude] = useState('');
     const [shopLongitude, setShopLongitude] = useState('');
+    const [shopAddress, setShopAddress] = useState('');
+    const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+    const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'done' | 'error'>('idle');
 
     // Step 3: Documents
     const [shopPhotoUrl, setShopPhotoUrl] = useState('');
@@ -52,15 +56,23 @@ export default function VendorRegister() {
         }
     };
 
-    const getLocation = () => {
-        if (!navigator.geolocation) { setError('Geolocation not supported'); return; }
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                setShopLatitude(pos.coords.latitude.toString());
-                setShopLongitude(pos.coords.longitude.toString());
-            },
-            () => setError('Location access denied. Enter coordinates manually.')
-        );
+    const getLocation = async () => {
+        setLocationStatus('locating');
+        setError('');
+        try {
+            const pos = await getHighAccuracyLocation(); // enableHighAccuracy: true — Fused GPS + Wi-Fi
+            const { latitude, longitude, accuracy } = pos.coords;
+            setShopLatitude(latitude.toString());
+            setShopLongitude(longitude.toString());
+            setLocationAccuracy(accuracy);
+            // Reverse geocode to confirm the address visually
+            const address = await reverseGeocode(latitude, longitude);
+            setShopAddress(address);
+            setLocationStatus('done');
+        } catch (err: any) {
+            setLocationStatus('error');
+            setError('Location access denied or timed out. Please enter coordinates manually.');
+        }
     };
 
     const handleSubmit = async () => {
@@ -227,10 +239,19 @@ export default function VendorRegister() {
                                             <input type="text" value={shopLatitude} onChange={e => setShopLatitude(e.target.value)} placeholder="Latitude" className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors" />
                                             <input type="text" value={shopLongitude} onChange={e => setShopLongitude(e.target.value)} placeholder="Longitude" className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-colors" />
                                         </div>
-                                        <button type="button" onClick={getLocation} className="mt-2 w-full text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl border border-slate-700 transition-colors flex items-center justify-center gap-2">
+                                        <button type="button" onClick={getLocation} disabled={locationStatus === 'locating'} className="mt-2 w-full text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-300 py-2.5 rounded-xl border border-slate-700 transition-colors flex items-center justify-center gap-2">
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                            📍 Use My Current Location
+                                            {locationStatus === 'locating' ? '📡 Acquiring GPS Fix...' : '📍 Use My Current Location (High Accuracy)'}
                                         </button>
+                                        {locationStatus === 'done' && shopAddress && (
+                                            <div className="mt-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                                                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">📍 Confirmed Address</p>
+                                                <p className="text-xs text-slate-300 leading-relaxed">{shopAddress}</p>
+                                                {locationAccuracy !== null && (
+                                                    <p className="text-[10px] text-slate-500 mt-1">GPS Accuracy: ±{locationAccuracy.toFixed(0)}m</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex gap-3 mt-4">
                                         <button onClick={() => setStep(1)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors">← Back</button>
