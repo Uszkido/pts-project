@@ -1,0 +1,8 @@
+﻿src/App.tsx(3,8): error TS6133: 'React' is declared but its value is never read.
+src/components/BeaconFeed.tsx(3,1): error TS6133: 'React' is declared but its value is never read.
+src/components/RadarScreen.tsx(3,8): error TS6133: 'React' is declared but its value is never read.
+src/components/RadarScreen.tsx(58,23): error TS6133: 'trailGrad' is declared but its value is never read.
+src/components/RadarScreen.tsx(58,39): error TS2551: Property 'createConicalGradient' does not exist on type 'CanvasRenderingContext2D'. Did you mean 'createConicGradient'?
+src/services/beaconService.ts(136,42): error TS18048: 'battery.batteryLevel' is possibly 'undefined'.
+src/services/beaconService.ts(137,17): error TS2322: Type 'boolean | undefined' is not assignable to type 'boolean'.
+  Type 'undefined' is not assignable to type 'boolean'.

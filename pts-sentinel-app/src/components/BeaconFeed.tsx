@@ -1,6 +1,5 @@
 /* ─── BEACON LOG FEED ───────────────────────────────────────────────────── */
 
-import React from 'react';
 import type { BeaconLog } from '../services/beaconService';
 
 interface Props {
@@ -79,7 +78,6 @@ function LogRow({ log }: { log: BeaconLog }) {
             borderBottom: '1px solid rgba(26, 40, 64, 0.5)',
             animation: 'slide-up 0.25s ease-out',
         }}>
-            {/* Status indicator */}
             <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10,
@@ -90,7 +88,6 @@ function LogRow({ log }: { log: BeaconLog }) {
                 {statusLabel}
             </span>
 
-            {/* Main info */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{
                     fontFamily: 'var(--font-mono)',
@@ -107,12 +104,37 @@ function LogRow({ log }: { log: BeaconLog }) {
                     fontSize: 10,
                     color: 'var(--col-muted)',
                     marginTop: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
                 }}>
-                    {log.latitude.toFixed(5)}, {log.longitude.toFixed(5)} · ±{log.accuracy.toFixed(0)}m
+                    <span>{log.latitude.toFixed(5)}, {log.longitude.toFixed(5)} · ±{log.accuracy.toFixed(0)}m</span>
+                    {log.trackingMode === 'LOST_MODE' && (
+                        <span style={{
+                            padding: '1px 4px',
+                            background: 'rgba(255, 0, 85, 0.15)',
+                            color: '#ff0055',
+                            borderRadius: 2,
+                            fontSize: 9,
+                            fontWeight: 'bold'
+                        }}>
+                            ⚡ LOST MODE
+                        </span>
+                    )}
+                    {log.simCountry && (
+                        <span style={{
+                            padding: '1px 4px',
+                            background: 'rgba(0, 240, 255, 0.1)',
+                            color: 'var(--col-primary)',
+                            borderRadius: 2,
+                            fontSize: 9,
+                        }}>
+                            SIM: {log.simCountry}
+                        </span>
+                    )}
                 </div>
             </div>
 
-            {/* Time */}
             <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10,

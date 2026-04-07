@@ -26,6 +26,7 @@ const guardianRoutes = require('./src/routes/guardian');
 const aiRoutes = require('./src/routes/ai');
 const whatsappRoutes = require('./src/routes/whatsapp');
 const telegramRoutes = require('./src/routes/telegram');
+const trackingRoutes = require('./src/routes/tracking');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,6 +53,7 @@ app.use('/api/v1/guardian', guardianRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/api/v1/telegram', telegramRoutes);
+app.use('/api/v1/tracking', trackingRoutes);
 
 app.get('/ping', (req, res) => {
     res.json({ status: 'ok', message: 'Pong!' });

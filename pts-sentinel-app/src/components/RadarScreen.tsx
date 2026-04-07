@@ -1,6 +1,6 @@
 /* ─── RADAR SCREEN — Live Scanning Visualizer ──────────────────────────── */
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface RadarProps {
     active: boolean;
@@ -55,7 +55,7 @@ export default function RadarScreen({ active, pings }: RadarProps) {
             if (active) {
                 // Sweep gradient trail
                 sweepAngle.current = (sweepAngle.current + 0.025) % (Math.PI * 2);
-                const trailGrad = ctx.createConicalGradient?.(cx, cy, sweepAngle.current - 1.2, sweepAngle.current);
+
                 // Fallback for browsers without conical gradient support
                 const grad = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
                 grad.addColorStop(0, 'rgba(0, 240, 255, 0)');

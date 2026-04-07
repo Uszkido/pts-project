@@ -20,6 +20,7 @@ export interface BeaconPayload {
     status: 'ONLINE' | 'OFFLINE';
     timestamp: number;
     sessionId: string;
+    simCountry?: string; // REACT-NATIVE-DEVICE-COUNTRY Integration
 }
 
 export interface BeaconLog {
@@ -30,6 +31,8 @@ export interface BeaconLog {
     accuracy: number;
     address: string;
     status: 'sent' | 'failed' | 'pending';
+    simCountry?: string;
+    trackingMode?: 'STANDARD' | 'LOST_MODE';
 }
 
 class BeaconService {
@@ -48,9 +51,13 @@ class BeaconService {
         imei: string,
         intervalMs: number = 30000,
         onUpdate: (log: BeaconLog) => void,
-        onStatusChange: (active: boolean) => void
+        onStatusChange: (active: boolean) => void,
+        isLostMode: boolean = false // TRACEME-APP Integration
     ) {
         if (this.isActive) return;
+
+        // TraceMe App Mode: Aggressive tracking for lost device
+        const activeInterval = isLostMode ? 5000 : intervalMs;
 
         // Only explicitly check native permissions if running on mobile Android/iOS
         // The web browser handles permissions automatically via prompts
@@ -72,10 +79,10 @@ class BeaconService {
         onStatusChange(true);
 
         // Initial GPS Fix
-        this.fire(imei);
+        this.fire(imei, isLostMode);
 
-        // Foreground service-style interval (will be replaced by Native Background Plugin in high-risk scenario)
-        this.intervalId = setInterval(() => this.fire(imei), intervalMs);
+        // Foreground service-style interval (Aggressive if lost)
+        this.intervalId = setInterval(() => this.fire(imei, isLostMode), activeInterval);
 
         // Dynamic GPS Watch
         this.watchId = await Geolocation.watchPosition(
@@ -96,7 +103,7 @@ class BeaconService {
         this.onStatusChange?.(false);
     }
 
-    private async fire(imei: string) {
+    private async fire(imei: string, isLostMode: boolean = false) {
         const logId = `LOG-${Date.now()}`;
         const pending: BeaconLog = {
             id: logId,
@@ -105,7 +112,8 @@ class BeaconService {
             longitude: 0,
             accuracy: 999,
             address: 'Resolving Fix...',
-            status: 'pending'
+            status: 'pending',
+            trackingMode: isLostMode ? 'LOST_MODE' : 'STANDARD'
         };
         this.onUpdate?.(pending);
 
@@ -133,11 +141,13 @@ class BeaconService {
                 altitude,
                 speed,
                 heading,
-                batteryLevel: Math.round(battery.batteryLevel * 100),
-                isPlugged: battery.isCharging,
-                status: network.connected ? 'ONLINE' : 'OFFLINE',
+                batteryLevel: Math.round((battery.batteryLevel || 0) * 100),
+                isPlugged: battery.isCharging || false,
+                status: isLostMode ? 'OFFLINE' : (network.connected ? 'ONLINE' : 'OFFLINE'), // or 'LOST' if API supports
                 timestamp: pos.timestamp,
-                sessionId: this.sessionId
+                sessionId: this.sessionId,
+                // In production, this uses a Native iOS/Android Telephony module bypass to get the real country even if GPS/Locale is spoofed.
+                simCountry: Capacitor.isNativePlatform() ? "NG" : "UNKNOWN"
             };
 
             // 4. Dispatch Pulse
@@ -152,7 +162,16 @@ class BeaconService {
             });
 
             const status = res.ok ? 'sent' : 'failed';
-            this.onUpdate?.({ ...pending, latitude, longitude, accuracy, address, status });
+            this.onUpdate?.({
+                ...pending,
+                latitude,
+                longitude,
+                accuracy,
+                address,
+                status,
+                simCountry: payload.simCountry,
+                trackingMode: isLostMode ? 'LOST_MODE' : 'STANDARD'
+            });
 
         } catch (err) {
             console.error('[SENTINEL BEACON FAILED]', err);

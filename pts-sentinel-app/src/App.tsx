@@ -1,6 +1,6 @@
 /* ─── PTS SENTINEL — Root App ────────────────────────────────────────────*/
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import SetupScreen from './screens/SetupScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import { beaconService, type BeaconLog } from './services/beaconService';
