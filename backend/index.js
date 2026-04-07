@@ -95,6 +95,21 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 
+// ─── NEON DATABASE KEEP-ALIVE ────────────────────────────────────────────────
+// Neon free-tier suspends after 5 minutes of inactivity.
+// This silent ping runs every 4 minutes to keep the connection warm.
+if (process.env.NODE_ENV === 'production') {
+    const prisma = require('./src/db');
+    setInterval(async () => {
+        try {
+            await prisma.$queryRaw`SELECT 1`;
+            console.log('💓 DB Keep-Alive Ping: OK');
+        } catch (e) {
+            console.warn('⚠️ DB Keep-Alive failed:', e.message);
+        }
+    }, 4 * 60 * 1000); // Every 4 minutes
+}
+
 module.exports = app;
 
 // Trigger redeploy sync
