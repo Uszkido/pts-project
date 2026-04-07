@@ -263,9 +263,66 @@ export default function DeveloperPortal() {
                 </div>
             </section>
 
-            <footer className="border-t border-slate-900 py-8 text-center">
-                <p className="text-xs text-slate-600">© Vexel Innovations 2026 — PTS National Device Registry B2B Developer Portal</p>
+            {/* Contact Section */}
+            <section className="border-t border-slate-800 bg-slate-900/40">
+                <div className="max-w-5xl mx-auto px-6 py-16">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div>
+                            <div className="flex items-center gap-2 mb-4">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white text-sm">PTS</div>
+                                <span className="font-bold text-white">Vexel Innovations</span>
+                            </div>
+                            <p className="text-slate-400 text-sm leading-relaxed">
+                                Building Nigeria's sovereign device identity and anti-theft infrastructure. Protecting citizens and businesses across 36 states.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Developer Resources</h4>
+                            <ul className="space-y-2 text-sm">
+                                <li><a href="#request-access" className="text-slate-400 hover:text-blue-400 transition-colors">Request API Key</a></li>
+                                <li><span className="text-slate-400">API Docs (above)</span></li>
+                                <li><a href="/police/dashboard" className="text-slate-400 hover:text-blue-400 transition-colors">Law Enforcement Portal</a></li>
+                                <li><a href="/consumer/login" className="text-slate-400 hover:text-blue-400 transition-colors">Consumer Dashboard</a></li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Contact & Support</h4>
+                            <ul className="space-y-3 text-sm">
+                                <li className="flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    <div>
+                                        <p className="text-slate-500 text-[10px] uppercase tracking-widest mb-0.5">General & API Support</p>
+                                        <a href="mailto:vexelvision@gmail.com" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">vexelvision@gmail.com</a>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                    <div>
+                                        <p className="text-slate-500 text-[10px] uppercase tracking-widest mb-0.5">Enterprise & Partnerships</p>
+                                        <a href="mailto:vexelvision@gmail.com" className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium">vexelvision@gmail.com</a>
+                                        <p className="text-slate-500 text-[10px] mt-0.5">Subject: Enterprise API Partnership</p>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <div>
+                                        <p className="text-slate-500 text-[10px] uppercase tracking-widest mb-0.5">Headquarters</p>
+                                        <p className="text-slate-300">Abuja, Federal Capital Territory</p>
+                                        <p className="text-slate-500 text-[10px]">Federal Republic of Nigeria</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <footer className="border-t border-slate-900 py-6 text-center">
+                <p className="text-xs text-slate-600">© Vexel Innovations 2026 — PTS National Device Registry &nbsp;·&nbsp; <a href="mailto:vexelvision@gmail.com" className="hover:text-slate-400 transition-colors">vexelvision@gmail.com</a></p>
             </footer>
         </div>
     );
 }
+
