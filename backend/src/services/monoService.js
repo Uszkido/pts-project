@@ -41,12 +41,20 @@ const verifyCAC = async (searchTerm) => {
     }
 };
 
+const IdentityValidationService = require('./identityValidationService');
+
 /**
  * Verify National Identity Number (NIN) using Mono API
  * @param {string} nin - The National Identity Number
  * @returns {Promise<any>} - The identity details if valid
  */
 const verifyNIN = async (nin) => {
+    // 1. Local Pre-validation Check
+    if (!IdentityValidationService.isValidNIN(nin)) {
+        console.warn(`Local AI Validation rejected NIN: ${nin} (Invalid Structure)`);
+        return { valid: false, reason: 'NIN format is structurally invalid. Verification rejected.' };
+    }
+
     if (!MONO_SEC_KEY) {
         console.warn('⚠️ MONO_SEC_KEY is not set. Skipping real NIN verification.');
         return { valid: true, mock: true, warning: "Mono API Key missing" };

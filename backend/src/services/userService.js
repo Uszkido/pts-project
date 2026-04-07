@@ -1,6 +1,7 @@
 const prisma = require('../db');
 const bcrypt = require('bcryptjs');
 const { verifyCAC, verifyNIN } = require('./monoService');
+const IdentityValidationService = require('./identityValidationService');
 const { verifyFacialIdentityLiveness } = require('./aiService');
 
 /**
@@ -15,20 +16,12 @@ const startRegistration = async (data) => {
     } = data;
 
     if (phoneNumber) {
-        try {
-            const numverifyResponse = await fetch(`http://apilayer.net/api/validate?access_key=43130b833cf0ab9e02ed0ce9c830eda1&number=${encodeURIComponent(phoneNumber)}&format=1`);
-            const numverifyData = await numverifyResponse.json();
-            if (numverifyData.valid === false) {
-                // If it's outright invalid according to Numverify, reject the registration
-                throw new Error('Invalid phone number format detected. Please verify your number.');
-            }
-        } catch (err) {
-            console.error('Numverify API error:', err.message);
-            if (err.message.includes('Invalid phone number')) {
-                throw err;
-            }
-            // Otherwise, continue registration even if the API fails
+        const phoneCheck = IdentityValidationService.validatePhone(phoneNumber);
+        if (!phoneCheck.isValid) {
+            throw new Error('Invalid Nigerian phone number format detected. Validation rejected.');
         }
+        // Normalize the phone number using the offline tool before saving
+        data.phoneNumber = phoneCheck.formatted;
     }
 
     // Check if user already exists in real table
