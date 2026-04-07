@@ -247,8 +247,13 @@ export default function Home() {
                         <p className="text-[11px] font-bold tracking-[0.55em] text-slate-500 uppercase mt-1">INNOVATIONS</p>
                     </div>
 
-                    <p className="text-[10px] text-slate-700 font-medium mt-8 tracking-wider">
-                        &copy; Vexel Innovations 2026. All rights reserved. &nbsp;·&nbsp; <a href="/developer" className="text-indigo-600 hover:text-indigo-400 transition-colors">Developer API</a> &nbsp;·&nbsp; <a href="mailto:vexelvision@gmail.com" className="hover:text-slate-500 transition-colors">vexelvision@gmail.com</a>
+                    <div className="flex items-center gap-4 mt-8">
+                        <a href="/developer" className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 transition-colors uppercase tracking-[0.2em]">Developer API</a>
+                        <span className="text-slate-800 text-[10px]">·</span>
+                        <a href="mailto:vexelvision@gmail.com" className="text-[10px] font-bold text-slate-500 hover:text-slate-400 transition-colors uppercase tracking-[0.2em]">vexelvision@gmail.com</a>
+                    </div>
+                    <p className="text-[10px] text-slate-700 font-medium mt-4 tracking-wider">
+                        &copy; Vexel Innovations 2026. All rights reserved.
                     </p>
                 </div>
             </footer>
