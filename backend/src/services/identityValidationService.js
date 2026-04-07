@@ -1,4 +1,3 @@
-const ngv = require('nigeria-validator');
 const validateNin = require('validate-nin');
 
 /**
@@ -17,13 +16,14 @@ class IdentityValidationService {
         if (!nin) return false;
 
         // 1. Check with Reguity/validate-nin
-        const ninValidator = validateNin.getValidator({ country: 'ng', type: 'person' });
-        const isFormatValid = ninValidator.isValidNiN(nin);
-
-        // 2. Check with nigeria-validator (fallback/backup)
-        const isNigerianValid = ngv.isValidNIN(nin);
-
-        return isFormatValid || isNigerianValid;
+        try {
+            const ninValidator = validateNin.getValidator({ country: 'ng', type: 'person' });
+            const isFormatValid = ninValidator.isValidNiN(nin);
+            return isFormatValid;
+        } catch (e) {
+            // Fallback: 11 digit check
+            return /^\d{11}$/.test(nin);
+        }
     }
 
     /**
@@ -33,7 +33,8 @@ class IdentityValidationService {
      */
     static isValidBVN(bvn) {
         if (!bvn) return false;
-        return ngv.isValidBVN(bvn);
+        // BVN must be 11 digits
+        return /^\d{11}$/.test(bvn);
     }
 
     /**
@@ -44,14 +45,37 @@ class IdentityValidationService {
     static validatePhone(phone) {
         if (!phone) return { isValid: false };
 
-        const isValid = ngv.isValidPhone(phone);
-        if (!isValid) return { isValid: false };
+        // Clean all non-digit characters except +
+        let cleaned = phone.replace(/[^\d+]/g, '');
 
-        const formatted = ngv.formatPhone(phone, 'intl');
-        const carrier = ngv.getNigerianNetwork(phone);
+        // Pattern matching for Nigerian phones. 
+        // Checks formats like: +2348030000000, 2348030000000, 08030000000, 8030000000
+        const phoneRegex = /^(?:\+?234|0)?([789][01]\d{8})$/;
+        const match = cleaned.match(phoneRegex);
+
+        if (!match) {
+            return { isValid: false };
+        }
+
+        // Format to standard intl +234...
+        const standardNum = match[1];
+        const formatted = `+234${standardNum}`;
+        const prefix = standardNum.substring(0, 3); // e.g. 803
+
+        // Super basic carrier identification fallback (Can expand later)
+        const mtnPrefixes = ['803', '806', '814', '810', '813', '816', '703', '706', '903', '906'];
+        const airtelPrefixes = ['802', '808', '812', '701', '708', '902', '907', '901'];
+        const gloPrefixes = ['805', '807', '811', '705', '905'];
+        const mobile9Prefixes = ['809', '817', '818', '909', '908'];
+
+        let carrier = 'UNKNOWN';
+        if (mtnPrefixes.includes(prefix)) carrier = 'MTN';
+        else if (airtelPrefixes.includes(prefix)) carrier = 'Airtel';
+        else if (gloPrefixes.includes(prefix)) carrier = 'GLO';
+        else if (mobile9Prefixes.includes(prefix)) carrier = '9Mobile';
 
         return {
-            isValid,
+            isValid: true,
             formatted,
             carrier
         };
