@@ -99,6 +99,7 @@ export default function Home() {
                         <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Sentinel <span className="text-blue-500 text-xs font-medium ml-1 text-[10px] bg-blue-500/10 px-1.5 py-0.5 rounded">VEXEL AI</span></span>
                     </div>
                     <div className="flex gap-2 sm:gap-4">
+                        <a href="/developer" className="text-sm font-semibold text-indigo-400 hover:text-white transition-all bg-indigo-600/10 hover:bg-indigo-600/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-indigo-500/20 hover:border-indigo-500/40 hidden sm:flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>Developer API</a>
                         <a href="/admin/login" className="text-sm font-semibold text-amber-400 hover:text-white transition-all bg-amber-600/10 hover:bg-amber-600/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-amber-500/20 hover:border-amber-500/40 hidden sm:block">Admin</a>
                         <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
                         <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-blue-500/20 hidden sm:block">Vendor Portal</a>
@@ -247,7 +248,7 @@ export default function Home() {
                     </div>
 
                     <p className="text-[10px] text-slate-700 font-medium mt-8 tracking-wider">
-                        &copy; Vexel Innovations 2026. All rights reserved.
+                        &copy; Vexel Innovations 2026. All rights reserved. &nbsp;·&nbsp; <a href="/developer" className="text-indigo-600 hover:text-indigo-400 transition-colors">Developer API</a> &nbsp;·&nbsp; <a href="mailto:vexelvision@gmail.com" className="hover:text-slate-500 transition-colors">vexelvision@gmail.com</a>
                     </p>
                 </div>
             </footer>

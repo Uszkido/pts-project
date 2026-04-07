@@ -294,15 +294,21 @@ model PendingUser {
 }
 
 model DeveloperApiKey {
-  id              String   @id @default(uuid())
-  companyName     String
-  contactEmail    String
-  apiKeyHash      String   @unique // We store the hash for security, not the raw key
-  keyPrefix       String   // e.g. "pts_live_" to help identify standard keys
-  isActive        Boolean  @default(true)
-  monthlyQuota    Int      @default(10000)
-  currentUsage    Int      @default(0)
-  billingPlan     String   @default("PAYG") // Pay As You Go
-  createdAt       DateTime @default(now())
-  lastUsedAt      DateTime?
+  id                  String   @id @default(uuid())
+  companyName         String
+  contactEmail        String
+  apiKeyHash          String   @unique
+  keyPrefix           String
+  isActive            Boolean  @default(true)
+  monthlyQuota        Int      @default(500)     // 500 free trial calls
+  currentUsage        Int      @default(0)
+  billingPlan         String   @default("PAYG")
+  // Paystack Payment Tracking
+  paystackCustomerId  String?                    // Set after first Paystack payment
+  totalCallsPurchased Int      @default(0)        // Cumulative paid calls bought
+  lastPaymentDate     DateTime?                  // Last Paystack top-up
+  lastPaymentAmount   Float?                     // Last top-up amount (NGN)
+  createdAt           DateTime @default(now())
+  lastUsedAt          DateTime?
 }
+

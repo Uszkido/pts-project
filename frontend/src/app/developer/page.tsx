@@ -155,12 +155,16 @@ export default function DeveloperPortal() {
                             <h3 className="text-lg font-bold text-white mb-1">Pay As You Go</h3>
                             <p className="text-slate-400 text-sm mb-6">Ideal for startups and growing platforms.</p>
                             <div className="text-4xl font-black text-white mb-1">₦10 <span className="text-slate-500 text-lg font-normal">/ call</span></div>
-                            <p className="text-xs text-slate-500 mb-6">10,000 free calls/month included</p>
+                            <p className="text-xs text-slate-500 mb-6">500 free trial calls included on signup</p>
                             <ul className="space-y-2 text-sm text-slate-300">
                                 <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Real-time IMEI status</li>
-                                <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Risk Score & Brand info</li>
-                                <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Automated key delivery</li>
+                                <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Risk Score &amp; Brand info</li>
+                                <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Instant key delivery by email</li>
+                                <li className="flex items-center gap-2"><span className="text-slate-500">·</span> Top-up anytime via Paystack</li>
                             </ul>
+                            <a href="https://paystack.com/pay/pts-api-topup" target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-2 w-full bg-emerald-600/10 hover:bg-emerald-600 border border-emerald-500/20 text-emerald-400 hover:text-white text-sm font-bold py-3 rounded-xl transition-all">
+                                💳 Top Up via Paystack
+                            </a>
                         </div>
                         <div className="bg-slate-900 border border-blue-500/40 rounded-2xl p-8 relative overflow-hidden shadow-lg shadow-blue-500/10">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
@@ -175,6 +179,9 @@ export default function DeveloperPortal() {
                                 <li className="flex items-center gap-2"><span className="text-blue-400">✓</span> Webhook event notifications</li>
                                 <li className="flex items-center gap-2"><span className="text-blue-400">✓</span> NCC Telecom Block integration</li>
                             </ul>
+                            <a href="mailto:vexelvision@gmail.com?subject=Enterprise API Partnership" className="mt-6 flex items-center justify-center gap-2 w-full bg-blue-600/10 hover:bg-blue-600 border border-blue-500/20 text-blue-400 hover:text-white text-sm font-bold py-3 rounded-xl transition-all">
+                                ✉️ Contact for Enterprise Pricing
+                            </a>
                         </div>
                     </div>
                 </div>
