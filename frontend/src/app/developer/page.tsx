@@ -233,7 +233,7 @@ export default function DeveloperPortal() {
                                     onChange={e => setForm({ ...form, billingPlan: e.target.value })}
                                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors text-sm"
                                 >
-                                    <option value="PAYG">Pay As You Go — ₦10/call (10,000 free calls/month)</option>
+                                    <option value="PAYG">Pay As You Go — ₦10/call (500 free trial calls included)</option>
                                     <option value="ENTERPRISE">Enterprise — Custom pricing (up to 1M calls/month)</option>
                                 </select>
                             </div>
