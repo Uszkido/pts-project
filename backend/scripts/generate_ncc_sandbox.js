@@ -25,7 +25,8 @@ async function generateNCCKey() {
                 apiKeyHash: apiKeyHash,
                 keyPrefix: keyPrefix,
                 billingPlan: 'ENTERPRISE',
-                monthlyQuota: 1000000, // 1 Million calls for stress testing
+                monthlyQuota: 1000000,
+                isWaived: true, // PTS Sovereign Waiver enabled
                 isActive: true
             }
         });

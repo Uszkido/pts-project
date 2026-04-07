@@ -119,7 +119,7 @@ router.get('/verify/:imei', async (req, res) => {
     try {
         // 1. Authenticate via 'x-api-key' header
         const providedKey = req.headers['x-api-key'];
-        if (!providedKey || !providedKey.startsWith('pts_live_')) {
+        if (!providedKey || (!providedKey.startsWith('pts_live_') && !providedKey.startsWith('pts_ncc_sandbox_'))) {
             return res.status(401).json({ error: 'Unauthorized: Missing or malformed PTS API Key.' });
         }
 
@@ -133,8 +133,8 @@ router.get('/verify/:imei', async (req, res) => {
             return res.status(403).json({ error: 'Forbidden: Invalid or disabled API Key.' });
         }
 
-        // 3. Rate Limiting / Billing Check
-        if (developer.currentUsage >= developer.monthlyQuota) {
+        // 3. Rate Limiting / Billing Check (Bypassed for Sovereigns/Waivers)
+        if (!developer.isWaived && developer.currentUsage >= developer.monthlyQuota) {
             return res.status(429).json({ error: 'Quota Exceeded: Monthly API limit reached. Please upgrade to Enterprise.' });
         }
 

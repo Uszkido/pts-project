@@ -308,6 +308,7 @@ model DeveloperApiKey {
   totalCallsPurchased Int      @default(0)        // Cumulative paid calls bought
   lastPaymentDate     DateTime?                  // Last Paystack top-up
   lastPaymentAmount   Float?                     // Last top-up amount (NGN)
+  isWaived            Boolean  @default(false)    // PTS Waiver: Bypass payment & quota
   createdAt           DateTime @default(now())
   lastUsedAt          DateTime?
 }
