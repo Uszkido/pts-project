@@ -292,3 +292,17 @@ model PendingUser {
   otp                   String
   createdAt             DateTime @default(now())
 }
+
+model DeveloperApiKey {
+  id              String   @id @default(uuid())
+  companyName     String
+  contactEmail    String
+  apiKeyHash      String   @unique // We store the hash for security, not the raw key
+  keyPrefix       String   // e.g. "pts_live_" to help identify standard keys
+  isActive        Boolean  @default(true)
+  monthlyQuota    Int      @default(10000)
+  currentUsage    Int      @default(0)
+  billingPlan     String   @default("PAYG") // Pay As You Go
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime?
+}
