@@ -330,7 +330,6 @@ router.put('/users/:id/password', authenticateAdmin, async (req, res) => {
     }
 });
 
-// ============ DEVICE MANAGEMENT ============
 router.get('/devices', authenticateAdmin, async (req, res) => {
     try {
         const { status } = req.query;
@@ -345,6 +344,47 @@ router.get('/devices', authenticateAdmin, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin Bulk Import (Telecom / Enterprise Scale)
+router.post('/devices/bulk-import', authenticateAdmin, async (req, res) => {
+    try {
+        const { devices } = req.body; // Array of { imei, brand, model, registeredOwnerId }
+
+        if (!Array.isArray(devices) || devices.length === 0) {
+            return res.status(400).json({ error: 'Payload must contain a non-empty array of devices.' });
+        }
+
+        if (devices.length > 50000) {
+            return res.status(413).json({ error: 'Bulk import limit is 50,000 devices per batch to prevent database lockups.' });
+        }
+
+        console.log(`📦 B2B BULK LOAD: Admin initializing parallel import of ${devices.length} devices.`);
+
+        // Efficiently chunk and create many devices in one transaction using Prisma createMany (requires PostgreSQL)
+        const batchPayload = devices.map(d => ({
+            imei: String(d.imei).trim(),
+            brand: d.brand || 'Unknown',
+            model: d.model || 'Unknown',
+            registeredOwnerId: d.registeredOwnerId || req.user.id, // Fallback to Admin's ID if no owner is provided
+            status: d.status || 'CLEAN',
+            riskScore: d.riskScore || 100
+        }));
+
+        const result = await prisma.device.createMany({
+            data: batchPayload,
+            skipDuplicates: true // Prevents crashing if some IMEIs already exist
+        });
+
+        res.status(201).json({
+            message: `Bulk operation completed successfully.`,
+            importedCount: result.count,
+            skippedCount: devices.length - result.count
+        });
+    } catch (error) {
+        console.error('Bulk Import Error:', error);
+        res.status(500).json({ error: 'Database error during mass injection batch.' });
     }
 });
 
