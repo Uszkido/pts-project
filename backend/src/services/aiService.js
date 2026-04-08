@@ -15,6 +15,22 @@ const generateGeminiText = async (prompt) => {
     throw new Error("Invalid Gemini response structure");
 };
 
+const getFetchBufferAndMime = async (url) => {
+    if (url.startsWith('data:')) {
+        const matches = url.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+            return { mimeType: matches[1], buffer: Buffer.from(matches[2], 'base64') };
+        } else {
+            throw new Error("Invalid base64 image data");
+        }
+    } else {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Could not fetch image payload. Status: ${response.status}`);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return { mimeType: response.headers.get("content-type") || "image/jpeg", buffer };
+    }
+};
+
 /**
  * Generates a localized response using Google's Gemini AI.
  * Translates the structured PTS device data into conversational Nigerian English/Pidgin.
@@ -63,34 +79,32 @@ CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}
 const analyzeReceiptForFraud = async (receiptUrl, expectedBrand, expectedModel) => {
     if (!genAI || !receiptUrl) return { isLikelyFake: false, reason: "No AI or no receipt" };
     try {
-        const response = await fetch(receiptUrl);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const { buffer, mimeType } = await getFetchBufferAndMime(receiptUrl);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `You are a digital forensics AI. Analyze this device purchase receipt image for ${expectedBrand} ${expectedModel}.
         Look for Photoshop, text misalignment, or tampering. Respond with ONLY a JSON object: { "isLikelyFake": boolean, "confidenceScore": 0-100, "reasonText": "string" }`;
 
-        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, prompt]);
-        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, prompt]);
+        const cleanText = result.response.text();
         return JSON.parse(cleanText);
-    } catch (e) { return { isLikelyFake: false, reasonText: "Analysis failed" }; }
+    } catch (e) { console.error(e); return { isLikelyFake: false, reasonText: "Analysis failed" }; }
 };
 
 /**
  * AI Hardware Degradation Analyzer
  */
-const analyzeDeviceHardwareCondition = async (photoUrls, brand, model) => {
+const analyzeDeviceHardwareCondition = async (photoUrls, brand, modelName) => {
     if (!genAI || !photoUrls?.length) return { grade: "Unknown" };
     try {
-        const response = await fetch(photoUrls[0]);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Analyze this ${brand} ${model} hardware condition. Look for cracks, aftermarket bezels, or bulges. 
+        const { buffer, mimeType } = await getFetchBufferAndMime(photoUrls[0]);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const prompt = `Analyze this ${brand} ${modelName} hardware condition. Look for cracks, aftermarket bezels, or bulges. 
         Respond with ONLY a JSON object: { "grade": "String", "notes": "String", "hasAftermarketScreen": boolean }`;
 
-        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, prompt]);
-        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, prompt]);
+        const cleanText = result.response.text();
         return JSON.parse(cleanText);
-    } catch (e) { return { grade: "Unknown" }; }
+    } catch (e) { console.error(e); return { grade: "Unknown" }; }
 };
 
 /**
@@ -99,11 +113,12 @@ const analyzeDeviceHardwareCondition = async (photoUrls, brand, model) => {
 const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") => {
     if (!genAI) return { subject: "OTP", body: `Your OTP is ${otp}` };
     try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Write a premium, friendly email body for ${fullName}. Action: ${mode}. OTP: ${otp}. Mix in Nigerian English/Hausa. Keep under 60 words. 
         Respond with ONLY a JSON object: { "subject": "String", "body": "String" }`;
-        const resText = await generateGeminiText(prompt);
-        return JSON.parse(resText.replace(/```json/gi, '').replace(/```/g, '').trim());
-    } catch (e) { return { subject: "Security OTP", body: `Hello ${fullName}, your OTP is ${otp}.` }; }
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (e) { console.error(e); return { subject: "Security OTP", body: `Hello ${fullName}, your OTP is ${otp}.` }; }
 };
 
 /**
@@ -115,7 +130,7 @@ const transcribeAudio = async (audioBuffer, mimeType) => {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent([{ inlineData: { data: audioBuffer.toString("base64"), mimeType } }, "Transcribe this audio. Return ONLY the text."]);
         return result.response.text().trim();
-    } catch (e) { return null; }
+    } catch (e) { console.error(e); return null; }
 };
 
 /**
@@ -126,7 +141,7 @@ const generateCrimeInsights = async (reports) => {
     try {
         const prompt = `Analyze these reports and summarize hotspots/methods: ${JSON.stringify(reports)}. Be brief.`;
         return await generateGeminiText(prompt);
-    } catch (e) { return "Stay vigilant in high-traffic zones."; }
+    } catch (e) { console.error(e); return "Stay vigilant in high-traffic zones."; }
 };
 
 /**
@@ -137,7 +152,7 @@ const generateAffidavitSummary = async (reportData) => {
     try {
         const prompt = `Generate a formal, authoritative affidavit summary for: ${JSON.stringify(reportData)}`;
         return await generateGeminiText(prompt);
-    } catch (e) { return "Digital record created in PTS Registry."; }
+    } catch (e) { console.error(e); return "Digital record created in PTS Registry."; }
 }
 
 /**
@@ -146,13 +161,12 @@ const generateAffidavitSummary = async (reportData) => {
 const extractImeiFromImage = async (imageUrl) => {
     if (!genAI || !imageUrl) return null;
     try {
-        const response = await fetch(imageUrl);
-        const buffer = Buffer.from(await response.arrayBuffer());
+        const { buffer, mimeType } = await getFetchBufferAndMime(imageUrl);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, "Find 15-digit IMEI. Return numbers ONLY."]);
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, "Find 15-digit IMEI. Return numbers ONLY."]);
         const match = result.response.text().match(/\d{15}/);
         return match ? match[0] : null;
-    } catch (e) { return null; }
+    } catch (e) { console.error(e); return null; }
 };
 
 /**
@@ -163,7 +177,7 @@ const generateVendorTrustSummary = async (vendorData) => {
     try {
         const prompt = `Summarize trust for vendor: ${JSON.stringify(vendorData)}. Professional/Nigerian tone.`;
         return await generateGeminiText(prompt);
-    } catch (e) { return "Registry Verified Dealer."; }
+    } catch (e) { console.error(e); return "Registry Verified Dealer."; }
 };
 
 /**
@@ -174,15 +188,15 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
     if (!genAI || status !== 'STOLEN') return { isSmuggled: false, warning: null };
 
     try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Analyze this stolen device movement in Nigeria. 
         Last Scan City: ${lastLocation}
         Current Scan City: ${currentLocation}
         Does this move suggest professional smuggling or a syndicate (crossing state lines rapidly while stolen)?
         Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Professional alert message" }`;
-        const rawText = await generateGeminiText(prompt);
-        const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanText);
-    } catch (e) { return { isSmuggled: false, warning: null }; }
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (e) { console.error(e); return { isSmuggled: false, warning: null }; }
 };
 
 /**
@@ -192,14 +206,14 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
 const analyzePhishingMessage = async (messageText) => {
     if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe" };
     try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Analyze this message sent to a Nigerian mobile user. 
         Detect phishing, scam, "fake alert", or social engineering patterns (e.g. impersonating PTS, Banks, or NPF).
         Message: "${messageText}"
         Respond with ONLY JSON: { "isScam": boolean, "confidence": 0-100, "scamType": "string", "warning": "string", "action": "string" }`;
-        const rawText = await generateGeminiText(prompt);
-        const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanText);
-    } catch (e) { return { isScam: false, confidence: 0, warning: "System busy." }; }
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (e) { console.error("Phishing Shield Error:", e); return { isScam: false, confidence: 0, warning: "System busy." }; }
 };
 
 /**
@@ -216,7 +230,7 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
         Always advise them to cooperate with the Nigerian Police Force (NPF) and use the PTS Registry for safety.
         Keep it under 150 words.`;
         return await generateGeminiText(prompt);
-    } catch (e) { return "Please consult a qualified legal practitioner or visit the nearest NPF station."; }
+    } catch (e) { console.error("Legal AI Error:", e); return "Please consult a qualified legal practitioner or visit the nearest NPF station."; }
 };
 
 /**
@@ -255,11 +269,9 @@ const verifyFacialIdentityLiveness = async (facialImageUrl) => {
     if (!genAI || !facialImageUrl) return { isValid: true, reason: "Bypassed (No AI or missing Image)" };
 
     try {
-        const response = await fetch(facialImageUrl);
-        if (!response.ok) throw new Error("Could not fetch facial image");
+        const { buffer, mimeType } = await getFetchBufferAndMime(facialImageUrl);
 
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
 
         const prompt = `You are a strict, top-tier Government Biometric AI Security System for the National Device Registry.
         Analyze this facial capture.
@@ -270,9 +282,8 @@ const verifyFacialIdentityLiveness = async (facialImageUrl) => {
         Respond with ONLY a JSON object: 
         { "isValid": boolean, "confidenceScore": 0-100, "reason": "Detailed string explaining why it passed or failed" }`;
 
-        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType: "image/jpeg" } }, prompt]);
-        const cleanText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanText);
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, prompt]);
+        return JSON.parse(result.response.text());
     } catch (e) {
         console.error("Biometric AI Error:", e);
         return { isValid: false, reason: "Biometric AI System unavailable or image format unsupported." };
