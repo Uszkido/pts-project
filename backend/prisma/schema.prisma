@@ -314,3 +314,11 @@ model DeveloperApiKey {
   lastUsedAt          DateTime?
 }
 
+model RegionalGeoFence {
+  id              String   @id @default(uuid())
+  name            String
+  commanderId     String?
+  geometryJson    String   // GeoJSON or [{lat, lng}, ...] array
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}

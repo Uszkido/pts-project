@@ -353,22 +353,40 @@ router.post('/:imei/track', async (req, res) => {
 
             // --- 🌐 INTERPOL GEO-FENCE BREACH DETECTION ---
             let geoFenceAlert = null;
-            // Simple bounding box for Northern Nigeria borders to simulate Interpol threshold
-            // Northern Nigeria is roughly Lat: 7.0 (South edge of Middle Belt/North Central) to 14.0 (Niger border)
-            // Lon: 3.5 (West) to 14.5 (East border with Cameroon/Chad)
+            const currentCoord = { latitude: parseFloat(latitude), longitude: parseFloat(longitude) };
+
+            // 1. Dynamic Feature (User UI-drawn Polygon Intercepts)
+            let breachedCustomFence = null;
+            try {
+                const geolib = require('geolib');
+                const activeFences = await prisma.regionalGeoFence.findMany({ where: { isActive: true } });
+
+                for (const fence of activeFences) {
+                    const polygon = JSON.parse(fence.geometryJson);
+                    // Assume drawn polygon is the CONTAINMENT ZONE. If they ping OUTSIDE, they breached.
+                    if (!geolib.isPointInPolygon(currentCoord, polygon)) {
+                        breachedCustomFence = fence;
+                        break;
+                    }
+                }
+            } catch (e) { console.error("Dynamic Geofence Error", e); }
+
+            // 2. Static Fallback (Northern Nigeria macro boundary)
             const isOutsideNorthernRegion = (lat, lon) => {
                 return lat < 7.0 || lat > 14.0 || lon < 3.5 || lon > 14.5;
             };
 
-            if (isOutsideNorthernRegion(parseFloat(latitude), parseFloat(longitude))) {
-                geoFenceAlert = "Target device has breached the Northern Nigeria/Middle Belt Geo-Fence. Moving towards international borders or deep South.";
+            if (breachedCustomFence || isOutsideNorthernRegion(currentCoord.latitude, currentCoord.longitude)) {
+                geoFenceAlert = breachedCustomFence
+                    ? `Target device breached tactical containment line: ${breachedCustomFence.name}`
+                    : "Target device has breached the Northern Nigeria/Middle Belt Geo-Fence. Moving towards international borders or deep South.";
 
                 await prisma.incidentReport.create({
                     data: {
                         deviceId: updatedDevice.id,
                         reporterId: updatedDevice.registeredOwnerId, // auto reported
                         type: "INTERPOL_GEOFENCE_BREACH",
-                        description: `[WARRANT PING] Tracker breached Northern/Middle-Belt containment line. Loc: [${latitude}, ${longitude}]`,
+                        description: `[WARRANT PING] ${geoFenceAlert} Loc: [${latitude}, ${longitude}]`,
                         status: "OPEN"
                     }
                 });
@@ -376,7 +394,7 @@ router.post('/:imei/track', async (req, res) => {
                 await sendPushNotification(
                     updatedDevice.registeredOwnerId,
                     "🚨 INTERPOL GEO-FENCE ALARM",
-                    "Your stolen device has illegally crossed the geographical boundary of Northern Nigeria! Border patrol and checkpoint authorities have been automatically notified.",
+                    "Your stolen device has illegally crossed a critical geographical perimeter! Border patrol and checkpoint authorities have been electronically notified.",
                     { deviceId: updatedDevice.id, alarm: true }
                 );
             }
@@ -650,6 +668,45 @@ router.get('/public/threat-radar', async (req, res) => {
     } catch (error) {
         console.error('Threat radar error:', error);
         res.status(500).json({ error: 'Failed to generate threat radar' });
+    }
+});
+
+// ============================================================
+// POLICE COMMAND: Dynamic Polygon Geo-Fencing Engine
+// ============================================================
+router.post('/geofence', authenticateToken, async (req, res) => {
+    try {
+        const { name, geometryJson } = req.body;
+        // Expects geometryJson array: [{latitude: x, longitude: y}, ...]
+        if (!geometryJson || !Array.isArray(geometryJson)) return res.status(400).json({ error: 'Valid coordinate array required' });
+
+        const fence = await prisma.regionalGeoFence.create({
+            data: {
+                name,
+                geometryJson: JSON.stringify(geometryJson),
+                commanderId: req.user.id
+            }
+        });
+        res.json({ message: `Tactical perimeter '${name}' securely established on grid.`, fence });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to deploy geofence' });
+    }
+});
+
+router.get('/geofence', async (req, res) => {
+    try {
+        const fences = await prisma.regionalGeoFence.findMany({ where: { isActive: true } });
+        res.json({
+            customPerimeters: fences.map(f => ({
+                id: f.id,
+                name: f.name,
+                polygon: JSON.parse(f.geometryJson),
+                createdAt: f.createdAt
+            }))
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch tactical perimeters' });
     }
 });
 
