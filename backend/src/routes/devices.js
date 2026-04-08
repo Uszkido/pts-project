@@ -353,20 +353,21 @@ router.post('/:imei/track', async (req, res) => {
 
             // --- 🌐 INTERPOL GEO-FENCE BREACH DETECTION ---
             let geoFenceAlert = null;
-            // Simple bounding box for Lagos State borders to simulate Interpol threshold
-            const isOutsideLagos = (lat, lon) => {
-                return lat < 6.25 || lat > 6.85 || lon < 3.0 || lon > 4.1;
+            // Simple bounding box for Northern Nigeria borders to simulate Interpol threshold
+            // Northern Nigeria is roughly Lat: 8.5 (South border) to 14.0 (Niger border), Lon: 3.5 (West) to 14.5 (East)
+            const isOutsideNorthernRegion = (lat, lon) => {
+                return lat < 8.5 || lat > 14.0 || lon < 3.5 || lon > 14.5;
             };
 
-            if (isOutsideLagos(parseFloat(latitude), parseFloat(longitude))) {
-                geoFenceAlert = "Target device has breached the Lagos State Geo-Fence. Moving towards borders.";
+            if (isOutsideNorthernRegion(parseFloat(latitude), parseFloat(longitude))) {
+                geoFenceAlert = "Target device has breached the Northern Nigeria Geo-Fence. Moving towards international borders or Southern zones.";
 
                 await prisma.incidentReport.create({
                     data: {
                         deviceId: updatedDevice.id,
                         reporterId: updatedDevice.registeredOwnerId, // auto reported
                         type: "INTERPOL_GEOFENCE_BREACH",
-                        description: `[WARRANT PING] Tracker breached containment line. Loc: [${latitude}, ${longitude}]`,
+                        description: `[WARRANT PING] Tracker breached Northern containment line. Loc: [${latitude}, ${longitude}]`,
                         status: "OPEN"
                     }
                 });
@@ -374,7 +375,7 @@ router.post('/:imei/track', async (req, res) => {
                 await sendPushNotification(
                     updatedDevice.registeredOwnerId,
                     "🚨 INTERPOL GEO-FENCE ALARM",
-                    "Your stolen device has illegally crossed the geographical boundary of Lagos State! Border checks have been automatically notified.",
+                    "Your stolen device has illegally crossed the geographical boundary of Northern Nigeria! Border patrol and checkpoint authorities have been automatically notified.",
                     { deviceId: updatedDevice.id, alarm: true }
                 );
             }
