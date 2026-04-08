@@ -3,7 +3,7 @@
 
 **Date:** March 2026  
 **Project:** PTS Decentralized Device Registry & Recovery Network  
-**Developer AI:** Antigravity (Vexel Core)
+**Developer :** Vexel Innovations
 
 ---
 
