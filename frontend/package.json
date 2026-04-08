@@ -31,6 +31,7 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@regulaforensics/document-reader-webclient": "^9.3.804",
     "@types/leaflet": "^1.9.21",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.0",

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FaceCapture from '@/components/FaceCapture';
+import RegulaDocumentScanner from '@/components/RegulaDocumentScanner';
 
 export default function ConsumerLogin() {
     const [isLogin, setIsLogin] = useState(true);
@@ -193,6 +194,10 @@ export default function ConsumerLogin() {
                                     <label className="block text-sm font-medium text-slate-300 mb-1.5">National ID Number</label>
                                     <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="NIN / SSN" className="w-full bg-slate-950/50 border border-slate-700/50 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" required={!isLogin && !isForgotPassword} />
                                 </div>
+                                <RegulaDocumentScanner onExtracted={(data: { fullName: string; nationalId: string }) => {
+                                    setFullName(data.fullName);
+                                    setNationalId(data.nationalId);
+                                }} />
                                 <div>
                                     <FaceCapture onCapture={setFacialFile} label="Identity Verification (Live Selfie)" />
                                 </div>
