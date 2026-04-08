@@ -42,7 +42,7 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                     };
 
                     // Process the Document
-                    const response = await api.process(requestConfig as any);
+                    const response: any = await api.process(requestConfig as any);
 
                     if (response.data && response.data.ContainerList && response.data.ContainerList.List) {
                         const results = response.data.ContainerList.List;
@@ -50,10 +50,10 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                         let extractedId = "";
 
                         // Parse the standardized TextResult array
-                        results.forEach(result => {
+                        results.forEach((result: any) => {
                             if (result.result_type === 2 && result.Text) { // 2 = Text Result
                                 const textFields = result.Text.fieldList;
-                                textFields.forEach(field => {
+                                textFields.forEach((field: any) => {
                                     if (field.fieldType === 8 || field.fieldType === 14) { // First Name or Surname
                                         extractedName += field.value + " ";
                                     }
