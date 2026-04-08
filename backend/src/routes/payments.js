@@ -27,33 +27,59 @@ router.post('/paystack-webhook', async (req, res) => {
         const email = customer.email;
         const amountInNgn = amount / 100; // Paystack sends in kobo
 
-        // Calculate calls bought (Example: ₦10 per call)
-        const callsToAdd = Math.floor(amountInNgn / 10);
-
-        console.log(`✅ SUCCESS: ${email} paid ₦${amountInNgn}. Adding ${callsToAdd} calls.`);
-
-        try {
-            // Find the developer by email
-            const developer = await prisma.developerApiKey.findFirst({
-                where: { contactEmail: email }
-            });
-
-            if (developer) {
-                await prisma.developerApiKey.update({
-                    where: { id: developer.id },
-                    data: {
-                        totalCallsPurchased: { increment: callsToAdd },
-                        monthlyQuota: { increment: callsToAdd }, // Instantly increase their limit
-                        lastPaymentAmount: amountInNgn,
-                        lastPaymentDate: new Date()
-                    }
+        // --- SCENARIO A: VENDOR TIER 1 UPGRADE FEE ---
+        if (metadata && metadata.purpose === 'VENDOR_TIER_UPGRADE') {
+            const vendorId = metadata.vendorId;
+            console.log(`✅ SUCCESS: Vendor ${email} paid ₦${amountInNgn} for Enterprise Tier 1 Upgrade.`);
+            try {
+                // Automatically bump vendor tier to 1 instantly
+                await prisma.user.update({
+                    where: { email }, // using email since customer.email is verified by paystack
+                    data: { vendorTier: 1, vendorStatus: 'APPROVED' }
                 });
-                console.log(`🚀 QUOTA UPDATED for ${developer.companyName}`);
-            } else {
-                console.warn(`⚠️  WARNING: Payment received from ${email}, but no Developer account found.`);
+
+                // Send automated message
+                await prisma.message.create({
+                    data: {
+                        senderId: 'SYSTEM', // Assuming SYSTEM or similar handle
+                        receiverId: vendorId, // if the payload had it, though finding by email is safer
+                        subject: '📈 Enterprise Tier Unlock Success',
+                        body: `Your payment of ₦${amountInNgn} was successful. Your shop is now permanently upgraded to Enterprise Tier 1. You can now access Bulk Uploading and Priority Law Enforcement Routing.`
+                    }
+                }).catch(e => console.log("Non-fatal: couldn't send sys message to vendor."));
+
+            } catch (err) {
+                console.error('❌ FAILED to upgrade vendor tier:', err.message);
             }
-        } catch (err) {
-            console.error('❌ FAILED to top-up quota:', err.message);
+        }
+        // --- SCENARIO B: DEVELOPER API QUOTA TOP-UP ---
+        else {
+            // Calculate calls bought (Example: ₦10 per call)
+            const callsToAdd = Math.floor(amountInNgn / 10);
+            console.log(`✅ SUCCESS: B2B API ${email} paid ₦${amountInNgn}. Adding ${callsToAdd} calls.`);
+
+            try {
+                const developer = await prisma.developerApiKey.findFirst({
+                    where: { contactEmail: email }
+                });
+
+                if (developer) {
+                    await prisma.developerApiKey.update({
+                        where: { id: developer.id },
+                        data: {
+                            totalCallsPurchased: { increment: callsToAdd },
+                            monthlyQuota: { increment: callsToAdd }, // Instantly increase their limit
+                            lastPaymentAmount: amountInNgn,
+                            lastPaymentDate: new Date()
+                        }
+                    });
+                    console.log(`🚀 QUOTA UPDATED for ${developer.companyName}`);
+                } else {
+                    console.warn(`⚠️  WARNING: Payment received from ${email}, but no B2B Developer found. Could be an unaccounted payment.`);
+                }
+            } catch (err) {
+                console.error('❌ FAILED to top-up B2B quota:', err.message);
+            }
         }
     }
 
