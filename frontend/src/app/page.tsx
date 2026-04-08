@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/pts.config';
+import BananaSlides from '@/components/BananaSlides';
 
 export default function Home() {
     const router = useRouter();
@@ -159,6 +160,12 @@ export default function Home() {
                         </div>
                     </form>
                     {error && <p className="mt-6 text-red-400 text-center font-medium bg-red-500/10 py-3 rounded-xl border border-red-500/20">{error}</p>}
+
+                    {!result && !loading && (
+                        <div className="mt-8 animate-fade-in">
+                            <BananaSlides />
+                        </div>
+                    )}
                 </div>
 
                 {/* Results Card */}
