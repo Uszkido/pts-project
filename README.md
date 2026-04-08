@@ -18,7 +18,7 @@ The Phone Tracking System (PTS) is a platform designed to help users register, t
 
 ## Installation
 ```bash
-git clone https://github.com/your-username/pts.git
+git clone https://github.com/Uszkido/pts-project.git
 cd pts
 npm install
 npm start
