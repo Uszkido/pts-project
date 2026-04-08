@@ -7,6 +7,7 @@ import { generateCapSign } from '@/lib/capsign';
 import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
 import MeshScanner from '@/components/MeshScanner';
+import DynamicGeoFenceMap from '@/components/Map/DynamicGeoFenceMap';
 
 export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -37,7 +38,11 @@ export default function PoliceDashboard() {
     const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
 
     // UI Tabs
-    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'intel' | 'suspects' | 'messages' | 'warrants'>('registry');
+    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'intel' | 'suspects' | 'messages' | 'warrants' | 'geofence'>('registry');
+
+    // Geo-Fence State
+    const [activeFences, setActiveFences] = useState<any[]>([]);
+    const [isSavingFence, setIsSavingFence] = useState(false);
 
     // Messages
     const [messages, setMessages] = useState<any[]>([]);
@@ -589,6 +594,10 @@ export default function PoliceDashboard() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         Active Warrants
                     </button>
+                    <button onClick={() => { setActiveTab('geofence'); const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'; fetch(`${apiUrl}/devices/geofence`).then(r => r.json()).then(d => setActiveFences(d.customPerimeters || [])).catch(() => { }); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'geofence' ? 'bg-cyan-900/30 text-cyan-400 shadow-lg border border-cyan-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        🛰 Geo-Fence Deployer
+                    </button>
                 </div>
 
                 {/* Tab Contents */}
@@ -1056,6 +1065,64 @@ export default function PoliceDashboard() {
                                     {messages.length === 0 && <div className="text-center py-20 text-slate-500 font-mono text-sm max-w-sm mx-auto">&gt; NO ENCRYPTED MESSAGES IN THREAD.<br />&gt; AWAITING TRANSMISSION...</div>}
                                 </div>
                             </div>
+                        </div>
+                    ) : activeTab === 'geofence' ? (
+                        <div className="p-6 space-y-6">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30 text-xl">🛰</div>
+                                <div>
+                                    <h2 className="text-xl font-black text-white">Interpol Geo-Fence Deployer</h2>
+                                    <p className="text-sm text-slate-400">Draw custom containment perimeters. Any stolen device crossing a boundary triggers an instant INTERPOL_BREACH alert.</p>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2 bg-slate-950/50 border border-cyan-800/30 rounded-xl p-3">
+                                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                                    <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">{activeFences.length} Active Perimeter{activeFences.length !== 1 ? 's' : ''}</span>
+                                </div>
+                            </div>
+
+                            <DynamicGeoFenceMap
+                                activeFences={activeFences}
+                                onSavePolygon={async (name, coordinates) => {
+                                    setIsSavingFence(true);
+                                    try {
+                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                                        const res = await fetch(`${apiUrl}/devices/geofence`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
+                                            },
+                                            body: JSON.stringify({ name, geometryJson: coordinates })
+                                        });
+                                        if (!res.ok) throw new Error('Failed to deploy perimeter');
+                                        const data = await res.json();
+                                        setActiveFences(prev => [...prev, { id: data.fence.id, name: data.fence.name, polygon: coordinates }]);
+                                        alert(`✅ Tactical perimeter "${name}" deployed successfully!`);
+                                    } catch (e: any) {
+                                        alert(`❌ Fence deployment failed: ${e.message}`);
+                                    } finally {
+                                        setIsSavingFence(false);
+                                    }
+                                }}
+                            />
+
+                            {activeFences.length > 0 && (
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                                    <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-widest">Active Perimeters</h3>
+                                    <div className="space-y-2">
+                                        {activeFences.map((f: any) => (
+                                            <div key={f.id} className="flex items-center justify-between p-3 bg-slate-950/50 rounded-xl border border-slate-800">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+                                                    <span className="text-sm font-bold text-white">{f.name}</span>
+                                                    <span className="text-xs text-slate-500 font-mono">{f.polygon?.length || 0} points</span>
+                                                </div>
+                                                <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-full border border-cyan-500/20 uppercase">ACTIVE</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : null}
                 </div>
