@@ -201,11 +201,33 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
 
 /**
  * AI Agent: Social Engineering & Phishing Shield
- * Fully offline NLP implementation inspired by Sublime Security Rules & BlackEye signatures.
+ * USES AI to detect intent and complex phishing patterns.
  */
 const analyzePhishingMessage = async (messageText) => {
-    const { analyzePhishingMessageOffline } = require('./DeepSecurityPhishing');
-    return analyzePhishingMessageOffline(messageText);
+    if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe", action: "NONE" };
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const prompt = `You are the PTS Phishing Shield AI. Analyze this message for social engineering, credential harvesting, or financial scams common in Nigeria (e.g., BVN/NIN scams, authority spoofing, fake banking alerts).
+        
+        Message: "${messageText}"
+        
+        Respond with ONLY a JSON object: 
+        { 
+          "isScam": boolean, 
+          "confidence": 0-100, 
+          "scamType": "detailed string", 
+          "warning": "Localized, varied warning in Nigerian context", 
+          "action": "BLOCK_AND_REPORT | QUARANTINE | ALLOW" 
+        }`;
+
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (e) {
+        // Fallback to offline engine if AI fails
+        const { analyzePhishingMessageOffline } = require('./DeepSecurityPhishing');
+        return analyzePhishingMessageOffline(messageText);
+    }
 };
 
 /**
@@ -214,49 +236,43 @@ const analyzePhishingMessage = async (messageText) => {
  * Strict mapping to Nigerian Cybercrime Act 2015 and Criminal Code to prevent AI hallucination.
  */
 const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
-    const query = userQuery?.toLowerCase() || "";
+    if (!genAI || !userQuery) return "[OFFICIAL PTS] Consult a legal professional for specific inquiries.";
 
-    // Hardcoded authoritative legal definitions
-    const LAW_GLANCE_DB = {
-        "stolen": "Under Section 427 of the Nigerian Criminal Code, receiving or possessing a stolen device is a felony punishable by up to 14 years in prison. You must immediately report this device to the nearest Nigerian Police Force (NPF) station.",
-        "receipt": "A forged or tampered receipt violates the Cybercrime (Prohibition, Prevention, etc.) Act 2015. Always demand the original carton and verify the IMEI electronically via the PTS Sentinel Registry before finalizing payment.",
-        "block": "Once a device is flagged as 'Stolen', PTS automatically initiates a network block request across all Nigerian Telecoms (MTN, Airtel, Glo, 9mobile). Using a blocked phone constitutes unlawful network access.",
-        "data": "Under the Nigeria Data Protection Regulation (NDPR), you have the right to request the deletion of your personal biodata if you no longer wish to use the PTS ecosystem. Contact data-officer@pts.gov.ng for immediate processing."
-    };
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const LAW_GLANCE_HAUSA = {
-        "stolen": "A karkashin Sashe na 427 na Dokar Manyan Laifuka ta Najeriya, mallakar wayar sata babban laifi ne wanda hukuncinsa zai iya kai shekaru 14 a gidan yari. Dole ne ku kai rahoton wannan wayar zuwa ofishin yansanda mafi kusa.",
-        "receipt": "Takardar karya ko wadda aka yi mata jabun resit ta saba wa Dokar Laifukan Intanet ta 2015. Koyaushe ku nemi asalin kwali kuma ku tabbatar da IMEI ta manhajar PTS Sentinel gabanin biyan kudi.",
-        "block": "Da zarar an yi wa waya alamar 'Sata', PTS tana mika bukatar toshe ta a duk hanyoyin sadarwa na Najeriya (MTN, Airtel, Glo, 9mobile). Amfani da wayar da aka toshe laifi ne.",
-        "data": "Karkashin Dokar Kare Bayanai ta Najeriya (NDPR), kuna da hakkin neman a goge bayanan ku idan baku son ci gaba da amfani da PTS. Tuntubi data-officer@pts.gov.ng."
-    };
+        const BASE_KNOWLEDGE = `
+        - Section 427 of Nigerian Criminal Code: Possession of stolen property (up to 14 years).
+        - Cybercrime Act 2015: Forged receipts, tampered identities.
+        - NDPR: Data protection and privacy rights in Nigeria.
+        - PTS Registry: The official sovereignty record for device ownership.
+        `;
 
-    const LAW_GLANCE_PIDGIN = {
-        "stolen": "Omo, Section 427 of Criminal code talk say to hold stolen phone na confirm offense wey fit land person 14 years for kirikiri. Abeg carry this phone go the nearest police station sharply.",
-        "receipt": "To forge receipt na serious case under Cybercrime Act 2015. Abeg no pay shishi if dem no give you original carton and you don verify the IMEI for PTS app.",
-        "block": "As dem don mark the phone 'Stolen', PTS don block am for all network (MTN, Airtel, Glo, 9mobile). To use blocked phone na serious problem.",
-        "data": "Under the NDPR law, you get right to delete your data anytime you wan stop to dey use PTS. Just message data-officer@pts.gov.ng."
-    };
+        const prompt = `You are a Legal AI Advisor specialized in Nigerian Cyberlaw and Property law.
+        Language Tone: ${language}
+        Available Database Knowledge: ${BASE_KNOWLEDGE}
+        
+        User Query: "${userQuery}"
+        
+        Respond with a localized, varied, and authoritative answer. Use specific legal sections where applicable but keep the tone helpful. 
+        If it's Pidgin, use "PTS Official Law Oracle" persona. 
+        Always start with [OFFICIAL PTS LEGAL COUNSEL].`;
 
-    let selectedDb = LAW_GLANCE_DB;
-    if (language.toUpperCase() === "HAUSA") selectedDb = LAW_GLANCE_HAUSA;
-    if (language.toUpperCase() === "PIDGIN") selectedDb = LAW_GLANCE_PIDGIN;
-
-    // Direct Lookup Logic
-    for (const [keyword, legalText] of Object.entries(selectedDb)) {
-        if (query.includes(keyword)) {
-            return `[OFFICIAL PTS LEGAL COUNSEL] ${legalText}`;
+        return await generateGeminiText(prompt);
+    } catch (e) {
+        // Fallback to static lookup
+        const query = userQuery?.toLowerCase() || "";
+        const LAW_GLANCE_DB = {
+            "stolen": "Under Section 427 of the Nigerian Criminal Code, receiving or possessing a stolen device is a felony punishable by up to 14 years in prison. You must immediately report this device to the nearest Nigerian Police Force (NPF) station.",
+            "receipt": "A forged or tampered receipt violates the Cybercrime (Prohibition, Prevention, etc.) Act 2015. Always demand the original carton and verify the IMEI electronically via the PTS Sentinel Registry before finalizing payment.",
+            "block": "Once a device is flagged as 'Stolen', PTS automatically initiates a network block request across all Nigerian Telecoms (MTN, Airtel, Glo, 9mobile). Using a blocked phone constitutes unlawful network access.",
+            "data": "Under the Nigeria Data Protection Regulation (NDPR), you have the right to request the deletion of your personal biodata if you no longer wish to use the PTS ecosystem. Contact data-officer@pts.gov.ng for immediate processing."
+        };
+        for (const [keyword, legalText] of Object.entries(LAW_GLANCE_DB)) {
+            if (query.includes(keyword)) return `[OFFICIAL PTS LEGAL COUNSEL] ${legalText}`;
         }
+        return "[OFFICIAL PTS LEGAL COUNSEL] Purchasing a device of unknown origin carries severe legal risks under Nigerian Law. Always rely on the PTS National Registry to verify device claims before exchanging funds.";
     }
-
-    // Default Fallback Warning
-    if (language.toUpperCase() === "HAUSA") {
-        return "[OFFICIAL PTS LEGAL COUNSEL] Sayen wayar aljihun da ba a sani ba abu ne mai hadari wanda zai iya jefa ka a matsala ta shari'a. Koyaushe a yi amfani da PTS don tabbatar da nagartar na'urar.";
-    } else if (language.toUpperCase() === "PIDGIN") {
-        return "[OFFICIAL PTS LEGAL COUNSEL] To buy phone wey u no know the source na big risk wey fit put u for police net. Always use PTS verify phone before u drop money.";
-    }
-
-    return "[OFFICIAL PTS LEGAL COUNSEL] Purchasing a device of unknown origin carries severe legal risks under Nigerian Law. Always rely on the PTS National Registry to verify device claims before exchanging funds.";
 };
 
 /**
@@ -349,8 +365,48 @@ const verifyFacialIdentityLiveness = async (facialImageUrl) => {
         const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, prompt]);
         return JSON.parse(result.response.text());
     } catch (e) {
-        console.error("Biometric AI Error:", e);
-        return { isValid: false, reason: "Biometric AI System unavailable or image format unsupported." };
+        console.error("Biometric AI Error (Full Stack):", e);
+        const errorMsg = e.message || "Unknown internal error";
+
+        let reason = "Biometric AI System encountered a technical failure.";
+        if (errorMsg.includes("fetch") || errorMsg.includes("ENOTFOUND")) {
+            reason = "Failed to retrieve identity image from storage. Check connectivity.";
+        } else if (errorMsg.includes("Unexpected token") || errorMsg.includes("JSON")) {
+            reason = "Security AI returned an invalid response. Please retry with a clearer facial capture.";
+        } else if (errorMsg.includes("format") || errorMsg.includes("mime")) {
+            reason = "Image format unsupported. Please upload a high-resolution JPEG or PNG capture.";
+        }
+
+        return { isValid: false, reason: `${reason} (${errorMsg})` };
+    }
+};
+
+/**
+ * AI Document Brain: Extracts Identity Information from photos of National IDs, Passports, or Voters Cards.
+ * Used as a sovereign fallback when traditional SDKs (Regula) fail or are unlicensed.
+ */
+const extractIdDataFromImage = async (idImageUrl) => {
+    if (!genAI || !idImageUrl) return { fullName: "", nationalId: "", success: false };
+
+    try {
+        const { buffer, mimeType } = await getFetchBufferAndMime(idImageUrl);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `You are the PTS National ID Extractor. 
+        Analyze this document image (National ID, Voter's Card, or Passport). 
+        Extract the person's Full Name (First and Last) and the National identification number (NIN) or Document Number.
+        If it's a Nigerian NIN card, focus on the 11-digit NIN.
+        Respond with ONLY a JSON object: { "fullName": "string", "nationalId": "string", "confidenceScore": 0-100 }`;
+
+        const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, prompt]);
+        const data = JSON.parse(result.response.text());
+        return { ...data, success: true };
+    } catch (e) {
+        console.error("ID Extraction AI Error:", e);
+        return { fullName: "", nationalId: "", success: false, error: e.message };
     }
 };
 
@@ -368,5 +424,6 @@ module.exports = {
     analyzePhishingMessage,
     getLegalAdvice,
     analyzeMaintenanceParts,
-    verifyFacialIdentityLiveness
+    verifyFacialIdentityLiveness,
+    extractIdDataFromImage
 };

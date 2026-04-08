@@ -75,19 +75,44 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                         }
                     } else {
                         // Demo fallback if Regula API returns unauthorized without a license key
-                        setTimeout(() => {
-                            onExtracted({ fullName: "Oluwaseun Adeyemi", nationalId: "NIN-893274291" });
-                            setIsScanning(false);
-                        }, 2000);
-                    }
-                } catch (e) {
-                    console.error("Regula Extraction Error:", e);
-                    setError("Regula API required a valid commercial license or document was unreadable. Using local fallback.");
-                    setTimeout(() => {
-                        onExtracted({ fullName: "Aisha Mohammed", nationalId: "NIN-11223344" });
+                        console.log("Regula API unavailable, falling back to PTS Sovereign AI...");
+                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/ai-public/extract-id`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ idImageUrl: `data:${file.type};base64,${base64Data}` })
+                        });
+                        if (aiRes.ok) {
+                            const aiData = await aiRes.json();
+                            onExtracted({ fullName: aiData.fullName, nationalId: aiData.nationalId });
+                        } else {
+                            throw new Error("Sovereign AI extraction failed.");
+                        }
                         setIsScanning(false);
-                        setError(null);
-                    }, 2500);
+                    }
+                } catch (e: any) {
+                    console.error("Extraction Error:", e);
+                    setError(e.message || "Document was unreadable. Using remote backup...");
+
+                    // Final backup check with Gemini if not already tried
+                    try {
+                        const base64Data = (reader.result as string).split(',')[1];
+                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/ai-public/extract-id`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ idImageUrl: `data:${file.type};base64,${base64Data}` })
+                        });
+                        if (aiRes.ok) {
+                            const aiData = await aiRes.json();
+                            onExtracted({ fullName: aiData.fullName, nationalId: aiData.nationalId });
+                            setError(null);
+                        } else {
+                            setError("Sovereign AI failed to recognize this document format.");
+                        }
+                    } catch (innerErr) {
+                        setError("Critical failure in National Identity Link.");
+                    } finally {
+                        setIsScanning(false);
+                    }
                 }
             };
             reader.readAsDataURL(file);

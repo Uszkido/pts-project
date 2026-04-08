@@ -16,7 +16,8 @@ import {
     MessageSquare,
     UserX,
     Key,
-    Brain
+    Brain,
+    FileUp
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -548,6 +549,37 @@ export default function AdminDashboard() {
             alert(data.message);
             fetchData();
         } catch (err: any) { alert(err.message); }
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const content = event.target?.result as string;
+            if (file.name.endsWith('.json')) {
+                handleBulkImport(content);
+            } else if (file.name.endsWith('.csv')) {
+                const rows = content.split('\n').filter(r => r.trim());
+                if (rows.length < 2) return alert('CSV is empty or missing headers.');
+
+                const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+                const data = rows.slice(1).map(row => {
+                    // Simple CSV split with quote support
+                    const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || row.split(',').map(v => v.trim());
+                    const obj: any = {};
+                    headers.forEach((h, i) => {
+                        if (values[i]) obj[h] = values[i];
+                    });
+                    return obj;
+                });
+                handleBulkImport(JSON.stringify(data));
+            } else {
+                alert('Unsupported file format. Please use .json or .csv');
+            }
+        };
+        reader.readAsText(file);
     };
 
     const handleBulkImport = async (jsonString: string) => {
@@ -1221,10 +1253,27 @@ export default function AdminDashboard() {
 
                         <div className="grid md:grid-cols-2 gap-8">
                             <div className="space-y-4">
-                                <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">JSON Input Payload</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">Data Input</label>
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            id="bulk-file-input"
+                                            accept=".json,.csv"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                        />
+                                        <button
+                                            onClick={() => document.getElementById('bulk-file-input')?.click()}
+                                            className="flex items-center gap-2 text-[10px] font-black bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all uppercase"
+                                        >
+                                            <FileUp className="w-3 h-3" /> Upload Document (.csv / .json)
+                                        </button>
+                                    </div>
+                                </div>
                                 <textarea
                                     id="bulk-payload"
-                                    placeholder='[{"imei": "123...", "brand": "Samsung", "model": "S24 Ultra"}, ...]'
+                                    placeholder='Paste JSON here or upload a document...'
                                     rows={10}
                                     className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl px-4 py-4 text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
                                 />
