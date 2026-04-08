@@ -201,19 +201,11 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
 
 /**
  * AI Agent: Social Engineering & Phishing Shield
- * Analyzes messages for scam patterns targeting Nigerian users.
+ * Fully offline NLP implementation inspired by Sublime Security Rules & BlackEye signatures.
  */
 const analyzePhishingMessage = async (messageText) => {
-    if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe" };
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
-        const prompt = `Analyze this message sent to a Nigerian mobile user. 
-        Detect phishing, scam, "fake alert", or social engineering patterns (e.g. impersonating PTS, Banks, or NPF).
-        Message: "${messageText}"
-        Respond with ONLY JSON: { "isScam": boolean, "confidence": 0-100, "scamType": "string", "warning": "string", "action": "string" }`;
-        const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
-    } catch (e) { console.error("Phishing Shield Error:", e); return { isScam: false, confidence: 0, warning: "System busy." }; }
+    const { analyzePhishingMessageOffline } = require('./DeepSecurityPhishing');
+    return analyzePhishingMessageOffline(messageText);
 };
 
 /**
