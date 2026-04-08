@@ -105,6 +105,11 @@ router.post('/', authenticateToken, async (req, res) => {
             }
         }
 
+        const crypto = require('crypto');
+        const hardwareDnaHash = (motherboardSerialNumber && batterySerialNumber)
+            ? crypto.createHash('sha256').update(`${motherboardSerialNumber}-${batterySerialNumber}-${cameraSerialNumber || 'U'}`).digest('hex')
+            : null;
+
         const device = await prisma.device.create({
             data: {
                 imei,
@@ -118,7 +123,8 @@ router.post('/', authenticateToken, async (req, res) => {
                 screenSerialNumber,
                 batterySerialNumber,
                 motherboardSerialNumber,
-                cameraSerialNumber
+                cameraSerialNumber,
+                hardwareDnaHash
             }
         });
 
@@ -437,6 +443,57 @@ router.post('/scan-imei', authenticateToken, async (req, res) => {
         res.json({ imei });
     } catch (error) {
         res.status(500).json({ error: 'Vision AI Scan failed' });
+    }
+});
+// --- LAZARUS PROTOCOL: Hardware DNA Scanner ---
+router.post('/dna-scan', authenticateToken, async (req, res) => {
+    try {
+        const { currentImei, motherboardSerialNumber, batterySerialNumber, cameraSerialNumber } = req.body;
+
+        if (!motherboardSerialNumber || !batterySerialNumber) {
+            return res.status(400).json({ error: 'Incomplete hardware component profile. Motherboard and Battery serials required.' });
+        }
+
+        const crypto = require('crypto');
+        const hardwareDnaHash = crypto.createHash('sha256').update(`${motherboardSerialNumber}-${batterySerialNumber}-${cameraSerialNumber || 'U'}`).digest('hex');
+
+        // Check if this DNA belongs to a PREVIOUSLY marked STOLEN device
+        const stolenLazarusMatch = await prisma.device.findFirst({
+            where: {
+                hardwareDnaHash,
+                status: { in: ['STOLEN', 'LOST'] },
+                imei: { not: currentImei } // Catch when IMEI differs but DNA is the same!
+            }
+        });
+
+        if (stolenLazarusMatch) {
+            // Secretly log a high-severity alert
+            await prisma.incidentReport.create({
+                data: {
+                    deviceId: stolenLazarusMatch.id,
+                    reporterId: req.user.id,
+                    type: "LAZARUS_FRANKENSTEIN_DETECTED",
+                    description: `Hardware DNA Scan matched a stolen device! The software IMEI has been illegally changed. This is a Syndicate Chop-Shop device.`,
+                    status: "OPEN"
+                }
+            });
+
+            return res.status(403).json({
+                isLazarus: true,
+                warning: '🚨 SEVERE HARDWARE MISMATCH 🚨 This device matches the exact internal profile of a STOLEN asset, despite having a different IMEI. It has been illegally flashed.',
+                trueOriginalImeiHint: stolenLazarusMatch.imei.substring(0, 8) + '...'
+            });
+        }
+
+        res.json({
+            isLazarus: false,
+            hardwareDnaHash,
+            message: 'Hardware DNA verified. No internal anomalies detected.'
+        });
+
+    } catch (error) {
+        console.error('DNA scanner crash:', error);
+        res.status(500).json({ error: 'Lazarus Scan failed securely' });
     }
 });
 

@@ -81,6 +81,7 @@ model Device {
   motherboardSerialNumber String?
   cameraSerialNumber      String?
   // Guardian Mesh & Sovereignty
+  hardwareDnaHash    String?   @unique
   lastBluetoothSig   String?
   lastWifiSig        String?
   lastObservationDate DateTime?
