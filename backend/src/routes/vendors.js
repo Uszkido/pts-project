@@ -251,4 +251,46 @@ router.get('/nearby-risks', authenticateToken, verifyVendorRole, async (req, res
     }
 });
 
+// Vendor Bulk Import (Inventory Scaling for Major Retailers)
+router.post('/devices/bulk-import', authenticateToken, verifyVendorRole, async (req, res) => {
+    try {
+        const { devices } = req.body;
+
+        if (!Array.isArray(devices) || devices.length === 0) {
+            return res.status(400).json({ error: 'Payload must contain a non-empty array of devices.' });
+        }
+
+        // Vendor limit is 5000 to prevent tier-abuse, unlike Admins who get 50,000
+        if (devices.length > 5000) {
+            return res.status(413).json({ error: 'Vendor bulk import limit is 5,000 devices per batch.' });
+        }
+
+        console.log(`📦 VENDOR B2B LOAD: Retailer ${req.user.companyName || req.user.id} uploading ${devices.length} devices.`);
+
+        // Efficient transaction mapping
+        const batchPayload = devices.map(d => ({
+            imei: String(d.imei).trim(),
+            brand: d.brand || 'Unknown',
+            model: d.model || 'Unknown',
+            registeredOwnerId: req.user.id, // CRITICAL: Force Vendor ID so they cannot register devices to others
+            status: 'CLEAN',
+            riskScore: 100
+        }));
+
+        const result = await prisma.device.createMany({
+            data: batchPayload,
+            skipDuplicates: true // Will skip if IMEI belongs to someone else or is already in DB
+        });
+
+        res.status(201).json({
+            message: `Vendor inventory bulk operation completed successfully.`,
+            importedCount: result.count,
+            skippedCount: devices.length - result.count
+        });
+    } catch (error) {
+        console.error('Vendor Bulk Import Error:', error);
+        res.status(500).json({ error: 'Database error during inventory mass injection.' });
+    }
+});
+
 module.exports = router;
