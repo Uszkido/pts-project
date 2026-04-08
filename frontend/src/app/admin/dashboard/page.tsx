@@ -650,14 +650,14 @@ export default function AdminDashboard() {
                             <div className="absolute top-full mt-2 w-96 max-h-96 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-2 left-0 sm:left-auto sm:right-0">
                                 <div className="px-4 py-2 text-xs font-bold uppercase text-slate-500 tracking-wider">Users matched ({searchResults.users.length})</div>
                                 {searchResults.users.map(u => (
-                                    <div key={u.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-amber-500">
+                                    <div key={u.id} onClick={() => { setActiveTab('users'); setSearchQuery(u.email); setSearchResults(null); }} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-amber-500">
                                         <p className="font-bold text-white text-sm">{u.fullName || u.email}</p>
                                         <p className="text-xs text-slate-400">{u.role} {u.companyName ? `• ${u.companyName}` : ''}</p>
                                     </div>
                                 ))}
                                 <div className="px-4 py-2 text-xs font-bold uppercase text-slate-500 tracking-wider mt-2 border-t border-slate-800 pt-3">Devices matched ({searchResults.devices.length})</div>
                                 {searchResults.devices.map(d => (
-                                    <div key={d.id} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500 flex items-center gap-3">
+                                    <div key={d.id} onClick={() => { setActiveTab('devices'); setSearchQuery(d.imei); setSearchResults(null); }} className="px-4 py-3 hover:bg-slate-800 cursor-pointer border-l-2 border-transparent hover:border-emerald-500 flex items-center gap-3">
                                         <div className="w-8 h-8 rounded bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0">
                                             {d.devicePhotos && d.devicePhotos.length > 0 ? (
                                                 <img src={d.devicePhotos[0]} alt={d.model} className="w-full h-full object-cover" />

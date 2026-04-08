@@ -37,7 +37,7 @@ export default function PoliceDashboard() {
     const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
 
     // UI Tabs
-    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'intel' | 'suspects' | 'messages'>('registry');
+    const [activeTab, setActiveTab] = useState<'registry' | 'incidents' | 'alerts' | 'intel' | 'suspects' | 'messages' | 'warrants'>('registry');
 
     // Messages
     const [messages, setMessages] = useState<any[]>([]);
@@ -497,7 +497,7 @@ export default function PoliceDashboard() {
                             ) : (
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
                                     {searchResults.map((device: any) => (
-                                        <div key={device.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group">
+                                        <div key={device.id} onClick={() => { setLiveTrackingImei(device.imei); setShowSearch(false); setActiveTab('registry'); }} className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-red-900/50 transition-colors group cursor-pointer">
                                             <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-shrink-0">
                                                 {device.devicePhotos && device.devicePhotos.length > 0 ? (
                                                     <img src={device.devicePhotos[0]} alt={device.model} className="w-full h-full object-cover" />
@@ -584,6 +584,10 @@ export default function PoliceDashboard() {
                     <button onClick={() => setActiveTab('messages')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-slate-800 text-blue-400 shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                         Admin Comms
+                    </button>
+                    <button onClick={() => setActiveTab('warrants')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'warrants' ? 'bg-amber-900/30 text-amber-400 shadow-lg border border-amber-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Active Warrants
                     </button>
                 </div>
 
