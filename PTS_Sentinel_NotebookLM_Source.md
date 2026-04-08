@@ -1,7 +1,7 @@
 # PTS Sentinel: National Device Security & Identity Infrastructure
 ## Comprehensive Project Knowledge Base (v6.0)
 
-### 1. Vision & Executive Summary
+### 1. Vision & Executive Summary 
 The **PTS Sentinel** (Vexel AI) is a sovereign national digital infrastructure designed to eliminate mobile theft, fraud, and illegal device trafficking in Nigeria. It transforms the mobile phone from a simple gadget into a **Sentinel-Verified Digital Asset**.
 
 ---
