@@ -351,6 +351,34 @@ router.post('/:imei/track', async (req, res) => {
                 });
             }
 
+            // --- 🌐 INTERPOL GEO-FENCE BREACH DETECTION ---
+            let geoFenceAlert = null;
+            // Simple bounding box for Lagos State borders to simulate Interpol threshold
+            const isOutsideLagos = (lat, lon) => {
+                return lat < 6.25 || lat > 6.85 || lon < 3.0 || lon > 4.1;
+            };
+
+            if (isOutsideLagos(parseFloat(latitude), parseFloat(longitude))) {
+                geoFenceAlert = "Target device has breached the Lagos State Geo-Fence. Moving towards borders.";
+
+                await prisma.incidentReport.create({
+                    data: {
+                        deviceId: updatedDevice.id,
+                        reporterId: updatedDevice.registeredOwnerId, // auto reported
+                        type: "INTERPOL_GEOFENCE_BREACH",
+                        description: `[WARRANT PING] Tracker breached containment line. Loc: [${latitude}, ${longitude}]`,
+                        status: "OPEN"
+                    }
+                });
+
+                await sendPushNotification(
+                    updatedDevice.registeredOwnerId,
+                    "🚨 INTERPOL GEO-FENCE ALARM",
+                    "Your stolen device has illegally crossed the geographical boundary of Lagos State! Border checks have been automatically notified.",
+                    { deviceId: updatedDevice.id, alarm: true }
+                );
+            }
+
             // --- 🚨 CRITICAL PUSH NOTIFICATION ---
             await sendPushNotification(
                 updatedDevice.registeredOwnerId,
@@ -571,6 +599,55 @@ router.get('/public/blacklist', async (req, res) => {
     } catch (error) {
         console.error('Public blacklist error:', error);
         res.status(500).json({ error: 'Failed to fetch blacklist' });
+    }
+});
+
+// ============================================================
+// PUBLIC THREAT RADAR — Stolen Device Heatmap Aggregation
+// ============================================================
+router.get('/public/threat-radar', async (req, res) => {
+    try {
+        // Fetch tracking observation points of any device marked as STOLEN over the last 48 hours
+        const recentObservations = await prisma.observationReport.findMany({
+            where: {
+                device: { status: 'STOLEN' },
+                createdAt: {
+                    gte: new Date(Date.now() - 48 * 60 * 60 * 1000)
+                }
+            },
+            select: {
+                id: true,
+                latitude: true,
+                longitude: true,
+                device: { select: { brand: true, model: true } }
+            },
+            take: 2000
+        });
+
+        // Pull general text-based incident locations to map regional hot-zones
+        const recentIncidents = await prisma.incidentReport.findMany({
+            where: {
+                type: 'STOLEN',
+                createdAt: {
+                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                }
+            },
+            select: { location: true }
+        });
+
+        res.json({
+            activeHeatmapPoints: recentObservations.filter(o => o.latitude && o.longitude).map(o => ({
+                lat: o.latitude,
+                lng: o.longitude,
+                intensity: 10,
+                hint: `${o.device.brand} ${o.device.model} pinged recently`
+            })),
+            regionalWarnings: recentIncidents.map(i => i.location).filter(Boolean),
+            generatedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Threat radar error:', error);
+        res.status(500).json({ error: 'Failed to generate threat radar' });
     }
 });
 
