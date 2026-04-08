@@ -90,4 +90,4 @@ Anyone can go to the PTS homepage and enter a 15-digit IMEI. The system scans th
 ## 🛠️ Security Mechanisms
 - Devices cannot simply be deleted; they must go through proper Transfer or Reporting workflows.
 - Passwords are encrypted using `bcrypt`.
-- Authentication uses secure JWT token validation on the Express backend before returning Dashboard data.
+- Authentication uses secure JWT token validation on the Express backend before returning Dashboard data..
