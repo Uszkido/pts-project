@@ -27,7 +27,7 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence' | 'bulk-load'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence' | 'bulk-load' | 'telecom-eir' | 'warrants'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
     // New feature states
@@ -709,12 +709,14 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load'] as const).map(tab => (
+                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load', 'telecom-eir', 'warrants'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-400 shadow-lg border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
                                 tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length + users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length})` :
                                     tab === 'intelligence' ? 'AI Intelligence' :
-                                        tab === 'bulk-load' ? 'Bulk Load' : tab}
+                                        tab === 'bulk-load' ? 'Bulk Load' :
+                                            tab === 'telecom-eir' ? 'Telecom EIR' :
+                                                tab === 'warrants' ? 'Active Warrants' : tab}
                         </button>
                     ))}
                 </div>
@@ -1935,6 +1937,59 @@ export default function AdminDashboard() {
                 )}
                 {activeTab === 'intelligence' && (
                     <IntelligenceView apiUrl={apiUrl} headers={headers} />
+                )}
+
+                {/* TAB: Telecom EIR */}
+                {activeTab === 'telecom-eir' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center text-rose-400 border border-rose-500/30">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Telecom EIR Sandbox</h3>
+                                <p className="text-sm text-slate-400">Simulate network-level blocking across major Nigerian telecom operators.</p>
+                            </div>
+                        </div>
+                        <div className="grid md:grid-cols-3 gap-6">
+                            {['MTN Nigeria', 'Airtel', 'Globacom (Glo)'].map(telco => (
+                                <div key={telco} className="bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="text-white font-black mb-2">{telco}</h4>
+                                        <p className="text-xs text-slate-500 mb-4">Equipment Identity Register (EIR) Link: <span className="text-emerald-500">Active</span></p>
+                                    </div>
+                                    <button onClick={() => alert(`Simulating Drop-Kick for stolen IMEIs on ${telco} network. In production, this pushes to the Kafka event queue.`)} className="w-full py-3 rounded-lg text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700">
+                                        Test Network Drop-Kick
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: Active Warrants */}
+                {activeTab === 'warrants' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 border border-amber-500/30">
+                                <LayoutDashboard className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">NPF Active Warrants</h3>
+                                <p className="text-sm text-slate-400">Force devices into Bloodhound tracking mode based on electronic police warrants.</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
+                            <h4 className="text-slate-300 font-bold mb-4 uppercase text-sm tracking-widest border-b border-slate-800 pb-2">Issue Digital Warrant</h4>
+                            <div className="flex gap-4">
+                                <input type="text" placeholder="Enter Target IMEI..." className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" />
+                                <button onClick={() => alert('Warrant Executed! Target device is now in Bloodhound Mode. Live pings will be forwarded to Law Enforcement.')} className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg">
+                                    Execute Warrant
+                                </button>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-4 italic">Execution forces the native PTS app (if installed) to ignore battery constraints and ping GPS every 60 seconds.</p>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>

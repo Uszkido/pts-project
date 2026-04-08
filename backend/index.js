@@ -31,6 +31,7 @@ const trackingRoutes = require('./src/routes/tracking');
 const apiKeysRoutes = require('./src/routes/apiKeys');
 const paymentRoutes = require('./src/routes/payments');
 const analyticsRoutes = require('./src/routes/analytics');
+const ussdRoutes = require('./src/routes/ussd');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -62,6 +63,7 @@ app.use('/api/v1/tracking', trackingRoutes);
 app.use('/api/v1/b2b', apiKeysRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/ussd', ussdRoutes);
 
 app.get('/ping', (req, res) => {
     res.json({ status: 'ok', message: 'Pong!' });

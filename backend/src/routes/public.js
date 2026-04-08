@@ -95,4 +95,36 @@ router.post('/safe-contact/:imei', async (req, res) => {
     }
 });
 
+/**
+ * @api {post} /api/v1/public/whistleblower Anonymous Bounty Program
+ * @apiDescription Allows users/technicians to report illegal chop-shops and earn rewards.
+ */
+router.post('/whistleblower', async (req, res) => {
+    try {
+        const { targetCompanyName, evidenceDetails, cryptoWallet } = req.body;
+
+        if (!targetCompanyName || !evidenceDetails) {
+            return res.status(400).json({ error: 'Missing required evidence.' });
+        }
+
+        // Ideally log this securely in a dedicated "AnonymousTips" table
+        // For demonstration, we'll log it as a critical system incident
+        await prisma.incident.create({
+            data: {
+                deviceId: "SYSTEM_WIDE", // General incident
+                type: 'CHOP_SHOP_REPORT',
+                status: 'OPEN',
+                description: `WHISTLEBLOWER TIP: Target: ${targetCompanyName}. Evidence: ${evidenceDetails}. Bounty Payment Addr: ${cryptoWallet || 'None provided'}.`,
+                latitude: 0,
+                longitude: 0,
+            }
+        });
+
+        res.json({ message: 'Tip received securely and anonymously. Intelligence feed updated.' });
+    } catch (error) {
+        console.error('Whistleblower Error:', error);
+        res.status(500).json({ error: 'Failed to process anonymous tip.' });
+    }
+});
+
 module.exports = router;
