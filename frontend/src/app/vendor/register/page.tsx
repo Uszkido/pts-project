@@ -198,12 +198,16 @@ export default function VendorRegister() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN) *</label>
-                                        <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                                        <div className="relative">
+                                            <input type="text" value={nationalId} onChange={e => setNationalId(e.target.value)} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors" />
+                                            <div className="mt-3">
+                                                <RegulaDocumentScanner onExtracted={(data: { fullName: string; nationalId: string }) => {
+                                                    setFullName(data.fullName);
+                                                    setNationalId(data.nationalId);
+                                                }} />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <RegulaDocumentScanner onExtracted={(data: { fullName: string; nationalId: string }) => {
-                                        setFullName(data.fullName);
-                                        setNationalId(data.nationalId);
-                                    }} />
                                     <div>
                                         <label className="block text-xs font-medium text-slate-400 mb-1.5">Phone Number *</label>
                                         <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+234..." className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors" required />

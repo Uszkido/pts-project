@@ -98,36 +98,33 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
     };
 
     return (
-        <div className="w-full bg-slate-900/50 p-4 border border-blue-500/30 rounded-xl">
-            <h3 className="text-blue-400 font-semibold mb-2 text-sm flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                Regula Auto-Extract OCR
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-                Skip manual entry. Scan your physical National ID (NIN), Voters Card, or Driver's License.
-            </p>
+        <div className="w-full">
             <input
-                type="document"
+                type="file"
                 accept="image/*"
-                capture="environment"
                 ref={fileInputRef}
                 className="hidden"
                 onChange={handleProcessImage}
             />
-            {error && <p className="text-red-400 text-xs mb-3 font-medium bg-red-950/40 p-2 rounded">{error}</p>}
+            {error && <p className="text-red-400 text-[10px] mb-2 font-bold bg-red-500/10 p-2 rounded-lg border border-red-500/20">{error}</p>}
 
             <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isScanning}
-                className="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/50 rounded-lg py-2.5 px-4 text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl py-3 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 group"
             >
                 {isScanning ? (
                     <>
                         <svg className="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        Scanning ID Features...
+                        Parsing Sovereignty Data...
                     </>
-                ) : "Scan ID Card"}
+                ) : (
+                    <>
+                        <svg className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                        Scan ID / Voters Card
+                    </>
+                )}
             </button>
         </div>
     );

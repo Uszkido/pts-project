@@ -270,7 +270,6 @@ router.put('/users/:id/status', authenticateAdmin, async (req, res) => {
             return res.status(400).json({ error: 'Invalid status. Must be ACTIVE or SUSPENDED.' });
         }
 
-        // Prevent admin from suspending themselves
         if (id === req.user.id) {
             return res.status(403).json({ error: 'You cannot suspend your own admin account.' });
         }
@@ -280,6 +279,34 @@ router.put('/users/:id/status', authenticateAdmin, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Admin clears/deletes OTP for a user (Manual bypass)
+router.delete('/users/:id/otp', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.user.update({
+            where: { id },
+            data: { emailVerificationOtp: null }
+        });
+        res.json({ message: 'User OTP cleared. User must now be verified manually or re-request a code.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to clear OTP' });
+    }
+});
+
+// Admin manual verify (Skip OTP)
+router.put('/users/:id/verify-manually', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.user.update({
+            where: { id },
+            data: { isEmailConfirmed: true, emailVerificationOtp: null }
+        });
+        res.json({ message: 'User account verified manually by administrator.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Manual verification failed' });
     }
 });
 

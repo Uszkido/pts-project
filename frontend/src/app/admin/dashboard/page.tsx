@@ -26,7 +26,7 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence' | 'bulk-load'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
     // New feature states
@@ -529,6 +529,42 @@ export default function AdminDashboard() {
         } catch (err: any) { alert(err.message); }
     };
 
+    const clearUserOtp = async (userId: string) => {
+        if (!confirm('Permanently delete this user\'s OTP verification code?')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${userId}/otp`, { method: 'DELETE', headers });
+            if (!res.ok) throw new Error('Failed to clear OTP');
+            alert('OTP cleared successfully');
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const manualVerifyUser = async (userId: string) => {
+        if (!confirm('Manually verify this user and bypass OTP requirements?')) return;
+        try {
+            const res = await fetch(`${apiUrl}/admin/users/${userId}/verify-manually`, { method: 'PUT', headers });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(data.message);
+            fetchData();
+        } catch (err: any) { alert(err.message); }
+    };
+
+    const handleBulkImport = async (jsonString: string) => {
+        try {
+            const devices = JSON.parse(jsonString);
+            const res = await fetch(`${apiUrl}/admin/devices/bulk-import`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ devices })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(`Bulk Success: ${data.importedCount} devices imported, ${data.skippedCount} skipped.`);
+            fetchData();
+        } catch (err: any) { alert('Invalid format or upload failed: ' + err.message); }
+    };
+
     const clearIncident = async (incidentId: string) => {
         if (!confirm('Mark this incident as cleared/resolved?')) return;
         try {
@@ -641,11 +677,12 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests'] as const).map(tab => (
+                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-400 shadow-lg border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
-                                tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length})` :
-                                    tab === 'intelligence' ? 'AI Intelligence' : tab}
+                                tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length + users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length})` :
+                                    tab === 'intelligence' ? 'AI Intelligence' :
+                                        tab === 'bulk-load' ? 'Bulk Load' : tab}
                         </button>
                     ))}
                 </div>
@@ -756,7 +793,10 @@ export default function AdminDashboard() {
                                         <button onClick={() => fetchUserDetails(vendor.id)} className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors">View Details</button>
                                         {vendor.vendorStatus !== 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'APPROVED')} className="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg transition-colors">✓ Approve</button>}
                                         {vendor.vendorStatus !== 'REJECTED' && <button onClick={() => updateVendorStatus(vendor.id, 'REJECTED')} className="text-xs font-bold bg-red-600/80 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors">✕ Reject</button>}
-                                        {vendor.vendorStatus === 'APPROVED' && <button onClick={() => updateVendorStatus(vendor.id, 'SUSPENDED')} className="text-xs font-bold bg-amber-600/80 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors">⚠ Suspend</button>}
+                                        <button onClick={() => deleteUser(vendor.id)} className="text-xs font-bold bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            Delete Vendor
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -818,14 +858,13 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4 text-slate-300">{user._count?.devices || 0}</td>
                                                 <td className="px-6 py-4 text-slate-500 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <div className="flex flex-col gap-2 items-end">
-                                                        <button onClick={() => fetchUserDetails(user.id)} className="text-xs text-blue-500 hover:text-blue-400 font-bold">View / Edit</button>
-                                                        {user.status !== 'SUSPENDED' ? (
-                                                            <button onClick={() => updateUserStatus(user.id, 'SUSPENDED')} className="text-xs text-amber-500 hover:text-amber-400 font-bold">Suspend</button>
-                                                        ) : (
-                                                            <button onClick={() => updateUserStatus(user.id, 'ACTIVE')} className="text-xs text-emerald-500 hover:text-emerald-400 font-bold">Activate</button>
-                                                        )}
-                                                        <button onClick={() => deleteUser(user.id)} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => fetchUserDetails(user.id)} className="text-blue-400 hover:text-blue-300 p-2" title="View Details">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                        </button>
+                                                        <button onClick={() => deleteUser(user.id)} className="text-red-500 hover:text-red-400 p-2" title="Permanently Delete User">
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1167,6 +1206,62 @@ export default function AdminDashboard() {
                 }
 
                 {/* TAB: Auth Requests */}
+                {/* TAB: Bulk Load */}
+                {activeTab === 'bulk-load' && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
+                                <Smartphone className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Bulk Telemetric Asset Ingestion</h3>
+                                <p className="text-sm text-slate-400">Mass register devices directly into the National Sovereign Registry via JSON/CSV payload.</p>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">JSON Input Payload</label>
+                                <textarea
+                                    id="bulk-payload"
+                                    placeholder='[{"imei": "123...", "brand": "Samsung", "model": "S24 Ultra"}, ...]'
+                                    rows={10}
+                                    className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl px-4 py-4 text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                                />
+                                <button
+                                    onClick={() => handleBulkImport((document.getElementById('bulk-payload') as HTMLTextAreaElement).value)}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                                >
+                                    INITIALIZE BULK INJECTION
+                                </button>
+                            </div>
+
+                            <div className="bg-slate-950/50 border border-slate-800/50 rounded-2xl p-6">
+                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Ingestion Protocols</h4>
+                                <ul className="space-y-3 text-xs text-slate-400 leading-relaxed">
+                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> IMEIs must be 15 digits. Duplicates will be automatically suppressed.</li>
+                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Payload limit: 50,000 assets per broadcast.</li>
+                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Default status for new assets is set to <span className="text-emerald-500">CLEAN</span>.</li>
+                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Risk scores default to base 100 for verified batch imports.</li>
+                                </ul>
+
+                                <div className="mt-8 pt-8 border-t border-slate-800">
+                                    <p className="text-[10px] text-slate-600 uppercase font-black mb-2 tracking-widest">Example Structure</p>
+                                    <pre className="text-[9px] bg-black/40 p-3 rounded-xl border border-slate-800 text-emerald-500/70 overflow-hidden">
+                                        {`[
+  {
+    "imei": "358923098234901",
+    "brand": "Apple",
+    "model": "iPhone 15 Pro Max",
+    "status": "CLEAN"
+  }
+]`}
+                                    </pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {activeTab === 'auth-requests' && (
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
                         <table className="w-full text-sm text-left">
@@ -1203,8 +1298,11 @@ export default function AdminDashboard() {
                                                 <td className="px-6 py-4">
                                                     <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{user.emailVerificationOtp}</span>
                                                 </td>
-                                                <td className="px-6 py-4 text-right text-xs text-slate-500 italic">
-                                                    Waiting for User
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex gap-2 justify-end">
+                                                        <button onClick={() => manualVerifyUser(user.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded transition-colors uppercase">Verify Manually</button>
+                                                        <button onClick={() => clearUserOtp(user.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded transition-colors uppercase">Delete OTP</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
