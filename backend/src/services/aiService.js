@@ -218,19 +218,53 @@ const analyzePhishingMessage = async (messageText) => {
 
 /**
  * AI Agent: Sentinel Legal Advisor
- * Trained on Nigerian Cybercrime Act and Criminal Code.
+ * Deterministic Legal Lookup Engine (Based on Lawglance principles).
+ * Strict mapping to Nigerian Cybercrime Act 2015 and Criminal Code to prevent AI hallucination.
  */
 const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
-    if (!genAI || !userQuery) return "Legal advisor is currently offline.";
-    try {
-        const prompt = `You are the "Sentinel Legal AI". You are an expert on Nigerian Law, specifically the Cybercrime Act 2015 and the Criminal Code (Section 427 - Receiving Stolen Property).
-        A user is asking: "${userQuery}".
-        Provide a concise legal guidance in ${language}. 
-        Warn them clearly about the penalties for buying stolen phones (up to 14 years imprisonment).
-        Always advise them to cooperate with the Nigerian Police Force (NPF) and use the PTS Registry for safety.
-        Keep it under 150 words.`;
-        return await generateGeminiText(prompt);
-    } catch (e) { console.error("Legal AI Error:", e); return "Please consult a qualified legal practitioner or visit the nearest NPF station."; }
+    const query = userQuery?.toLowerCase() || "";
+
+    // Hardcoded authoritative legal definitions
+    const LAW_GLANCE_DB = {
+        "stolen": "Under Section 427 of the Nigerian Criminal Code, receiving or possessing a stolen device is a felony punishable by up to 14 years in prison. You must immediately report this device to the nearest Nigerian Police Force (NPF) station.",
+        "receipt": "A forged or tampered receipt violates the Cybercrime (Prohibition, Prevention, etc.) Act 2015. Always demand the original carton and verify the IMEI electronically via the PTS Sentinel Registry before finalizing payment.",
+        "block": "Once a device is flagged as 'Stolen', PTS automatically initiates a network block request across all Nigerian Telecoms (MTN, Airtel, Glo, 9mobile). Using a blocked phone constitutes unlawful network access.",
+        "data": "Under the Nigeria Data Protection Regulation (NDPR), you have the right to request the deletion of your personal biodata if you no longer wish to use the PTS ecosystem. Contact data-officer@pts.gov.ng for immediate processing."
+    };
+
+    const LAW_GLANCE_HAUSA = {
+        "stolen": "A karkashin Sashe na 427 na Dokar Manyan Laifuka ta Najeriya, mallakar wayar sata babban laifi ne wanda hukuncinsa zai iya kai shekaru 14 a gidan yari. Dole ne ku kai rahoton wannan wayar zuwa ofishin yansanda mafi kusa.",
+        "receipt": "Takardar karya ko wadda aka yi mata jabun resit ta saba wa Dokar Laifukan Intanet ta 2015. Koyaushe ku nemi asalin kwali kuma ku tabbatar da IMEI ta manhajar PTS Sentinel gabanin biyan kudi.",
+        "block": "Da zarar an yi wa waya alamar 'Sata', PTS tana mika bukatar toshe ta a duk hanyoyin sadarwa na Najeriya (MTN, Airtel, Glo, 9mobile). Amfani da wayar da aka toshe laifi ne.",
+        "data": "Karkashin Dokar Kare Bayanai ta Najeriya (NDPR), kuna da hakkin neman a goge bayanan ku idan baku son ci gaba da amfani da PTS. Tuntubi data-officer@pts.gov.ng."
+    };
+
+    const LAW_GLANCE_PIDGIN = {
+        "stolen": "Omo, Section 427 of Criminal code talk say to hold stolen phone na confirm offense wey fit land person 14 years for kirikiri. Abeg carry this phone go the nearest police station sharply.",
+        "receipt": "To forge receipt na serious case under Cybercrime Act 2015. Abeg no pay shishi if dem no give you original carton and you don verify the IMEI for PTS app.",
+        "block": "As dem don mark the phone 'Stolen', PTS don block am for all network (MTN, Airtel, Glo, 9mobile). To use blocked phone na serious problem.",
+        "data": "Under the NDPR law, you get right to delete your data anytime you wan stop to dey use PTS. Just message data-officer@pts.gov.ng."
+    };
+
+    let selectedDb = LAW_GLANCE_DB;
+    if (language.toUpperCase() === "HAUSA") selectedDb = LAW_GLANCE_HAUSA;
+    if (language.toUpperCase() === "PIDGIN") selectedDb = LAW_GLANCE_PIDGIN;
+
+    // Direct Lookup Logic
+    for (const [keyword, legalText] of Object.entries(selectedDb)) {
+        if (query.includes(keyword)) {
+            return `[OFFICIAL PTS LEGAL COUNSEL] ${legalText}`;
+        }
+    }
+
+    // Default Fallback Warning
+    if (language.toUpperCase() === "HAUSA") {
+        return "[OFFICIAL PTS LEGAL COUNSEL] Sayen wayar aljihun da ba a sani ba abu ne mai hadari wanda zai iya jefa ka a matsala ta shari'a. Koyaushe a yi amfani da PTS don tabbatar da nagartar na'urar.";
+    } else if (language.toUpperCase() === "PIDGIN") {
+        return "[OFFICIAL PTS LEGAL COUNSEL] To buy phone wey u no know the source na big risk wey fit put u for police net. Always use PTS verify phone before u drop money.";
+    }
+
+    return "[OFFICIAL PTS LEGAL COUNSEL] Purchasing a device of unknown origin carries severe legal risks under Nigerian Law. Always rely on the PTS National Registry to verify device claims before exchanging funds.";
 };
 
 /**
