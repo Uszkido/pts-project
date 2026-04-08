@@ -293,4 +293,36 @@ router.post('/devices/bulk-import', authenticateToken, verifyVendorRole, async (
     }
 });
 
+// Request Vendor Tier Upgrade (Tier 2 -> Tier 1)
+router.post('/request-tier-upgrade', authenticateToken, verifyVendorRole, async (req, res) => {
+    try {
+        const { cacCertificateUrl, shopPhotoUrl, notes } = req.body;
+
+        if (!cacCertificateUrl || !shopPhotoUrl) {
+            return res.status(400).json({ error: 'Corporate Affairs Commission (CAC) Certificate and Shop Photo are required for Tier 1 Enterprise upgrades.' });
+        }
+
+        // 1. Update the vendor's profile with the new documents
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { cacCertificateUrl, shopPhotoUrl, vendorStatus: 'PENDING' } // Downgrade back to PENDING so Admin can review
+        });
+
+        // 2. Alert the Admin Team 
+        await prisma.message.create({
+            data: {
+                senderId: req.user.id,
+                receiverRole: 'ADMIN',
+                subject: `📈 TIER 1 UPGRADE REQUEST: ${req.user.companyName || 'Vendor'}`,
+                body: `Vendor ${req.user.companyName} has requested an Enterprise Tier 1 upgrade.\n\nNotes: ${notes || 'None'}\n\nPlease review their CAC Certificate and Shop Data in the Admin portal.`
+            }
+        });
+
+        res.status(201).json({ message: 'Tier 1 Upgrade request transmitted securely to the PTS Sentinel Administrators. Your account enters an audit state.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to process tier upgrade request.' });
+    }
+});
+
 module.exports = router;

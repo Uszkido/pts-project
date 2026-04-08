@@ -227,6 +227,28 @@ router.put('/users/:id/vendor-status', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Admin overrides a vendor's numerical Tier
+router.put('/users/:id/vendor-tier', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { vendorTier } = req.body;
+
+        if (![1, 2, 3].includes(vendorTier)) {
+            return res.status(400).json({ error: 'Tier must be 1 (Enterprise), 2 (Standard), or 3 (Basic).' });
+        }
+
+        const user = await prisma.user.update({
+            where: { id },
+            data: { vendorTier }
+        });
+
+        res.json({ message: `Vendor physically upgraded to strict Tier ${vendorTier}`, user: { id: user.id, companyName: user.companyName, vendorTier: user.vendorTier } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update vendor tier.' });
+    }
+});
+
 // Delete user
 router.delete('/users/:id', authenticateAdmin, async (req, res) => {
     try {
