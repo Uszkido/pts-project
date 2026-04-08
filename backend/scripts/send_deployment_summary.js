@@ -35,6 +35,7 @@ const mailOptions = {
             <ul>
                 <li><strong>Main Landing / Public Verify:</strong> <a href="https://pts-vexel.vercel.app">pts-vexel.vercel.app</a></li>
                 <li><strong>B2B Developer Hub:</strong> <a href="https://pts-vexel.vercel.app/developer">/developer</a></li>
+                <li><strong>Enterprise Analytics (Metabase):</strong> <a href="https://pts-vexel.vercel.app/admin/analytics">/admin/analytics</a></li>
                 <li><strong>Law Enforcement Command:</strong> <a href="https://pts-vexel.vercel.app/police/login">/police/login</a></li>
                 <li><strong>Merchant/Vendor Network:</strong> <a href="https://pts-vexel.vercel.app/vendor/login">/vendor/login</a></li>
                 <li><strong>Consumer Dash:</strong> <a href="https://pts-vexel.vercel.app/consumer/login">/consumer/login</a></li>
@@ -46,15 +47,19 @@ const mailOptions = {
             </div>
             <p style="font-size: 12px; color: #666;">* Send this key to NCC for stress testing (1,000,000 call monthly quota).</p>
 
-            <h3 style="color: #059669;">📊 Presentation Pitch Deck</h3>
-            <p>The "Vexel Vision" printable proposal is updated with the new 2026 B2B Sovereign Gateways and stats.</p>
-            <p><strong>Local Path:</strong> <code>pts/PTS_Proposal_Printable.html</code></p>
-
-            <h3 style="color: #ea580c;">💰 Monetization & Quota Systems</h3>
+            <h3 style="color: #ea580c;">� Monetization & Quota Systems</h3>
             <ul>
-                <li><strong>Free Trial:</strong> 500 calls/month (fair usage)</li>
+                <li><strong>Standard PAYG:</strong> 10,000 calls/month (fair usage)</li>
                 <li><strong>Billing:</strong> Pay-As-You-Go with Paystack Integration</li>
-                <li><strong>Enterprise:</strong> Dedicated NCC/Telecom Hooks (Q3 2026)</li>
+                <li><strong>Enterprise:</strong> Dedicated NCC/Telecom Hooks (1,000,000+ Calls)</li>
+            </ul>
+
+            <h3 style="color: #059669;">�️ Finalized Zero-Trust Offline Engines</h3>
+            <ul>
+                <li><strong>Biometric Engine:</strong> Exadel CompreFace Integrated & KBY-AI Hardware Bridge prepped.</li>
+                <li><strong>ID Auto-Extraction:</strong> Regula Forensics Document Reader Web Hooks live.</li>
+                <li><strong>Phishing Guardian:</strong> Sublime-Security style Offline NLP active.</li>
+                <li><strong>Legal Framework:</strong> 100% Deterministic Judicial Engine (LawGlance).</li>
             </ul>
 
             <hr style="border: 1px solid #eee;" />

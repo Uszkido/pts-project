@@ -48,7 +48,7 @@ router.post('/generate', async (req, res) => {
                 apiKeyHash,
                 keyPrefix: 'pts_live_',
                 billingPlan: billingPlan || 'PAYG',
-                monthlyQuota: billingPlan === 'ENTERPRISE' ? 1000000 : 500 // 500 free trial calls
+                monthlyQuota: billingPlan === 'ENTERPRISE' ? 1000000 : 10000 // 10,000 standard calls
             }
         });
 
