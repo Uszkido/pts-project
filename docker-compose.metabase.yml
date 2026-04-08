@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  metabase:
+    image: metabase/metabase:latest
+    container_name: pts_metabase
+    ports:
+      - "3001:3000" # Exposing Metabase on 3001 to avoid colliding with Next.js on 3000
+    environment:
+      - MB_DB_TYPE=postgres
+      # Optional: Provide Metabase with its own application DB to store dashboard configurations.
+      # By default it uses H2 inside the container, but a real DB is safer.
+      # You can connect to your main PTS database AFTER metabase boots up via its UI.
+    volumes:
+      - metabase-data:/metabase-data
+    restart: unless-stopped
+
+volumes:
+  metabase-data:
