@@ -1,4 +1,4 @@
-# PTS Deployment Guide
+# PTS Deployment Guides
 
 This document outlines the steps to deploy the Phone Tracking System (PTS) to Vercel.
 
