@@ -1,6 +1,6 @@
 # 📘 PTS Platform Knowledge Base & Architecture Document
 **Designed for**: Personal AI Research & Training (NotebookLM)  
-**Project**: Phone Theft Tracking System (PTS)  
+**Project**: Phone/Police Theft Tracking System (PTS)  
 **Organization**: Vexel Innovations  
 **Version**: 3.0 (Comprehensive Build)  
 **Status**: Active Production Archive
