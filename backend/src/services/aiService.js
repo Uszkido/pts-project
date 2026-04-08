@@ -9,7 +9,7 @@ if (process.env.GEMINI_API_KEY) {
 
 const generateGeminiText = async (prompt) => {
     if (!genAI) throw new Error("No AI available. Check GEMINI_API_KEY.");
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     const result = await model.generateContent(prompt);
     if (result && result.response) return result.response.text();
     throw new Error("Invalid Gemini response structure");
@@ -40,7 +40,7 @@ const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, device
         return `[Fallback Mode]\nDevice: ${deviceBrand} ${deviceModel}\nStatus: ${deviceStatus}\nRisk Score: ${riskScore}%\nRecommendation: ${deviceStatus === 'CLEAN' ? 'Safe to buy' : 'Do not buy. Report to Police.'}`;
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const prompt = `You are the "PTS AI Sentinel" (National Device Identity & Security AI).
 A user has asked you to verify a mobile phone. You must reply using a mix of formal, clear Nigerian English and standard Hausa/Pidgin where appropriate.
@@ -80,7 +80,7 @@ const analyzeReceiptForFraud = async (receiptUrl, expectedBrand, expectedModel) 
     if (!genAI || !receiptUrl) return { isLikelyFake: false, reason: "No AI or no receipt" };
     try {
         const { buffer, mimeType } = await getFetchBufferAndMime(receiptUrl);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `You are a digital forensics AI. Analyze this device purchase receipt image for ${expectedBrand} ${expectedModel}.
         Look for Photoshop, text misalignment, or tampering. Respond with ONLY a JSON object: { "isLikelyFake": boolean, "confidenceScore": 0-100, "reasonText": "string" }`;
 
@@ -97,7 +97,7 @@ const analyzeDeviceHardwareCondition = async (photoUrls, brand, modelName) => {
     if (!genAI || !photoUrls?.length) return { grade: "Unknown" };
     try {
         const { buffer, mimeType } = await getFetchBufferAndMime(photoUrls[0]);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Analyze this ${brand} ${modelName} hardware condition. Look for cracks, aftermarket bezels, or bulges. 
         Respond with ONLY a JSON object: { "grade": "String", "notes": "String", "hasAftermarketScreen": boolean }`;
 
@@ -113,7 +113,7 @@ const analyzeDeviceHardwareCondition = async (photoUrls, brand, modelName) => {
 const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") => {
     if (!genAI) return { subject: "OTP", body: `Your OTP is ${otp}` };
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Write a premium, friendly email body for ${fullName}. Action: ${mode}. OTP: ${otp}. Mix in Nigerian English/Hausa. Keep under 60 words. 
         Respond with ONLY a JSON object: { "subject": "String", "body": "String" }`;
         const result = await model.generateContent(prompt);
@@ -127,7 +127,7 @@ const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") =
 const transcribeAudio = async (audioBuffer, mimeType) => {
     if (!genAI || !audioBuffer) return null;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
         const result = await model.generateContent([{ inlineData: { data: audioBuffer.toString("base64"), mimeType } }, "Transcribe this audio. Return ONLY the text."]);
         return result.response.text().trim();
     } catch (e) { console.error(e); return null; }
@@ -162,7 +162,7 @@ const extractImeiFromImage = async (imageUrl) => {
     if (!genAI || !imageUrl) return null;
     try {
         const { buffer, mimeType } = await getFetchBufferAndMime(imageUrl);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
         const result = await model.generateContent([{ inlineData: { data: buffer.toString("base64"), mimeType } }, "Find 15-digit IMEI. Return numbers ONLY."]);
         const match = result.response.text().match(/\d{15}/);
         return match ? match[0] : null;
@@ -188,7 +188,7 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
     if (!genAI || status !== 'STOLEN') return { isSmuggled: false, warning: null };
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `Analyze this stolen device movement in Nigeria. 
         Last Scan City: ${lastLocation}
         Current Scan City: ${currentLocation}
@@ -207,7 +207,7 @@ const analyzePhishingMessage = async (messageText) => {
     if (!genAI || !messageText) return { isScam: false, confidence: 0, warning: "Safe", action: "NONE" };
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
         const prompt = `You are the PTS Phishing Shield AI. Analyze this message for social engineering, credential harvesting, or financial scams common in Nigeria (e.g., BVN/NIN scams, authority spoofing, fake banking alerts).
         
         Message: "${messageText}"
@@ -239,7 +239,7 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
     if (!genAI || !userQuery) return "[OFFICIAL PTS] Consult a legal professional for specific inquiries.";
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         const BASE_KNOWLEDGE = `
         - Section 427 of Nigerian Criminal Code: Possession of stolen property (up to 14 years).
@@ -351,7 +351,7 @@ const verifyFacialIdentityLiveness = async (facialImageUrl) => {
         }
 
         // Gemini AI Integration Fallback (Priority #2)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
 
         const prompt = `You are a strict, top-tier Government Biometric AI Security System for the National Device Registry.
         Analyze this facial capture.
@@ -391,7 +391,7 @@ const extractIdDataFromImage = async (idImageUrl) => {
     try {
         const { buffer, mimeType } = await getFetchBufferAndMime(idImageUrl);
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",
+            model: "gemini-1.5-flash-latest",
             generationConfig: { responseMimeType: "application/json" }
         });
 
