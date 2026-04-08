@@ -354,20 +354,21 @@ router.post('/:imei/track', async (req, res) => {
             // --- 🌐 INTERPOL GEO-FENCE BREACH DETECTION ---
             let geoFenceAlert = null;
             // Simple bounding box for Northern Nigeria borders to simulate Interpol threshold
-            // Northern Nigeria is roughly Lat: 8.5 (South border) to 14.0 (Niger border), Lon: 3.5 (West) to 14.5 (East)
+            // Northern Nigeria is roughly Lat: 7.0 (South edge of Middle Belt/North Central) to 14.0 (Niger border)
+            // Lon: 3.5 (West) to 14.5 (East border with Cameroon/Chad)
             const isOutsideNorthernRegion = (lat, lon) => {
-                return lat < 8.5 || lat > 14.0 || lon < 3.5 || lon > 14.5;
+                return lat < 7.0 || lat > 14.0 || lon < 3.5 || lon > 14.5;
             };
 
             if (isOutsideNorthernRegion(parseFloat(latitude), parseFloat(longitude))) {
-                geoFenceAlert = "Target device has breached the Northern Nigeria Geo-Fence. Moving towards international borders or Southern zones.";
+                geoFenceAlert = "Target device has breached the Northern Nigeria/Middle Belt Geo-Fence. Moving towards international borders or deep South.";
 
                 await prisma.incidentReport.create({
                     data: {
                         deviceId: updatedDevice.id,
                         reporterId: updatedDevice.registeredOwnerId, // auto reported
                         type: "INTERPOL_GEOFENCE_BREACH",
-                        description: `[WARRANT PING] Tracker breached Northern containment line. Loc: [${latitude}, ${longitude}]`,
+                        description: `[WARRANT PING] Tracker breached Northern/Middle-Belt containment line. Loc: [${latitude}, ${longitude}]`,
                         status: "OPEN"
                     }
                 });
