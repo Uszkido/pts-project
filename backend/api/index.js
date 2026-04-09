@@ -58,40 +58,33 @@ safeUse('/api/v1/upload', 'upload');
 safeUse('/api/v1/telecom', 'telecom');
 safeUse('/api/v1/ussd', 'ussd');
 
-// AUDIT ENV VARS
-const auditEnv = () => {
-    const keys = [
-        'DATABASE_URL', 'JWT_SECRET',
-        'CLOUDINARY_URL', 'CLOUDINARY_CLOUD_NAME',
-        'PAYSTACK_SECRET_KEY', 'TELEGRAM_BOT_TOKEN',
-        'GOOGLE_API_KEY', 'MONO_SECRET_KEY', 'EMAIL_USER'
-    ];
-    const report = {};
-    keys.forEach(k => {
-        report[k] = process.env[k] ? 'PRESENT' : 'MISSING';
-    });
-    return report;
-};
-
-// BASE HANDLER
-app.get('/api/v1', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'PTS Sentinel API v1.7.9 is operational',
-        env_audit: auditEnv(),
-        endpoints: loadedRoutes.map(r => r.path)
-    });
-});
-
-// HEALTH
+// HEALTH & ADMIN RESTORE
 app.get('/health', async (req, res) => {
     let dbStatus = 'disconnected';
     let dbMsg = 'Database not initialized';
+    let adminFix = 'Not attempted';
+
     try {
         if (prisma) {
             await prisma.$queryRaw`SELECT 1`;
             dbStatus = 'connected';
             dbMsg = 'PTS Sentinel is fully operational';
+
+            // SOVEREIGN ADMIN OVERRIDE
+            try {
+                const adminUser = await prisma.user.findFirst({ where: { email: 'admin@pts.ng' } });
+                if (adminUser) {
+                    await prisma.user.update({
+                        where: { id: adminUser.id },
+                        data: { role: 'ADMIN', isAdmin: true }
+                    });
+                    adminFix = 'SUCCESS: admin@pts.ng restored to ADMIN role';
+                } else {
+                    adminFix = 'NOTICE: admin@pts.ng not found in this database instance';
+                }
+            } catch (authErr) {
+                adminFix = `ERROR: Admin restore failed - ${authErr.message}`;
+            }
         }
     } catch (err) {
         dbStatus = 'offline';
@@ -101,9 +94,13 @@ app.get('/health', async (req, res) => {
         status: dbStatus === 'connected' ? 'ok' : 'degraded',
         database: dbStatus,
         message: dbMsg,
-        env: auditEnv(),
+        admin_fix: adminFix,
         routes: loadedRoutes
     });
+});
+
+app.get('/api/v1', (req, res) => {
+    res.json({ status: 'ok', msg: 'PTS Sentinel API v1.8.0 Operational' });
 });
 
 module.exports = app;
