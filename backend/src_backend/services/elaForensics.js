@@ -14,7 +14,7 @@
  * 7. Calculate a tamper score from the statistical distribution of differences.
  */
 
-const fetch = require('node-fetch');
+const axios = require('axios');
 const crypto = require('crypto');
 
 // Lazy-load sharp to avoid native module boot-time issues on Vercel
@@ -34,9 +34,8 @@ const fetchImageBuffer = async (url) => {
         const base64Data = url.split(',')[1];
         return Buffer.from(base64Data, 'base64');
     }
-    const response = await fetch(url, { timeout: 8000 });
-    if (!response.ok) throw new Error(`Failed to fetch image: HTTP ${response.status}`);
-    return Buffer.from(await response.arrayBuffer());
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 8000 });
+    return Buffer.from(response.data);
 };
 
 /**
