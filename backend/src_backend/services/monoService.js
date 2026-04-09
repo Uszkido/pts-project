@@ -1,95 +1,45 @@
-// Using native Node 18+ fetch
+/**
+ * PTS SENTINEL — Mono Financial & Identity Service
+ * Status: SUSPENDED (v1.7.8) - Mock Mode Active
+ * ==================================================
+ * Suspended as requested. Returns simulated successful verifications
+ * to maintain UI flows without requiring a live MONO_SEC_KEY.
+ */
 
 const MONO_SEC_KEY = process.env.MONO_SEC_KEY || '';
 
 /**
- * Verify exactly or search CAC business registration using Mono API
- * @param {string} searchTerm - The CAC registration number or company name
- * @returns {Promise<any>} - The business details if valid
+ * Mock CAC Business Verification
  */
 const verifyCAC = async (searchTerm) => {
-    if (!MONO_SEC_KEY) {
-        console.warn('⚠️ MONO_SEC_KEY is not set. Skipping real CAC verification.');
-        return { valid: true, mock: true, warning: "Mono API Key missing" };
-    }
-
-    try {
-        const response = await fetch(`https://api.withmono.com/v3/lookup/cac?search=${encodeURIComponent(searchTerm)}`, {
-            method: 'GET',
-            headers: {
-                'accept': 'application/json',
-                'mono-sec-key': MONO_SEC_KEY
-            }
-        });
-
-        if (!response.ok) {
-            console.error('Mono API error:', await response.text());
-            return { valid: false, reason: 'Failed to verify CAC number with the National Registry.' };
+    console.log(`[Mono Service] (MOCK) Verifying CAC: ${searchTerm}`);
+    return {
+        valid: true,
+        mock: true,
+        details: {
+            name: searchTerm,
+            registration_number: "RC1234567-MOCK",
+            address: "PTS Sentinel Digital HQ",
+            status: "ACTIVE_SIMULATED"
         }
-
-        const data = await response.json();
-
-        // Mono API typically returns results in `data` array for search endpoints
-        if (data && data.data && data.data.length > 0) {
-            return { valid: true, details: data.data[0] };
-        } else {
-            return { valid: false, reason: 'Business not found in CAC registry.' };
-        }
-    } catch (error) {
-        console.error('Error verifying CAC with Mono:', error.message);
-        throw new Error('CAC verification service is currently unreachable.');
-    }
+    };
 };
 
-const IdentityValidationService = require('./identityValidationService');
-
 /**
- * Verify National Identity Number (NIN) using Mono API
- * @param {string} nin - The National Identity Number
- * @returns {Promise<any>} - The identity details if valid
+ * Mock NIN Identity Verification
  */
 const verifyNIN = async (nin) => {
-    // 1. Local Pre-validation Check
-    if (!IdentityValidationService.isValidNIN(nin)) {
-        console.warn(`Local AI Validation rejected NIN: ${nin} (Invalid Structure)`);
-        return { valid: false, reason: 'NIN format is structurally invalid. Verification rejected.' };
-    }
-
-    if (!MONO_SEC_KEY) {
-        console.warn('⚠️ MONO_SEC_KEY is not set. Skipping real NIN verification.');
-        return { valid: true, mock: true, warning: "Mono API Key missing" };
-    }
-
-    try {
-        const response = await fetch(`https://api.withmono.com/v3/lookup/nin`, {
-            method: 'POST',
-            headers: {
-                'accept': 'application/json',
-                'content-type': 'application/json',
-                'mono-sec-key': MONO_SEC_KEY
-            },
-            body: JSON.stringify({ nin })
-        });
-
-        if (!response.ok) {
-            console.error('Mono NIN verification API error:', await response.text());
-            return { valid: false, reason: 'Failed to verify NIN with the National Identity Database.' };
+    console.log(`[Mono Service] (MOCK) Verifying NIN: ${nin}`);
+    return {
+        valid: true,
+        mock: true,
+        details: {
+            first_name: "Sentinel-Citizen",
+            last_name: "Verified",
+            nin: nin,
+            verification_status: "SUCCESS_MOCKED"
         }
-
-        const data = await response.json();
-
-        // Ensure successful response contains data
-        if (data && data.status === 'successful' && data.data) {
-            return { valid: true, details: data.data };
-        } else if (data && data.data) {
-            return { valid: true, details: data.data };
-        } else {
-            return { valid: false, reason: 'NIN not found or invalid.' };
-        }
-    } catch (error) {
-        console.error('Error verifying NIN with Mono:', error.message);
-        throw new Error('NIN verification service is currently unreachable.');
-    }
+    };
 };
 
 module.exports = {
