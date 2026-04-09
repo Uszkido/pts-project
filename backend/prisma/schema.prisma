@@ -1,0 +1,324 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                    String                  @id @default(uuid())
+  email                 String                  @unique
+  password              String
+  role                  String                  @default("VENDOR")
+  status                String                  @default("ACTIVE")
+  fullName              String?
+  nationalId            String?
+  companyName           String?
+  facialDataUrl         String?
+  biodataUrl            String?
+  cacCertificateUrl     String?
+  businessAddress       String?
+  shopLatitude          Float?
+  shopLongitude         Float?
+  shopPhotoUrl          String?
+  businessRegNo         String?
+  vendorStatus          String                  @default("PENDING")
+  vendorTier            Int                     @default(3)
+  createdAt             DateTime                @default(now())
+  phoneNumber           String?
+  address               String?
+  isEmailConfirmed      Boolean                 @default(false)
+  emailVerificationOtp  String?
+  certificates          Certificate[]
+  devices               Device[]
+  incidentsReported     IncidentReport[]
+  maintenanceRecords    MaintenanceRecord[]     @relation("MaintenanceVendor")
+  receivedMessages      Message[]               @relation("ReceivedMessages")
+  sentMessages          Message[]               @relation("SentMessages")
+  purchases             OwnershipTransfer[]     @relation("Purchases")
+  sales                 OwnershipTransfer[]     @relation("Sales")
+  passwordResetRequests PasswordResetRequest[]
+  proofsOfSaleAsBuyer   ProofOfSale[]           @relation("BuyerPurchases")
+  proofsOfSaleAsVendor  ProofOfSale[]           @relation("VendorSales")
+  actionsPerformed      TransactionHistory[]    @relation("ActionsPerformed")
+  vendorAlertsSubmitted VendorSuspiciousAlert[] @relation("VendorAlerts")
+  trustScore            VendorTrustScore?
+}
+
+model PasswordResetRequest {
+  id              String   @id @default(uuid())
+  userId          String
+  newPasswordHash String
+  status          String   @default("PENDING")
+  otp             String?
+  adminNotes      String?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model Device {
+  id                      String                  @id @default(uuid())
+  imei                    String                  @unique
+  serialNumber            String?
+  brand                   String
+  model                   String
+  status                  String                  @default("CLEAN")
+  riskScore               Int                     @default(100)
+  lastKnownLocation       String?
+  lastKnownIp             String?
+  lastLocationUpdate      DateTime?
+  registeredOwnerId       String
+  devicePhotos            String[]
+  purchaseReceiptUrl      String?
+  cartonPhotoUrl          String?
+  isLocationShared        Boolean                 @default(false)
+  screenSerialNumber      String?
+  batterySerialNumber     String?
+  motherboardSerialNumber String?
+  cameraSerialNumber      String?
+  // Guardian Mesh & Sovereignty
+  hardwareDnaHash    String?   @unique
+  lastBluetoothSig   String?
+  lastWifiSig        String?
+  lastObservationDate DateTime?
+  isBricked          Boolean  @default(false)
+  observationReports ObservationReport[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  certificates     Certificate[]
+  registeredOwner  User     @relation(fields: [registeredOwnerId], references: [id])
+  incidents        IncidentReport[]
+  maintenance      MaintenanceRecord[]
+  transfersAsDevice OwnershipTransfer[]
+  proofsOfSale     ProofOfSale[]
+  history          TransactionHistory[]
+  vendorAlerts     VendorSuspiciousAlert[]
+}
+
+model VendorTrustScore {
+  id             String   @id @default(uuid())
+  vendorId       String   @unique
+  score          Int      @default(100)
+  completedSales Int      @default(0)
+  flaggedDevices Int      @default(0)
+  updatedAt      DateTime @updatedAt
+  vendor         User     @relation(fields: [vendorId], references: [id])
+}
+
+model TelecomSyncLog {
+  id          String   @id @default(uuid())
+  telecomName String
+  syncedAt    DateTime @default(now())
+  recordsSent Int
+}
+
+model IncidentReport {
+  id                      String    @id @default(uuid())
+  deviceId                String
+  reporterId              String
+  type                    String
+  incidentDate            DateTime?
+  location                String?
+  description             String?
+  policeReportNo          String?
+  evidenceUrls            String[]
+  status                  String    @default("OPEN")
+  locationSharedWithOwner Boolean   @default(false)
+  suspectId               String?
+  bounty                  Float?
+  createdAt               DateTime  @default(now())
+  device                  Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  reporter                User      @relation(fields: [reporterId], references: [id])
+  suspect                 Suspect?  @relation(fields: [suspectId], references: [id])
+}
+
+model VendorSuspiciousAlert {
+  id          String   @id @default(uuid())
+  deviceId    String
+  vendorId    String
+  sellerEmail String?
+  description String?
+  createdAt   DateTime @default(now())
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vendor      User     @relation("VendorAlerts", fields: [vendorId], references: [id])
+}
+
+model Certificate {
+  id        String   @id @default(uuid())
+  deviceId  String
+  ownerId   String
+  issueDate DateTime @default(now())
+  qrHash    String   @unique
+  isActive  Boolean  @default(true)
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  owner     User     @relation(fields: [ownerId], references: [id])
+}
+
+model ObservationReport {
+  id          String   @id @default(uuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  latitude    Float?
+  longitude   Float?
+  signalType  String   // BT, WIFI
+  signalStrength Int?
+  observerId  String?  // ID of the "Guardian" device that reported it
+  createdAt   DateTime @default(now())
+}
+
+model OwnershipTransfer {
+  id           String    @id @default(uuid())
+  deviceId     String
+  sellerId     String
+  buyerId      String
+  handoverCode String?
+  expiresAt    DateTime?
+  status       String    @default("PENDING")
+  transferDate DateTime  @default(now())
+  price        String?
+  // Echelon III: Escrow
+  isEscrowEnabled Boolean @default(false)
+  escrowStatus    String   @default("NONE") // NONE, LOCKED, RELEASED, REFUNDED, DISPUTED
+  escrowAmount    Float?
+  buyer        User      @relation("Purchases", fields: [buyerId], references: [id])
+  device       Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  seller       User      @relation("Sales", fields: [sellerId], references: [id])
+}
+
+model TransactionHistory {
+  id          String   @id @default(uuid())
+  deviceId    String
+  actorId     String?
+  type        String
+  description String
+  metadata    String?
+  hash        String?  // SHA-256 integrity seal
+  isSealed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("ActionsPerformed", fields: [actorId], references: [id])
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model ProofOfSale {
+  id             String   @id @default(uuid())
+  deviceId       String
+  vendorId       String
+  buyerId        String?
+  transactionRef String?
+  signedByVendor Boolean  @default(false)
+  signedByBuyer  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  buyer          User?    @relation("BuyerPurchases", fields: [buyerId], references: [id])
+  device         Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vendor         User     @relation("VendorSales", fields: [vendorId], references: [id])
+}
+
+model Suspect {
+  id             String           @id @default(uuid())
+  fullName       String?
+  alias          String?
+  nationalId     String?
+  phoneNumber    String?
+  description    String?
+  photoUrl       String?
+  knownAddresses String?
+  dangerLevel    String           @default("UNKNOWN")
+  status         String           @default("ACTIVE")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  incidents      IncidentReport[]
+}
+
+model DeviceTrackingLog {
+  id         String   @id @default(uuid())
+  deviceImei String
+  method     String
+  location   String
+  accuracy   String?
+  ipAddress  String?
+  metadata   String?
+  loggedById String?
+  createdAt  DateTime @default(now())
+}
+
+model Message {
+  id           String   @id @default(uuid())
+  senderId     String
+  receiverRole String?
+  receiverId   String?
+  subject      String
+  body         String
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  receiver     User?    @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model MaintenanceRecord {
+  id            String   @id @default(uuid())
+  deviceId      String
+  vendorId      String
+  serviceType   String?
+  description   String
+  partsReplaced String?
+  cost          Float?
+  serviceDate   DateTime @default(now())
+  evidenceUrl   String?
+  createdAt     DateTime @default(now())
+  device        Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vendor        User     @relation("MaintenanceVendor", fields: [vendorId], references: [id])
+}
+model PendingUser {
+  id                    String   @id @default(uuid())
+  email                 String   @unique
+  password              String
+  role                  String
+  fullName              String?
+  nationalId            String?
+  companyName           String?
+  facialDataUrl         String?
+  phoneNumber           String?
+  address               String?
+  businessAddress       String?
+  businessRegNo         String?
+  shopPhotoUrl          String?
+  cacCertificateUrl     String?
+  shopLatitude          Float?
+  shopLongitude         Float?
+  otp                   String
+  createdAt             DateTime @default(now())
+}
+
+model DeveloperApiKey {
+  id                  String   @id @default(uuid())
+  companyName         String
+  contactEmail        String
+  apiKeyHash          String   @unique
+  keyPrefix           String
+  isActive            Boolean  @default(true)
+  monthlyQuota        Int      @default(500)     // 500 free trial calls
+  currentUsage        Int      @default(0)
+  billingPlan         String   @default("PAYG")
+  // Paystack Payment Tracking
+  paystackCustomerId  String?                    // Set after first Paystack payment
+  totalCallsPurchased Int      @default(0)        // Cumulative paid calls bought
+  lastPaymentDate     DateTime?                  // Last Paystack top-up
+  lastPaymentAmount   Float?                     // Last top-up amount (NGN)
+  isWaived            Boolean  @default(false)    // PTS Waiver: Bypass payment & quota
+  createdAt           DateTime @default(now())
+  lastUsedAt          DateTime?
+}
+
+model RegionalGeoFence {
+  id              String   @id @default(uuid())
+  name            String
+  commanderId     String?
+  geometryJson    String   // GeoJSON or [{lat, lng}, ...] array
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
