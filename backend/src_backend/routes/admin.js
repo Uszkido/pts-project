@@ -3,15 +3,15 @@ const router = express.Router();
 const prisma = require('../db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const JWT_SECRET = 'supersecret_pts_dev_key';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_pts_dev_key';
 
 // Admin auth middleware
 const authenticateAdmin = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
+    if (!token) return res.status(401).json({error: 'Unauthorized'});
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
+        if (err) return res.status(403).json({error: 'Forbidden'});
         if (user.role !== 'ADMIN') return res.status(403).json({ error: 'Admin access required' });
         req.user = user;
         next();
