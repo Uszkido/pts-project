@@ -1,14 +1,14 @@
 {
   "name": "backend",
-  "version": "1.2.0",
-  "main": "index.js",
+  "main": "api/index.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
+    "vercel-build": "echo 'Build bypass for Vercel'",
     "build": "npm install && npx prisma generate",
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
