@@ -37,30 +37,30 @@ function safeUse(path, routeFile) {
 // RESTORE DATABASE (Safe Load)
 let prisma;
 try {
-    // Note: Since we are in api/index.js, src is at ../src
-    prisma = require('../src/db');
+    // Note: Since we are in api/index.js, src is now inside api/
+    prisma = require('./src/db');
 } catch (e) {
     console.error('❌ db.js failed:', e.message);
 }
 
-// CORE ROUTES (Fixed Paths)
-safeUse('/api/v1/auth', '../src/routes/auth');
-safeUse('/api/v1/devices', '../src/routes/devices');
-safeUse('/api/v1/police', '../src/routes/police');
-safeUse('/api/v1/consumers', '../src/routes/consumers');
-safeUse('/api/v1/transfers', '../src/routes/transfers');
-safeUse('/api/v1/public', '../src/routes/public');
-safeUse('/api/v1/admin', '../src/routes/admin');
-safeUse('/api/v1/registry', '../src/routes/registry');
-safeUse('/api/v1/upload', '../src/routes/upload');
-safeUse('/api/v1/telecom', '../src/routes/telecom');
-safeUse('/api/v1/ussd', '../src/routes/ussd');
+// CORE ROUTES (Relative to api/index.js)
+safeUse('/api/v1/auth', './src/routes/auth');
+safeUse('/api/v1/devices', './src/routes/devices');
+safeUse('/api/v1/police', './src/routes/police');
+safeUse('/api/v1/consumers', './src/routes/consumers');
+safeUse('/api/v1/transfers', './src/routes/transfers');
+safeUse('/api/v1/public', './src/routes/public');
+safeUse('/api/v1/admin', './src/routes/admin');
+safeUse('/api/v1/registry', './src/routes/registry');
+safeUse('/api/v1/upload', './src/routes/upload');
+safeUse('/api/v1/telecom', './src/routes/telecom');
+safeUse('/api/v1/ussd', './src/routes/ussd');
 
 // BASE HANDLER
 app.get('/api/v1', (req, res) => {
     res.json({
         status: 'ok',
-        message: 'PTS Sentinel API v1.7.1 is operational',
+        message: 'PTS Sentinel API v1.7.2 is operational',
         endpoints: loadedRoutes.map(r => r.path)
     });
 });
