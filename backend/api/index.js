@@ -25,46 +25,61 @@ function safeUse(path, routeFile) {
         console.error(`❌ Route load failed [${routeFile}]:`, e.message);
         loadedRoutes.push({ path, status: 'failed', error: e.message });
         const r = express.Router();
-        r.all('*', (req, res) => res.status(503).json({ error: `Module offline`, module: routeFile, details: e.message }));
+        r.all('*', (req, res) => res.status(503).json({
+            error: `Module offline`,
+            module: routeFile,
+            details: e.message
+        }));
         app.use(path, r);
     }
 }
 
-// RESTORE DATABASE
+// RESTORE DATABASE (Safe Load)
 let prisma;
 try {
-    prisma = require('./src/db');
+    // Note: Since we are in api/index.js, src is at ../src
+    prisma = require('../src/db');
 } catch (e) {
     console.error('❌ db.js failed:', e.message);
 }
 
-// CORE ROUTES
-safeUse('/api/v1/auth', './src/routes/auth');
-safeUse('/api/v1/devices', './src/routes/devices');
-safeUse('/api/v1/police', './src/routes/police');
-safeUse('/api/v1/consumers', './src/routes/consumers');
-safeUse('/api/v1/transfers', './src/routes/transfers');
-safeUse('/api/v1/public', './src/routes/public');
-safeUse('/api/v1/admin', './src/routes/admin');
-safeUse('/api/v1/registry', './src/routes/registry');
+// CORE ROUTES (Fixed Paths)
+safeUse('/api/v1/auth', '../src/routes/auth');
+safeUse('/api/v1/devices', '../src/routes/devices');
+safeUse('/api/v1/police', '../src/routes/police');
+safeUse('/api/v1/consumers', '../src/routes/consumers');
+safeUse('/api/v1/transfers', '../src/routes/transfers');
+safeUse('/api/v1/public', '../src/routes/public');
+safeUse('/api/v1/admin', '../src/routes/admin');
+safeUse('/api/v1/registry', '../src/routes/registry');
+safeUse('/api/v1/upload', '../src/routes/upload');
+safeUse('/api/v1/telecom', '../src/routes/telecom');
+safeUse('/api/v1/ussd', '../src/routes/ussd');
 
 // PING
 app.get('/ping', (req, res) => {
-    res.json({ status: 'ok', msg: 'PTS_SENTINEL_RENDER_READY_V1' });
+    res.json({ status: 'ok', msg: 'PTS_SENTINEL_STABLE_PROD_V1' });
 });
 
 app.get('/health', async (req, res) => {
-    let dbStatus = 'unknown';
+    let dbStatus = 'disconnected';
+    let dbMsg = 'Database not initialized';
     try {
         if (prisma) {
             await prisma.$queryRaw`SELECT 1`;
             dbStatus = 'connected';
+            dbMsg = 'PTS Sentinel is fully operational';
         }
     } catch (err) {
         dbStatus = 'offline';
+        dbMsg = err.message;
     }
-    res.json({ status: dbStatus === 'connected' ? 'ok' : 'degraded', database: dbStatus, routes: loadedRoutes });
+    res.json({
+        status: dbStatus === 'connected' ? 'ok' : 'degraded',
+        database: dbStatus,
+        message: dbMsg,
+        routes: loadedRoutes
+    });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ PTS Sentinel running on port ${PORT}`));
+module.exports = app;

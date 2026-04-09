@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "main": "api/index.js",
   "engines": {
     "node": ">=18.0.0"
@@ -30,6 +30,7 @@
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^8.0.2",
+    "prisma": "6.4.1",
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",
     "validate-nin": "^2.0.9"
