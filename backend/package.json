@@ -9,7 +9,7 @@
     "vercel-build": "npx prisma generate && npx prisma migrate deploy",
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "postinstall": "npx prisma generate",
+    "postinstall": "npx prisma generate && npm install --platform=linux --arch=x64 --libc=glibc sharp || true",
     "build": "npx prisma generate && npx prisma migrate deploy"
   },
   "keywords": [],
@@ -44,5 +44,8 @@
     "@types/node": "^25.4.0",
     "nodemon": "^3.1.14",
     "typescript": "^5.9.3"
+  },
+  "optionalDependencies": {
+    "@img/sharp-linux-x64": "^0.33.5"
   }
 }
