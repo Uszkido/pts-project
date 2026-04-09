@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const prisma = require('../db');
 const jwt = require('jsonwebtoken');
@@ -124,7 +125,7 @@ router.post('/', authenticateToken, async (req, res) => {
             }
         }
 
-        const crypto = require('crypto');
+
         const hardwareDnaHash = (motherboardSerialNumber && batterySerialNumber)
             ? crypto.createHash('sha256').update(`${motherboardSerialNumber}-${batterySerialNumber}-${cameraSerialNumber || 'U'}`).digest('hex')
             : null;
@@ -174,7 +175,7 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Generate Digital Device Ownership Certificate (DDOC)
-        const crypto = require('crypto');
+
         const ddocHash = crypto.createHash('sha256').update(`${device.id}-${req.user.id}-${Date.now()}`).digest('hex');
 
         const certificate = await prisma.certificate.create({
