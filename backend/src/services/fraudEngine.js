@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 /**
  * Checks if an IMEI is experiencing abnormal verification velocity.
