@@ -34,18 +34,14 @@ function safeUse(path, routeFile) {
 // 🛑 DB DISABLED FOR ISOLATION
 let prisma = null;
 
-// STAGE 1 RE-ENABLE (WITHOUT DB)
+// ONE BY ONE
 safeUse('/api/v1/auth', './src/routes/auth');
-safeUse('/api/v1/devices', './src/routes/devices');
-safeUse('/api/v1/police', './src/routes/police');
-safeUse('/api/v1/consumers', './src/routes/consumers');
-safeUse('/api/v1/transfers', './src/routes/transfers');
 
 // Health endpoints
 app.get('/health', async (req, res) => {
-    res.status(200).json({ status: 'ok', routes: loadedRoutes, db: 'disabled' });
+    res.status(200).json({ status: 'ok', routes: loadedRoutes });
 });
 
-app.listen(PORT, () => console.log(`✅ Stage 1 (No DB) running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Auth Only boot running on port ${PORT}`));
 
 module.exports = app;
