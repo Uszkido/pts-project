@@ -2,5 +2,5 @@ export type AppType = 'MERCHANT' | 'SENTINEL' | 'COMMAND' | 'CONSUMER' | 'LANDIN
 
 export const APP_CONFIG = {
     TYPE: 'LANDING' as AppType,
-    API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1',
+    API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1',
 };

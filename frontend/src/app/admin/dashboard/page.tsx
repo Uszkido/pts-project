@@ -7,6 +7,7 @@ import { generateCapSign } from '@/lib/capsign';
 import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
 import IntelligenceView from '@/components/IntelligenceView';
+import { APP_CONFIG } from '@/lib/pts.config';
 import {
     LayoutDashboard,
     Users as UsersIcon,
@@ -74,8 +75,11 @@ export default function AdminDashboard() {
     // Inline Risk Score Editing
     const [editingRiskId, setEditingRiskId] = useState<string | null>(null);
     const [editingRiskValue, setEditingRiskValue] = useState<number>(0);
+    const [forensicsImageUrl, setForensicsImageUrl] = useState('');
+    const [forensicsResult, setForensicsResult] = useState<any>(null);
+    const [isScanningForensics, setIsScanningForensics] = useState(false);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    const apiUrl = APP_CONFIG.API_URL;
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
 
     const fetchData = async () => {
@@ -597,6 +601,40 @@ export default function AdminDashboard() {
         } catch (err: any) { alert('Invalid format or upload failed: ' + err.message); }
     };
 
+    const runForensicScan = async () => {
+        if (!forensicsImageUrl) return alert('Please provide an image URL to scan.');
+        setIsScanningForensics(true);
+        setForensicsResult(null);
+        try {
+            const res = await fetch(`${apiUrl}/devices/forensic-scan`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrl: forensicsImageUrl, context: 'Admin Dashboard Tool' })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            setForensicsResult(data);
+        } catch (err: any) {
+            alert('Forensic scan failed: ' + err.message);
+        } finally {
+            setIsScanningForensics(false);
+        }
+    };
+
+    const runDnaScan = async (imei: string) => {
+        try {
+            const res = await fetch(`${apiUrl}/devices/dna-scan`, {
+                method: 'POST',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imei, scanType: 'ADMIN_REQUESTED' })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            alert(`Lazarus Protocol Output:\n\nHardware DNA: ${data.hardwareDna}\nVerdict: ${data.isValid ? 'VALID INTEGRITY' : 'TAMPERED / FAKE'}\nConfidence: ${data.confidenceScore}%`);
+            fetchData();
+        } catch (err: any) { alert('DNA Scan failed: ' + err.message); }
+    };
+
     const clearIncident = async (incidentId: string) => {
         if (!confirm('Mark this incident as cleared/resolved?')) return;
         try {
@@ -709,14 +747,15 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load', 'telecom-eir', 'warrants'] as const).map(tab => (
+                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load', 'telecom-eir', 'warrants', 'forensics'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-400 shadow-lg border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
                                 tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length + users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length})` :
                                     tab === 'intelligence' ? 'AI Intelligence' :
                                         tab === 'bulk-load' ? 'Bulk Load' :
                                             tab === 'telecom-eir' ? 'Telecom EIR' :
-                                                tab === 'warrants' ? 'Active Warrants' : tab}
+                                                tab === 'warrants' ? 'Active Warrants' :
+                                                    tab === 'forensics' ? '🔬 Forensics' : tab}
                         </button>
                     ))}
                 </div>
@@ -984,6 +1023,7 @@ export default function AdminDashboard() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => runDnaScan(d.imei)} className="text-xs text-indigo-400 hover:text-indigo-300 font-bold border border-indigo-500/20 px-2 py-1 rounded bg-indigo-500/5">DNA Scan</button>
                                                     <button onClick={() => fetchDeviceDetails(d.id)} className="text-xs text-emerald-400 hover:text-emerald-300 font-bold">Details</button>
                                                     <button onClick={() => transferDevice(d.id)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">Transfer</button>
                                                     <button onClick={() => setLiveTrackingImei(d.imei)} className="text-xs text-red-500 hover:text-red-400 font-bold">Track</button>
@@ -1162,144 +1202,259 @@ export default function AdminDashboard() {
                     )
                 }
 
-                {/* TAB: Messages */}
+                {/* TAB: Forensics */}
                 {
-                    activeTab === 'messages' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
-                                <h3 className="text-lg font-bold text-white mb-4">Send System Notice</h3>
-                                <form onSubmit={sendMessage} className="space-y-4">
-                                    <div className="flex gap-4">
-                                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                                            <input type="radio" checked={messageTarget === 'ROLE'} onChange={() => setMessageTarget('ROLE')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
-                                            Target Role
-                                        </label>
-                                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                                            <input type="radio" checked={messageTarget === 'USER'} onChange={() => setMessageTarget('USER')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
-                                            Target User
-                                        </label>
-                                    </div>
-                                    {messageTarget === 'ROLE' ? (
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-1">Select Role Group</label>
-                                            <select value={receiverRole} onChange={e => setReceiverRole(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500">
-                                                <option value="ALL">Everyone (Global Broadcast)</option>
-                                                <option value="POLICE">Law Enforcement Only</option>
-                                                <option value="VENDOR">Vendors Only</option>
-                                                <option value="CONSUMER">Consumers Only</option>
-                                            </select>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-1">User Email *</label>
-                                            <input type="email" value={receiverEmail} onChange={e => setReceiverEmail(e.target.value)} required placeholder="user@example.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                            <datalist id="user-emails">
-                                                {users.map(u => <option key={u.email} value={u.email} />)}
-                                            </datalist>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
-                                        <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="System update..." />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
-                                        <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to network..." />
-                                    </div>
-                                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Dispatch
+                    activeTab === 'forensics' && (
+        <div className="space-y-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30 text-2xl">🔬</div>
+                    <div>
+                        <h2 className="text-2xl font-black text-white">Sovereign Image Forensics Lab</h2>
+                        <p className="text-slate-400">Run Error Level Analysis (ELA) and Metadata forensics to detect digital forgery inside receipts, IDs, and affidavits.</p>
+                    </div>
+                </div>
+
+                <div className="max-w-3xl">
+                    <label className="block text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Input Target Image URL / Base64</label>
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={forensicsImageUrl}
+                            onChange={e => setForensicsImageUrl(e.target.value)}
+                            placeholder="Paste image URL here (https://... or data:image/...)"
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white font-mono text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                        />
+                        <button
+                            onClick={runForensicScan}
+                            disabled={isScanningForensics || !forensicsImageUrl}
+                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black px-8 py-4 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2 uppercase tracking-widest text-xs"
+                        >
+                            {isScanningForensics ? 'Analyzing...' : 'Execute Scan'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {forensicsResult && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
+                    {/* Score Card */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                        <div className={`absolute top-0 right-0 px-6 py-2 font-black text-[10px] uppercase tracking-tighter ${forensicsResult.confidence === 'HIGH' ? 'bg-red-600 text-white' : forensicsResult.confidence === 'MEDIUM' ? 'bg-amber-500 text-black' : 'bg-emerald-500 text-black'}`}>
+                            Verdict: {forensicsResult.confidence} Risk
+                        </div>
+
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6">Forensic Integrity Score</h3>
+                        <div className="flex items-center gap-8">
+                            <div className="relative w-32 h-32 flex items-center justify-center">
+                                <svg className="w-full h-full transform -rotate-90">
+                                    <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-800" />
+                                    <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className={forensicsResult.tamperScore >= 70 ? 'text-red-500' : forensicsResult.tamperScore >= 40 ? 'text-amber-500' : 'text-emerald-500'} strokeDasharray={364.4} strokeDashoffset={364.4 - (364.4 * forensicsResult.tamperScore) / 100} strokeLinecap="round" />
+                                </svg>
+                                <span className="absolute text-3xl font-black text-white">{forensicsResult.tamperScore}<span className="text-xs text-slate-500">/100</span></span>
+                            </div>
+                            <div className="flex-1">
+                                <p className={`text-lg font-bold mb-2 ${forensicsResult.isLikelyFaked ? 'text-red-400' : 'text-emerald-400'}`}>
+                                    {forensicsResult.isLikelyFaked ? 'Manipulation Detected' : 'Likely Authentic'}
+                                </p>
+                                <p className="text-sm text-slate-400 leading-relaxed font-medium">
+                                    {forensicsResult.verdict}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-slate-800 grid grid-cols-3 gap-4">
+                            <div className="text-center">
+                                <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Avg Pixel Diff</p>
+                                <p className="text-white font-mono text-sm">{forensicsResult.stats?.avgPixelDiff}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Tamper Ratio</p>
+                                <p className="text-white font-mono text-sm">{forensicsResult.stats?.highDiffPixelRatio}%</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[10px] text-slate-500 uppercase font-black mb-1">Scan Engine</p>
+                                <p className="text-indigo-400 font-bold text-[10px] uppercase">VEXEL-ELA-v1</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Metadata & Anomalies */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6">EXIF Discovery & Anomalies</h3>
+
+                        <div className="space-y-3 flex-1">
+                            {forensicsResult.exifAnomalies?.map((anomaly: string, i: number) => (
+                                <div key={i} className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex gap-3 items-start">
+                                    <div className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">!</div>
+                                    <p className="text-xs text-red-200 font-medium leading-relaxed">{anomaly}</p>
+                                </div>
+                            ))}
+                            {(!forensicsResult.exifAnomalies || forensicsResult.exifAnomalies.length === 0) && (
+                                <div className="h-full flex items-center justify-center text-slate-600 italic text-sm">No metadata anomalies detected.</div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-slate-800">
+                            <p className="text-[10px] text-slate-500 uppercase font-black mb-2">Cryptographic Fingerprint</p>
+                            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-[10px] text-slate-400 break-all">
+                                SHA256: {forensicsResult.sha256}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Preview Card */}
+                    <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Target Evidence Preview</h3>
+                        <div className="bg-slate-950 rounded-xl overflow-hidden border border-slate-800 max-h-[500px] flex items-center justify-center">
+                            <img src={forensicsImageUrl} alt="Target Forensics" className="max-w-full max-h-full object-contain" />
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+{/* TAB: Messages */ }
+{
+    activeTab === 'messages' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl h-fit sticky top-24">
+                <h3 className="text-lg font-bold text-white mb-4">Send System Notice</h3>
+                <form onSubmit={sendMessage} className="space-y-4">
+                    <div className="flex gap-4">
+                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                            <input type="radio" checked={messageTarget === 'ROLE'} onChange={() => setMessageTarget('ROLE')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                            Target Role
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                            <input type="radio" checked={messageTarget === 'USER'} onChange={() => setMessageTarget('USER')} className="text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700" />
+                            Target User
+                        </label>
+                    </div>
+                    {messageTarget === 'ROLE' ? (
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Select Role Group</label>
+                            <select value={receiverRole} onChange={e => setReceiverRole(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500">
+                                <option value="ALL">Everyone (Global Broadcast)</option>
+                                <option value="POLICE">Law Enforcement Only</option>
+                                <option value="VENDOR">Vendors Only</option>
+                                <option value="CONSUMER">Consumers Only</option>
+                            </select>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">User Email *</label>
+                            <input type="email" value={receiverEmail} onChange={e => setReceiverEmail(e.target.value)} required placeholder="user@example.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" />
+                            <datalist id="user-emails">
+                                {users.map(u => <option key={u.email} value={u.email} />)}
+                            </datalist>
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Subject *</label>
+                        <input type="text" value={newMessage.subject} onChange={e => setNewMessage({ ...newMessage, subject: e.target.value })} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="System update..." />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Message *</label>
+                        <textarea value={newMessage.body} onChange={e => setNewMessage({ ...newMessage, body: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Type message to network..." />
+                    </div>
+                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> Dispatch
+                    </button>
+                </form>
+            </div>
+            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[500px]">
+                <h3 className="text-lg font-bold text-white mb-6">Discussions Thread</h3>
+                <div className="space-y-4">
+                    {messages.map(msg => (
+                        <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/5 border-amber-500/20 ml-12' : 'bg-blue-500/5 border-blue-500/20 mr-12'}`}>
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>{msg.sender?.role}</span>
+                                    <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
+                                    <button onClick={() => deleteMessage(msg.id)} className="text-slate-600 hover:text-red-500 transition-colors p-1" title="Delete message">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
-                                </form>
-                            </div>
-                            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[500px]">
-                                <h3 className="text-lg font-bold text-white mb-6">Discussions Thread</h3>
-                                <div className="space-y-4">
-                                    {messages.map(msg => (
-                                        <div key={msg.id} className={`p-4 rounded-xl border ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/5 border-amber-500/20 ml-12' : 'bg-blue-500/5 border-blue-500/20 mr-12'}`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${msg.sender?.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-500/20 text-blue-500'}`}>{msg.sender?.role}</span>
-                                                    <span className="text-sm font-bold text-white">{msg.sender?.fullName || msg.sender?.email}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-xs text-slate-500 font-medium">{new Date(msg.createdAt).toLocaleString()}</span>
-                                                    <button onClick={() => deleteMessage(msg.id)} className="text-slate-600 hover:text-red-500 transition-colors p-1" title="Delete message">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
-                                            <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
-                                        </div>
-                                    ))}
-                                    {messages.length === 0 && <div className="text-center py-20 text-slate-500">No messages in thread yet.</div>}
                                 </div>
                             </div>
+                            <p className="text-sm font-bold text-slate-300 mb-1">{msg.subject}</p>
+                            <p className="text-sm text-slate-400 whitespace-pre-wrap">{msg.body}</p>
                         </div>
-                    )
-                }
+                    ))}
+                    {messages.length === 0 && <div className="text-center py-20 text-slate-500">No messages in thread yet.</div>}
+                </div>
+            </div>
+        </div>
+    )
+}
 
-                {/* TAB: Auth Requests */}
-                {/* TAB: Bulk Load */}
-                {activeTab === 'bulk-load' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
-                                <Smartphone className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Bulk Telemetric Asset Ingestion</h3>
-                                <p className="text-sm text-slate-400">Mass register devices directly into the National Sovereign Registry via JSON/CSV payload.</p>
-                            </div>
+{/* TAB: Auth Requests */ }
+{/* TAB: Bulk Load */ }
+{
+    activeTab === 'bulk-load' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+            <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
+                    <Smartphone className="w-6 h-6" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-white">Bulk Telemetric Asset Ingestion</h3>
+                    <p className="text-sm text-slate-400">Mass register devices directly into the National Sovereign Registry via JSON/CSV payload.</p>
+                </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">Data Input</label>
+                        <div className="relative">
+                            <input
+                                type="file"
+                                id="bulk-file-input"
+                                accept=".json,.csv"
+                                className="hidden"
+                                onChange={handleFileUpload}
+                            />
+                            <button
+                                onClick={() => document.getElementById('bulk-file-input')?.click()}
+                                className="flex items-center gap-2 text-[10px] font-black bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all uppercase"
+                            >
+                                <FileUp className="w-3 h-3" /> Upload Document (.csv / .json)
+                            </button>
                         </div>
+                    </div>
+                    <textarea
+                        id="bulk-payload"
+                        placeholder='Paste JSON here or upload a document...'
+                        rows={10}
+                        className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl px-4 py-4 text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                    />
+                    <button
+                        onClick={() => handleBulkImport((document.getElementById('bulk-payload') as HTMLTextAreaElement).value)}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                    >
+                        INITIALIZE BULK INJECTION
+                    </button>
+                </div>
 
-                        <div className="grid md:grid-cols-2 gap-8">
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">Data Input</label>
-                                    <div className="relative">
-                                        <input
-                                            type="file"
-                                            id="bulk-file-input"
-                                            accept=".json,.csv"
-                                            className="hidden"
-                                            onChange={handleFileUpload}
-                                        />
-                                        <button
-                                            onClick={() => document.getElementById('bulk-file-input')?.click()}
-                                            className="flex items-center gap-2 text-[10px] font-black bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-3 py-1.5 rounded-lg border border-indigo-500/20 transition-all uppercase"
-                                        >
-                                            <FileUp className="w-3 h-3" /> Upload Document (.csv / .json)
-                                        </button>
-                                    </div>
-                                </div>
-                                <textarea
-                                    id="bulk-payload"
-                                    placeholder='Paste JSON here or upload a document...'
-                                    rows={10}
-                                    className="w-full bg-slate-950/80 border border-slate-700 rounded-2xl px-4 py-4 text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
-                                />
-                                <button
-                                    onClick={() => handleBulkImport((document.getElementById('bulk-payload') as HTMLTextAreaElement).value)}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
-                                >
-                                    INITIALIZE BULK INJECTION
-                                </button>
-                            </div>
+                <div className="bg-slate-950/50 border border-slate-800/50 rounded-2xl p-6">
+                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Ingestion Protocols</h4>
+                    <ul className="space-y-3 text-xs text-slate-400 leading-relaxed">
+                        <li className="flex gap-2"><span className="text-indigo-500">→</span> IMEIs must be 15 digits. Duplicates will be automatically suppressed.</li>
+                        <li className="flex gap-2"><span className="text-indigo-500">→</span> Payload limit: 50,000 assets per broadcast.</li>
+                        <li className="flex gap-2"><span className="text-indigo-500">→</span> Default status for new assets is set to <span className="text-emerald-500">CLEAN</span>.</li>
+                        <li className="flex gap-2"><span className="text-indigo-500">→</span> Risk scores default to base 100 for verified batch imports.</li>
+                    </ul>
 
-                            <div className="bg-slate-950/50 border border-slate-800/50 rounded-2xl p-6">
-                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Ingestion Protocols</h4>
-                                <ul className="space-y-3 text-xs text-slate-400 leading-relaxed">
-                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> IMEIs must be 15 digits. Duplicates will be automatically suppressed.</li>
-                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Payload limit: 50,000 assets per broadcast.</li>
-                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Default status for new assets is set to <span className="text-emerald-500">CLEAN</span>.</li>
-                                    <li className="flex gap-2"><span className="text-indigo-500">→</span> Risk scores default to base 100 for verified batch imports.</li>
-                                </ul>
-
-                                <div className="mt-8 pt-8 border-t border-slate-800">
-                                    <p className="text-[10px] text-slate-600 uppercase font-black mb-2 tracking-widest">Example Structure</p>
-                                    <pre className="text-[9px] bg-black/40 p-3 rounded-xl border border-slate-800 text-emerald-500/70 overflow-hidden">
-                                        {`[
+                    <div className="mt-8 pt-8 border-t border-slate-800">
+                        <p className="text-[10px] text-slate-600 uppercase font-black mb-2 tracking-widest">Example Structure</p>
+                        <pre className="text-[9px] bg-black/40 p-3 rounded-xl border border-slate-800 text-emerald-500/70 overflow-hidden">
+                            {`[
   {
     "imei": "358923098234901",
     "brand": "Apple",
@@ -1307,691 +1462,697 @@ export default function AdminDashboard() {
     "status": "CLEAN"
   }
 ]`}
-                                    </pre>
-                                </div>
-                            </div>
-                        </div>
+                        </pre>
                     </div>
-                )}
-                {activeTab === 'auth-requests' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
-                                <tr>
-                                    <th className="px-6 py-4">Request Date</th>
-                                    <th className="px-6 py-4">User Email</th>
-                                    <th className="px-6 py-4">Role</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">OTP</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                </div>
+            </div>
+        </div>
+    )
+}
+{
+    activeTab === 'auth-requests' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
+                    <tr>
+                        <th className="px-6 py-4">Request Date</th>
+                        <th className="px-6 py-4">User Email</th>
+                        <th className="px-6 py-4">Role</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">OTP</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                    {authRequests.length === 0 && users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length === 0 ? (
+                        <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No password reset or registration requests found.</td></tr>
+                    ) : (
+                        <>
+                            {/* New Account Registrations */}
+                            {users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).map(user => (
+                                <tr key={`reg-${user.id}`} className="hover:bg-slate-800/30 transition-colors">
+                                    <td className="px-6 py-4 text-xs text-slate-400">{new Date(user.createdAt).toLocaleString()}</td>
+                                    <td className="px-6 py-4 font-bold text-white"><span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20 mr-2 uppercase">New Reg</span>{user.email}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(user.role)}`}>
+                                            {user.role}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                            PENDING OTP
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{user.emailVerificationOtp}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => manualVerifyUser(user.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded transition-colors uppercase">Verify Manually</button>
+                                            <button onClick={() => clearUserOtp(user.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded transition-colors uppercase">Delete OTP</button>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                                {authRequests.length === 0 && users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length === 0 ? (
-                                    <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No password reset or registration requests found.</td></tr>
-                                ) : (
-                                    <>
-                                        {/* New Account Registrations */}
-                                        {users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).map(user => (
-                                            <tr key={`reg-${user.id}`} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-6 py-4 text-xs text-slate-400">{new Date(user.createdAt).toLocaleString()}</td>
-                                                <td className="px-6 py-4 font-bold text-white"><span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20 mr-2 uppercase">New Reg</span>{user.email}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(user.role)}`}>
-                                                        {user.role}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                                                        PENDING OTP
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{user.emailVerificationOtp}</span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex gap-2 justify-end">
-                                                        <button onClick={() => manualVerifyUser(user.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded transition-colors uppercase">Verify Manually</button>
-                                                        <button onClick={() => clearUserOtp(user.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded transition-colors uppercase">Delete OTP</button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-
-                                        {/* Password Resets */}
-                                        {authRequests.map(req => (
-                                            <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-6 py-4 text-xs text-slate-400">{new Date(req.createdAt).toLocaleString()}</td>
-                                                <td className="px-6 py-4 font-bold text-white">{req.user?.email}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(req.user?.role)}`}>
-                                                        {req.user?.role}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                        {req.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {req.otp ? (
-                                                        <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{req.otp}</span>
-                                                    ) : (
-                                                        <span className="text-slate-600 italic text-xs">N/A</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {req.status === 'PENDING' && (
-                                                        <div className="flex gap-2 justify-end">
-                                                            <button onClick={() => approveReset(req.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded transition-colors uppercase">Approve</button>
-                                                            <button onClick={() => rejectReset(req.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded transition-colors uppercase">Reject</button>
-                                                        </div>
-                                                    )}
-                                                    {req.adminNotes && <p className="text-[10px] text-slate-500 mt-1 italic">Note: {req.adminNotes}</p>}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {/* Create Account Modal */}
-                {
-                    isCreateOpen && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
-                            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-emerald-500"></div>
-                                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                                    <h2 className="text-xl font-bold text-white">Create Account</h2>
-                                    <button onClick={() => setIsCreateOpen(false)} className="text-slate-500 hover:text-white text-xl">✕</button>
-                                </div>
-                                <div className="p-6 space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Role *</label>
-                                        <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
-                                            {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Full Name *</label>
-                                        <input type="text" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} placeholder="John Doe" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Email *</label>
-                                        <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@pts.com" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Password *</label>
-                                        <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                    </div>
-                                    {newUser.role === 'VENDOR' && (
-                                        <div>
-                                            <label className="block text-xs font-medium text-slate-400 mb-1">Company Name</label>
-                                            <input type="text" value={newUser.companyName} onChange={e => setNewUser({ ...newUser, companyName: e.target.value })} placeholder="Business Ltd" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                        </div>
-                                    )}
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN)</label>
-                                        <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
-                                    </div>
-                                    <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
-
-                {/* User Details Modal */}
-                {
-                    isDetailsModalOpen && selectedUser && (
-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm overflow-y-auto">
-                            <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative my-8">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-amber-500"></div>
-                                <div className="p-6 border-b border-slate-800 flex justify-between items-start sticky top-0 bg-slate-900 z-10">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center relative">
-                                            {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) ? (
-                                                <img src={selectedUser.facialDataUrl || selectedUser.cacCertificateUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className={`text-2xl font-black ${selectedUser.role === 'ADMIN' ? 'text-amber-500' : selectedUser.role === 'VENDOR' ? 'text-blue-500' : 'text-emerald-500'}`}>
-                                                    {selectedUser.role.charAt(0)}
-                                                </span>
-                                            )}
-                                            {selectedUser.cacCertificateUrl && !selectedUser.facialDataUrl && (
-                                                <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[8px] text-center text-slate-300 py-0.5 font-bold uppercase tracking-widest backdrop-blur-sm">CAC</div>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl font-bold text-white mb-1">{selectedUser.fullName || selectedUser.email}</h2>
-                                            <div className="flex items-center gap-2 text-xs">
-                                                <span className={`px-2 py-0.5 rounded-full font-bold uppercase ${selectedUser.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : selectedUser.role === 'VENDOR' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{selectedUser.role}</span>
-                                                {selectedUser.companyName && <span className="text-slate-400">@ {selectedUser.companyName}</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors">✕</button>
-                                </div>
-
-                                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* Left Column: Info & Edit Form */}
-                                    <div className="lg:col-span-1 space-y-6">
-                                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="font-bold text-white">Profile Details</h3>
-                                                <button onClick={() => setEditMode(!editMode)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">{editMode ? 'Cancel' : 'Edit'}</button>
-                                            </div>
-
-                                            {editMode ? (
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <label className="text-xs text-slate-500 mb-1 block">Full Name</label>
-                                                        <input type="text" value={editUserForm.fullName} onChange={e => setEditUserForm({ ...editUserForm, fullName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-xs text-slate-500 mb-1 block">Email</label>
-                                                        <input type="email" value={editUserForm.email} onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                    </div>
-                                                    {selectedUser.role === 'VENDOR' && (
-                                                        <div>
-                                                            <label className="text-xs text-slate-500 mb-1 block">Company Name</label>
-                                                            <input type="text" value={editUserForm.companyName} onChange={e => setEditUserForm({ ...editUserForm, companyName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <label className="text-xs text-slate-500 mb-1 block">National ID</label>
-                                                        <input type="text" value={editUserForm.nationalId} onChange={e => setEditUserForm({ ...editUserForm, nationalId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                    </div>
-                                                    <button onClick={saveUserDetails} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Changes</button>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-3 text-sm">
-                                                    <div><span className="text-slate-500 block text-xs">Email</span><span className="text-white break-all">{selectedUser.email}</span></div>
-                                                    <div><span className="text-slate-500 block text-xs">Role</span><span className="text-white">{selectedUser.role}</span></div>
-                                                    <div><span className="text-slate-500 block text-xs">Status</span><span className={`font-bold ${selectedUser.status === 'SUSPENDED' ? 'text-red-400' : 'text-emerald-400'}`}>{selectedUser.status}</span></div>
-                                                    {selectedUser.companyName && <div><span className="text-slate-500 block text-xs">Company Name</span><span className="text-white">{selectedUser.companyName}</span></div>}
-                                                    {selectedUser.nationalId && <div><span className="text-slate-500 block text-xs">National ID</span><span className="text-white font-mono">{selectedUser.nationalId}</span></div>}
-                                                    <div><span className="text-slate-500 block text-xs">Joined</span><span className="text-white">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
-
-                                                    {/* Link out to view full size images if they exist */}
-                                                    {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) && (
-                                                        <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap gap-2">
-                                                            {selectedUser.facialDataUrl && <a href={selectedUser.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full Selfie</a>}
-                                                            {selectedUser.cacCertificateUrl && <a href={selectedUser.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full CAC Doc</a>}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="font-bold text-white">Security</h3>
-                                            </div>
-                                            {!isResettingPassword ? (
-                                                <button onClick={() => setIsResettingPassword(true)} className="w-full bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold py-2 rounded transition-colors text-sm">Reset Password</button>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    <input type="password" placeholder="New Password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
-                                                    <div className="flex gap-2">
-                                                        <button onClick={handleResetPassword} disabled={!resetPassword || resetPassword.length < 6} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold py-2 rounded transition-colors text-sm">Confirm</button>
-                                                        <button onClick={() => { setIsResettingPassword(false); setResetPassword(''); }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded transition-colors text-sm">Cancel</button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Right Column: Devices List */}
-                                    <div className="lg:col-span-2 space-y-6">
-                                        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full min-h-[400px]">
-                                            <div className="p-4 border-b border-slate-800 bg-slate-900/50">
-                                                <h3 className="font-bold text-white flex items-center justify-between">
-                                                    Registered Devices
-                                                    <span className="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300">{selectedUser.devices?.length || 0}</span>
-                                                </h3>
-                                            </div>
-                                            <div className="flex-1 overflow-y-auto max-h-[500px]">
-                                                {(!selectedUser.devices || selectedUser.devices.length === 0) ? (
-                                                    <div className="p-8 text-center text-slate-500 text-sm">No devices registered by this user.</div>
-                                                ) : (
-                                                    <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-slate-400 uppercase bg-slate-900/30 border-b border-slate-800 sticky top-0">
-                                                            <tr>
-                                                                <th className="px-4 py-3">Device</th>
-                                                                <th className="px-4 py-3">IMEI</th>
-                                                                <th className="px-4 py-3">Status</th>
-                                                                <th className="px-4 py-3">Registered</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-800/50">
-                                                            {selectedUser.devices.map((device: any) => (
-                                                                <tr key={device.id} className="hover:bg-slate-900/50">
-                                                                    <td className="px-4 py-3 font-medium text-white">{device.brand} {device.model}</td>
-                                                                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{device.imei}</td>
-                                                                    <td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">{device.status}</span></td>
-                                                                    <td className="px-4 py-3 text-xs text-slate-500">{new Date(device.createdAt).toLocaleDateString()}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
-
-                {/* TAB: Telecom EIR */}
-                {activeTab === 'telecom-eir' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center text-rose-400 border border-rose-500/30">
-                                <AlertTriangle className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Telecom EIR Sandbox</h3>
-                                <p className="text-sm text-slate-400">Simulate network-level blocking across major Nigerian telecom operators.</p>
-                            </div>
-                        </div>
-                        <div className="grid md:grid-cols-3 gap-6">
-                            {['MTN Nigeria', 'Airtel', 'Globacom (Glo)'].map(telco => (
-                                <div key={telco} className="bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
-                                    <div>
-                                        <h4 className="text-white font-black mb-2">{telco}</h4>
-                                        <p className="text-xs text-slate-500 mb-4">Equipment Identity Register (EIR) Link: <span className="text-emerald-500">Active</span></p>
-                                    </div>
-                                    <button onClick={() => alert(`Simulating Drop-Kick for stolen IMEIs on ${telco} network. In production, this pushes to the Kafka event queue.`)} className="w-full py-3 rounded-lg text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700">
-                                        Test Network Drop-Kick
-                                    </button>
-                                </div>
                             ))}
+
+                            {/* Password Resets */}
+                            {authRequests.map(req => (
+                                <tr key={req.id} className="hover:bg-slate-800/30 transition-colors">
+                                    <td className="px-6 py-4 text-xs text-slate-400">{new Date(req.createdAt).toLocaleString()}</td>
+                                    <td className="px-6 py-4 font-bold text-white">{req.user?.email}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${roleColor(req.user?.role)}`}>
+                                            {req.user?.role}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-500' : req.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
+                                            {req.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {req.otp ? (
+                                            <span className="font-mono text-amber-400 bg-amber-500/10 px-2 py-1 rounded text-sm tracking-widest font-bold border border-amber-500/20">{req.otp}</span>
+                                        ) : (
+                                            <span className="text-slate-600 italic text-xs">N/A</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        {req.status === 'PENDING' && (
+                                            <div className="flex gap-2 justify-end">
+                                                <button onClick={() => approveReset(req.id)} className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded transition-colors uppercase">Approve</button>
+                                                <button onClick={() => rejectReset(req.id)} className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded transition-colors uppercase">Reject</button>
+                                            </div>
+                                        )}
+                                        {req.adminNotes && <p className="text-[10px] text-slate-500 mt-1 italic">Note: {req.adminNotes}</p>}
+                                    </td>
+                                </tr>
+                            ))}
+                        </>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
+{/* Create Account Modal */ }
+{
+    isCreateOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-emerald-500"></div>
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">Create Account</h2>
+                    <button onClick={() => setIsCreateOpen(false)} className="text-slate-500 hover:text-white text-xl">✕</button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Role *</label>
+                        <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm">
+                            {['ADMIN', 'VENDOR', 'CONSUMER', 'POLICE', 'INSURANCE', 'TELECOM'].map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Full Name *</label>
+                        <input type="text" value={newUser.fullName} onChange={e => setNewUser({ ...newUser, fullName: e.target.value })} placeholder="John Doe" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Email *</label>
+                        <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="user@pts.com" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Password *</label>
+                        <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                    </div>
+                    {newUser.role === 'VENDOR' && (
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Company Name</label>
+                            <input type="text" value={newUser.companyName} onChange={e => setNewUser({ ...newUser, companyName: e.target.value })} placeholder="Business Ltd" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">National ID (NIN)</label>
+                        <input type="text" value={newUser.nationalId} onChange={e => setNewUser({ ...newUser, nationalId: e.target.value })} placeholder="12345678901" className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" />
+                    </div>
+                    <button onClick={createUser} className="w-full bg-gradient-to-r from-amber-600 to-emerald-600 hover:from-amber-500 hover:to-emerald-500 text-white font-bold py-3 rounded-xl transition-all mt-2">Create Account</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+{/* User Details Modal */ }
+{
+    isDetailsModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden relative my-8">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-amber-500"></div>
+                <div className="p-6 border-b border-slate-800 flex justify-between items-start sticky top-0 bg-slate-900 z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 border-2 border-slate-700 flex-shrink-0 flex items-center justify-center relative">
+                            {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) ? (
+                                <img src={selectedUser.facialDataUrl || selectedUser.cacCertificateUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className={`text-2xl font-black ${selectedUser.role === 'ADMIN' ? 'text-amber-500' : selectedUser.role === 'VENDOR' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                                    {selectedUser.role.charAt(0)}
+                                </span>
+                            )}
+                            {selectedUser.cacCertificateUrl && !selectedUser.facialDataUrl && (
+                                <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[8px] text-center text-slate-300 py-0.5 font-bold uppercase tracking-widest backdrop-blur-sm">CAC</div>
+                            )}
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white mb-1">{selectedUser.fullName || selectedUser.email}</h2>
+                            <div className="flex items-center gap-2 text-xs">
+                                <span className={`px-2 py-0.5 rounded-full font-bold uppercase ${selectedUser.role === 'ADMIN' ? 'bg-amber-500/20 text-amber-500' : selectedUser.role === 'VENDOR' ? 'bg-blue-500/20 text-blue-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{selectedUser.role}</span>
+                                {selectedUser.companyName && <span className="text-slate-400">@ {selectedUser.companyName}</span>}
+                            </div>
                         </div>
                     </div>
-                )}
+                    <button onClick={() => setIsDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors">✕</button>
+                </div>
 
-                {/* TAB: Active Warrants */}
-                {activeTab === 'warrants' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 border border-amber-500/30">
-                                <LayoutDashboard className="w-6 h-6" />
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Info & Edit Form */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-white">Profile Details</h3>
+                                <button onClick={() => setEditMode(!editMode)} className="text-xs text-blue-400 hover:text-blue-300 font-bold">{editMode ? 'Cancel' : 'Edit'}</button>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-white">NPF Active Warrants</h3>
-                                <p className="text-sm text-slate-400">Force devices into Bloodhound tracking mode based on electronic police warrants.</p>
-                            </div>
-                        </div>
-                        <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
-                            <h4 className="text-slate-300 font-bold mb-4 uppercase text-sm tracking-widest border-b border-slate-800 pb-2">Issue Digital Warrant</h4>
-                            <div className="flex gap-4">
-                                <input type="text" id="warrant-imei-admin" placeholder="Enter Target IMEI..." className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" />
-                                <button onClick={() => alert('Warrant Executed! Target device is now in Bloodhound Mode. Live pings will be forwarded to Law Enforcement.')} className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg">
-                                    Execute Warrant
-                                </button>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-4 italic">Execution forces the native PTS app (if installed) to ignore battery constraints and ping GPS every 60 seconds.</p>
-                        </div>
-                    </div>
-                )}
-                {activeTab === 'intelligence' && (
-                    <IntelligenceView apiUrl={apiUrl} headers={headers} />
-                )}
-            </main>
-            {liveTrackingImei && <LiveView imei={liveTrackingImei as string} onClose={() => setLiveTrackingImei(null)} />}
 
-            {/* Device Details Modal */}
-            {isDeviceDetailsModalOpen && selectedDevice && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden relative my-8 flex flex-col max-h-[90vh]">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
-                        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 backdrop-blur-md">
-                            <div className="flex items-center gap-5">
-                                <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 relative group">
-                                    {selectedDevice.devicePhotos && selectedDevice.devicePhotos.length > 0 ? (
-                                        <img src={selectedDevice.devicePhotos[0]} alt="Device" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-600">
-                                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            {editMode ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs text-slate-500 mb-1 block">Full Name</label>
+                                        <input type="text" value={editUserForm.fullName} onChange={e => setEditUserForm({ ...editUserForm, fullName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-500 mb-1 block">Email</label>
+                                        <input type="email" value={editUserForm.email} onChange={e => setEditUserForm({ ...editUserForm, email: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                    </div>
+                                    {selectedUser.role === 'VENDOR' && (
+                                        <div>
+                                            <label className="text-xs text-slate-500 mb-1 block">Company Name</label>
+                                            <input type="text" value={editUserForm.companyName} onChange={e => setEditUserForm({ ...editUserForm, companyName: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="text-xs text-slate-500 mb-1 block">National ID</label>
+                                        <input type="text" value={editUserForm.nationalId} onChange={e => setEditUserForm({ ...editUserForm, nationalId: e.target.value })} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                    </div>
+                                    <button onClick={saveUserDetails} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Changes</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3 text-sm">
+                                    <div><span className="text-slate-500 block text-xs">Email</span><span className="text-white break-all">{selectedUser.email}</span></div>
+                                    <div><span className="text-slate-500 block text-xs">Role</span><span className="text-white">{selectedUser.role}</span></div>
+                                    <div><span className="text-slate-500 block text-xs">Status</span><span className={`font-bold ${selectedUser.status === 'SUSPENDED' ? 'text-red-400' : 'text-emerald-400'}`}>{selectedUser.status}</span></div>
+                                    {selectedUser.companyName && <div><span className="text-slate-500 block text-xs">Company Name</span><span className="text-white">{selectedUser.companyName}</span></div>}
+                                    {selectedUser.nationalId && <div><span className="text-slate-500 block text-xs">National ID</span><span className="text-white font-mono">{selectedUser.nationalId}</span></div>}
+                                    <div><span className="text-slate-500 block text-xs">Joined</span><span className="text-white">{new Date(selectedUser.createdAt).toLocaleDateString()}</span></div>
+
+                                    {/* Link out to view full size images if they exist */}
+                                    {(selectedUser.facialDataUrl || selectedUser.cacCertificateUrl) && (
+                                        <div className="pt-3 mt-3 border-t border-slate-800 flex flex-wrap gap-2">
+                                            {selectedUser.facialDataUrl && <a href={selectedUser.facialDataUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full Selfie</a>}
+                                            {selectedUser.cacCertificateUrl && <a href={selectedUser.cacCertificateUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded transition-colors inline-block">View Full CAC Doc</a>}
                                         </div>
                                     )}
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl font-black text-white">{selectedDevice.brand} {selectedDevice.model}</h2>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">IMEI: {selectedDevice.imei}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedDevice.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>{selectedDevice.status}</span>
+                            )}
+                        </div>
+
+                        <div className="bg-slate-950 rounded-xl p-5 border border-slate-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-white">Security</h3>
+                            </div>
+                            {!isResettingPassword ? (
+                                <button onClick={() => setIsResettingPassword(true)} className="w-full bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold py-2 rounded transition-colors text-sm">Reset Password</button>
+                            ) : (
+                                <div className="space-y-3">
+                                    <input type="password" placeholder="New Password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500" />
+                                    <div className="flex gap-2">
+                                        <button onClick={handleResetPassword} disabled={!resetPassword || resetPassword.length < 6} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold py-2 rounded transition-colors text-sm">Confirm</button>
+                                        <button onClick={() => { setIsResettingPassword(false); setResetPassword(''); }} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 rounded transition-colors text-sm">Cancel</button>
                                     </div>
                                 </div>
-                            </div>
-                            <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-800 transition-all">✕</button>
+                            )}
                         </div>
+                    </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                            {/* Left: Metadata & Documents (4 cols) */}
-                            <div className="lg:col-span-4 space-y-6">
-                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
-                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Ownership Information</h3>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Registered Owner</p>
-                                            <p className="text-sm font-bold text-white">{selectedDevice.registeredOwner?.fullName || 'Anonymous'}</p>
-                                            <p className="text-xs text-slate-400">{selectedDevice.registeredOwner?.email}</p>
-                                        </div>
-                                        {selectedDevice.registeredOwner?.phoneNumber && (
-                                            <div>
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Phone</p>
-                                                <p className="text-sm text-white font-mono">{selectedDevice.registeredOwner.phoneNumber}</p>
-                                            </div>
-                                        )}
-                                        {selectedDevice.registeredOwner?.address && (
-                                            <div>
-                                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Home Address</p>
-                                                <p className="text-xs text-slate-300 leading-relaxed">{selectedDevice.registeredOwner.address}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-
-                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
-                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Evidence & Documents</h3>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {[
-                                            { label: 'Device Photo', url: selectedDevice.devicePhotos?.[0], icon: '🖼️' },
-                                            { label: 'Purchase Receipt', url: selectedDevice.purchaseReceiptUrl, icon: '🧾' },
-                                            { label: 'Packaging/Carton', url: selectedDevice.cartonPhotoUrl, icon: '📦' }
-                                        ].map(doc => (
-                                            doc.url ? (
-                                                <a key={doc.label} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition-all group">
-                                                    <span className="text-xs font-bold text-slate-300 flex items-center gap-2"><span>{doc.icon}</span> {doc.label}</span>
-                                                    <svg className="w-4 h-4 text-slate-600 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                </a>
-                                            ) : (
-                                                <div key={doc.label} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-dashed border-slate-800 opacity-50">
-                                                    <span className="text-xs font-medium text-slate-600">{doc.label} (Not Provided)</span>
-                                                </div>
-                                            )
-                                        ))}
-                                    </div>
-                                </section>
-
-                                <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
-                                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">System Metrics</h3>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-xs text-slate-400">Trust Score</span>
-                                        <span className={`text-sm font-black ${selectedDevice.riskScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>{selectedDevice.riskScore}/100</span>
-                                    </div>
-                                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div className={`h-full rounded-full ${selectedDevice.riskScore >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${selectedDevice.riskScore}%` }}></div>
-                                    </div>
-                                </section>
+                    {/* Right Column: Devices List */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full min-h-[400px]">
+                            <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                                <h3 className="font-bold text-white flex items-center justify-between">
+                                    Registered Devices
+                                    <span className="bg-slate-800 px-2 py-0.5 rounded text-xs text-slate-300">{selectedUser.devices?.length || 0}</span>
+                                </h3>
                             </div>
-
-                            {/* Center/Right: Tabs for History, Certificates, Incidents (8 cols) */}
-                            <div className="lg:col-span-8 flex flex-col h-full gap-6">
-                                {/* Digital Certificates Section */}
-                                <section className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col">
-                                    <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex justify-between items-center">
-                                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Digital Property Certificates</h3>
-                                        <span className="bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full">{selectedDevice.certificates?.length || 0} ISSUED</span>
-                                    </div>
-                                    <div className="p-4 space-y-3 max-h-[200px] overflow-y-auto">
-                                        {(!selectedDevice.certificates || selectedDevice.certificates.length === 0) ? (
-                                            <p className="text-xs text-slate-600 italic text-center py-4">No digital certificates have been generated for this device yet.</p>
-                                        ) : selectedDevice.certificates.map((cert: any) => (
-                                            <div key={cert.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
-                                                        {/* Placeholder for QR - usually we'd render the cert hash */}
-                                                        <div className="grid grid-cols-2 gap-0.5 w-full h-full opacity-30">
-                                                            <div className="bg-black"></div><div className="bg-black"></div><div className="bg-black"></div><div className="bg-gray-400"></div>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs font-bold text-white">Cert ID: {cert.id.split('-')[0].toUpperCase()}</p>
-                                                        <p className="text-[10px] text-slate-500 font-mono tracking-tight">{cert.qrHash.substring(0, 32)}...</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(cert.issueDate).toLocaleDateString()}</p>
-                                                    <span className={`text-[9px] font-black ${cert.isActive ? 'text-emerald-500' : 'text-slate-500'}`}>{cert.isActive ? 'ACTIVE' : 'REVOKED'}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-
-                                {/* Activity & Forensics Logs */}
-                                <section className="bg-slate-950 rounded-2xl border border-slate-800 flex-1 flex flex-col min-h-0 overflow-hidden">
-                                    <div className="p-4 bg-slate-900/50 border-b border-slate-800">
-                                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Forensic Activity Log</h3>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                        {/* Incident Reports Merge */}
-                                        {selectedDevice.incidents?.map((inc: any) => (
-                                            <div key={inc.id} className="relative pl-6 border-l-2 border-red-500/30 pb-4">
-                                                <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-950 border-2 border-red-500 flex items-center justify-center">
-                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></div>
-                                                </div>
-                                                <div className="bg-red-500/5 rounded-xl p-3 border border-red-500/10">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">INCIDENT REPORTED: {inc.type}</span>
-                                                        <span className="text-[10px] text-slate-500 font-bold">{new Date(inc.createdAt).toLocaleString()}</span>
-                                                    </div>
-                                                    <p className="text-xs text-slate-300 font-medium">{inc.description}</p>
-                                                    <div className="mt-2 flex justify-between items-center">
-                                                        <span className="text-[9px] text-slate-500 italic">Reporter: {inc.reporter?.email}</span>
-                                                        <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">{inc.status}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {/* Transaction History */}
-                                        {selectedDevice.history?.map((hist: any) => (
-                                            <div key={hist.id} className="relative pl-6 border-l-2 border-slate-800 pb-4">
-                                                <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-slate-700"></div>
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{hist.type}</p>
-                                                        <p className="text-xs text-white mt-1">{hist.description}</p>
-                                                        {hist.actor && <p className="text-[9px] text-slate-600 mt-1 uppercase font-bold italic">Signed By: {hist.actor.email} ({hist.actor.role})</p>}
-                                                    </div>
-                                                    <span className="text-[10px] text-slate-500 font-bold">{new Date(hist.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {(!selectedDevice.history?.length && !selectedDevice.incidents?.length) && (
-                                            <p className="text-xs text-slate-600 italic text-center py-10">No physical or digital logs recorded for this device.</p>
-                                        )}
-                                    </div>
-                                </section>
+                            <div className="flex-1 overflow-y-auto max-h-[500px]">
+                                {(!selectedUser.devices || selectedUser.devices.length === 0) ? (
+                                    <div className="p-8 text-center text-slate-500 text-sm">No devices registered by this user.</div>
+                                ) : (
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-xs text-slate-400 uppercase bg-slate-900/30 border-b border-slate-800 sticky top-0">
+                                            <tr>
+                                                <th className="px-4 py-3">Device</th>
+                                                <th className="px-4 py-3">IMEI</th>
+                                                <th className="px-4 py-3">Status</th>
+                                                <th className="px-4 py-3">Registered</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800/50">
+                                            {selectedUser.devices.map((device: any) => (
+                                                <tr key={device.id} className="hover:bg-slate-900/50">
+                                                    <td className="px-4 py-3 font-medium text-white">{device.brand} {device.model}</td>
+                                                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{device.imei}</td>
+                                                    <td className="px-4 py-3"><span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">{device.status}</span></td>
+                                                    <td className="px-4 py-3 text-xs text-slate-500">{new Date(device.createdAt).toLocaleDateString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
-                        </div>
-
-                        <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
-                            <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="px-5 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors">Close Console</button>
-                            <button onClick={() => { setIsDeviceDetailsModalOpen(false); setLiveTrackingImei(selectedDevice.imei); }} className="px-5 py-2 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-500 text-white transition-all shadow-lg shadow-red-600/20 flex items-center gap-2">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                Engage Live Tracking
-                            </button>
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
+        </div>
+    )
+}
 
-            {/* HIDDEN DOSSIER TEMPLATE FOR PDF GENERATION */}
-            <div className="fixed -left-[4000px] top-0 pointer-events-none">
-                {dossierData && (
-                    <div ref={dossierRef} className="w-[800px] p-12 bg-white text-slate-900 font-sans shadow-2xl flex flex-col min-h-[1123px]">
-                        {/* Dossier Header */}
-                        <div className="flex justify-between items-start border-b-[6px] border-slate-900 pb-8 mb-10">
-                            <div className="flex items-center gap-4">
-                                <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-slate-200">PTS</div>
-                                <div>
-                                    <h1 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">Forensic Asset Dossier</h1>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">National Device Registry • Forensic Intelligence Division</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-none mb-1">Dossier ID</p>
-                                <p className="text-sm font-mono font-black text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{dossierData.reportId}</p>
-                            </div>
+{/* TAB: Telecom EIR */ }
+{
+    activeTab === 'telecom-eir' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+            <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center text-rose-400 border border-rose-500/30">
+                    <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-white">Telecom EIR Sandbox</h3>
+                    <p className="text-sm text-slate-400">Simulate network-level blocking across major Nigerian telecom operators.</p>
+                </div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+                {['MTN Nigeria', 'Airtel', 'Globacom (Glo)'].map(telco => (
+                    <div key={telco} className="bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <h4 className="text-white font-black mb-2">{telco}</h4>
+                            <p className="text-xs text-slate-500 mb-4">Equipment Identity Register (EIR) Link: <span className="text-emerald-500">Active</span></p>
                         </div>
+                        <button onClick={() => alert(`Simulating Drop-Kick for stolen IMEIs on ${telco} network. In production, this pushes to the Kafka event queue.`)} className="w-full py-3 rounded-lg text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700">
+                            Test Network Drop-Kick
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
 
-                        {/* Metadata Header */}
-                        <div className="grid grid-cols-3 gap-6 mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <div>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Generated Date</p>
-                                <p className="text-sm font-bold text-slate-800">{new Date(dossierData.generatedAt).toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Authorizing Official</p>
-                                <p className="text-sm font-bold text-slate-800 truncate">{dossierData.generatedBy}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Security Clearance</p>
-                                <p className="text-sm font-bold text-red-600">CENTRAL ADMIN / RESTRICTED</p>
-                            </div>
-                        </div>
+{/* TAB: Active Warrants */ }
+{
+    activeTab === 'warrants' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+            <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 border border-amber-500/30">
+                    <LayoutDashboard className="w-6 h-6" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-white">NPF Active Warrants</h3>
+                    <p className="text-sm text-slate-400">Force devices into Bloodhound tracking mode based on electronic police warrants.</p>
+                </div>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
+                <h4 className="text-slate-300 font-bold mb-4 uppercase text-sm tracking-widest border-b border-slate-800 pb-2">Issue Digital Warrant</h4>
+                <div className="flex gap-4">
+                    <input type="text" id="warrant-imei-admin" placeholder="Enter Target IMEI..." className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" />
+                    <button onClick={() => alert('Warrant Executed! Target device is now in Bloodhound Mode. Live pings will be forwarded to Law Enforcement.')} className="bg-amber-600 hover:bg-amber-500 text-white font-bold px-8 py-3 rounded-lg shadow-lg">
+                        Execute Warrant
+                    </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-4 italic">Execution forces the native PTS app (if installed) to ignore battery constraints and ping GPS every 60 seconds.</p>
+            </div>
+        </div>
+    )
+}
+            </main>
+    { liveTrackingImei && <LiveView imei={liveTrackingImei as string} onClose={() => setLiveTrackingImei(null)} />}
 
-                        <div className="grid grid-cols-5 gap-8 flex-1">
-                            {/* Left Panel: Subject Data */}
-                            <div className="col-span-2 space-y-8">
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Asset Manifest</h3>
-                                    <div className="space-y-4">
-                                        <div className="w-full aspect-square bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden shadow-inner flex items-center justify-center">
-                                            {dossierData.asset.photos && dossierData.asset.photos.length > 0 ? (
-                                                <img src={dossierData.asset.photos[0]} alt="Primary Evidence" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <svg className="w-20 h-20 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                                            )}
-                                        </div>
-                                        <div className="bg-slate-950 text-white p-5 rounded-2xl space-y-3 font-mono">
-                                            <div>
-                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Brand / Model</p>
-                                                <p className="text-sm font-bold">{dossierData.asset.brand} {dossierData.asset.model}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">IMEI Identity</p>
-                                                <p className="text-sm font-bold tracking-widest">{dossierData.asset.imei}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Serial Identity</p>
-                                                <p className="text-sm font-bold">{dossierData.asset.serial || 'NOT_LOGGED'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Active Status</h3>
-                                    <div className="p-4 rounded-xl border-2 border-red-600 bg-red-600/[0.03]">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Network Status</span>
-                                            <span className="text-xs font-black text-red-600 uppercase tracking-wider">{dossierData.asset.status}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">Risk Index</span>
-                                            <span className="text-xs font-black text-slate-900">{dossierData.asset.riskScore}/100</span>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Current Custodian</h3>
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                        <p className="text-sm font-bold text-slate-900 mb-1">{dossierData.ownership.current}</p>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase italic">Verified Legal Registrant</p>
-                                    </div>
-                                </section>
-                            </div>
-
-                            {/* Right Panel: Timeline & Logs */}
-                            <div className="col-span-3 space-y-8">
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Ownership Chain-of-Custody</h3>
-                                    <div className="space-y-4">
-                                        {dossierData.ownership.chain.map((link: any, idx: number) => (
-                                            <div key={idx} className="flex gap-4 items-start bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shrink-0">{idx + 1}</div>
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-800">Transfer from {link.from} to {link.to}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-1 font-mono uppercase font-bold">{new Date(link.date).toLocaleDateString()} • TS-VERIFIED</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {dossierData.ownership.chain.length === 0 && <p className="text-xs text-slate-400 italic">No historical ownership transfers recorded in PTS Ledger.</p>}
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Forensic Transaction Ledger</h3>
-                                    <div className="bg-slate-950 text-slate-300 p-6 rounded-2xl space-y-6 font-mono border-t-[4px] border-emerald-500">
-                                        {(dossierData.ledger || []).slice(0, 8).map((entry: any, idx: number) => (
-                                            <div key={idx} className="flex gap-4">
-                                                <div className="text-[10px] font-black text-slate-600 shrink-0 border-r border-slate-800 pr-3 w-16 leading-tight">
-                                                    {new Date(entry.date).toLocaleDateString()}<br />
-                                                    {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase text-emerald-400 leading-none mb-1">{entry.type}</p>
-                                                    <p className="text-[11px] font-bold text-slate-200 mb-1 leading-tight">{entry.details}</p>
-                                                    <p className="text-[9px] text-slate-600 font-black italic">SGN: {entry.actor}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Service & Technical Log</h3>
-                                    <div className="space-y-3">
-                                        {(dossierData.maintenance || []).map((m: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-slate-800 uppercase leading-none mb-1">{m.type}</p>
-                                                    <p className="text-[10px] text-slate-500 font-bold">{m.provider}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-mono text-slate-900 font-black">{new Date(m.date).toLocaleDateString()}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {(!dossierData.maintenance || dossierData.maintenance.length === 0) && <p className="text-xs text-slate-400 italic">No technical service history available for this asset.</p>}
-                                    </div>
-                                </section>
-                            </div>
-                        </div>
-
-                        {/* Dossier Footer */}
-                        <div className="mt-auto pt-10 border-t border-slate-200 flex justify-between items-end">
-                            <div className="flex gap-6 items-center">
-                                <div className="w-20 h-20 bg-slate-900 p-2 rounded-lg flex items-center justify-center">
-                                    <div className="w-full h-full bg-slate-800 rounded flex items-center justify-center text-[8px] text-slate-500 text-center uppercase tracking-tightest leading-none">PTS<br />FORENSIC<br />SEAL</div>
+{/* Device Details Modal */ }
+{
+    isDeviceDetailsModalOpen && selectedDevice && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden relative my-8 flex flex-col max-h-[90vh]">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-blue-500"></div>
+                <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 backdrop-blur-md">
+                    <div className="flex items-center gap-5">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 relative group">
+                            {selectedDevice.devicePhotos && selectedDevice.devicePhotos.length > 0 ? (
+                                <img src={selectedDevice.devicePhotos[0]} alt="Device" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-2 underline">Confidentiality Notice</p>
-                                    <p className="text-[9px] text-slate-400 italic max-w-xs leading-relaxed">
-                                        This document is an immutable record from the National Property Tracking System. Data integrity is guaranteed via cryptographical hash verification for central administration.
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-right border-l-2 border-slate-900 pl-4">
-                                <p className="text-[10px] font-mono font-black text-slate-900 uppercase">ADMINISTRATIVE CLEARANCE VERIFIED</p>
-                                <p className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">PTS GLOBAL COMMAND • CORE v4.1</p>
+                            )}
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-white">{selectedDevice.brand} {selectedDevice.model}</h2>
+                            <div className="flex items-center gap-3 mt-1">
+                                <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">IMEI: {selectedDevice.imei}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedDevice.status === 'CLEAN' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>{selectedDevice.status}</span>
                             </div>
                         </div>
                     </div>
-                )}
+                    <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="text-slate-500 hover:text-white text-xl w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-800 transition-all">✕</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left: Metadata & Documents (4 cols) */}
+                    <div className="lg:col-span-4 space-y-6">
+                        <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Ownership Information</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Registered Owner</p>
+                                    <p className="text-sm font-bold text-white">{selectedDevice.registeredOwner?.fullName || 'Anonymous'}</p>
+                                    <p className="text-xs text-slate-400">{selectedDevice.registeredOwner?.email}</p>
+                                </div>
+                                {selectedDevice.registeredOwner?.phoneNumber && (
+                                    <div>
+                                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Phone</p>
+                                        <p className="text-sm text-white font-mono">{selectedDevice.registeredOwner.phoneNumber}</p>
+                                    </div>
+                                )}
+                                {selectedDevice.registeredOwner?.address && (
+                                    <div>
+                                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Home Address</p>
+                                        <p className="text-xs text-slate-300 leading-relaxed">{selectedDevice.registeredOwner.address}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Evidence & Documents</h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                {[
+                                    { label: 'Device Photo', url: selectedDevice.devicePhotos?.[0], icon: '🖼️' },
+                                    { label: 'Purchase Receipt', url: selectedDevice.purchaseReceiptUrl, icon: '🧾' },
+                                    { label: 'Packaging/Carton', url: selectedDevice.cartonPhotoUrl, icon: '📦' }
+                                ].map(doc => (
+                                    doc.url ? (
+                                        <a key={doc.label} href={doc.url} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/50 transition-all group">
+                                            <span className="text-xs font-bold text-slate-300 flex items-center gap-2"><span>{doc.icon}</span> {doc.label}</span>
+                                            <svg className="w-4 h-4 text-slate-600 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                        </a>
+                                    ) : (
+                                        <div key={doc.label} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-dashed border-slate-800 opacity-50">
+                                            <span className="text-xs font-medium text-slate-600">{doc.label} (Not Provided)</span>
+                                        </div>
+                                    )
+                                ))}
+                            </div>
+                        </section>
+
+                        <section className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">System Metrics</h3>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-400">Trust Score</span>
+                                <span className={`text-sm font-black ${selectedDevice.riskScore >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>{selectedDevice.riskScore}/100</span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${selectedDevice.riskScore >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${selectedDevice.riskScore}%` }}></div>
+                            </div>
+                        </section>
+                    </div>
+
+                    {/* Center/Right: Tabs for History, Certificates, Incidents (8 cols) */}
+                    <div className="lg:col-span-8 flex flex-col h-full gap-6">
+                        {/* Digital Certificates Section */}
+                        <section className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col">
+                            <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex justify-between items-center">
+                                <h3 className="text-xs font-black text-white uppercase tracking-widest">Digital Property Certificates</h3>
+                                <span className="bg-blue-500/20 text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full">{selectedDevice.certificates?.length || 0} ISSUED</span>
+                            </div>
+                            <div className="p-4 space-y-3 max-h-[200px] overflow-y-auto">
+                                {(!selectedDevice.certificates || selectedDevice.certificates.length === 0) ? (
+                                    <p className="text-xs text-slate-600 italic text-center py-4">No digital certificates have been generated for this device yet.</p>
+                                ) : selectedDevice.certificates.map((cert: any) => (
+                                    <div key={cert.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center p-1">
+                                                {/* Placeholder for QR - usually we'd render the cert hash */}
+                                                <div className="grid grid-cols-2 gap-0.5 w-full h-full opacity-30">
+                                                    <div className="bg-black"></div><div className="bg-black"></div><div className="bg-black"></div><div className="bg-gray-400"></div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-white">Cert ID: {cert.id.split('-')[0].toUpperCase()}</p>
+                                                <p className="text-[10px] text-slate-500 font-mono tracking-tight">{cert.qrHash.substring(0, 32)}...</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(cert.issueDate).toLocaleDateString()}</p>
+                                            <span className={`text-[9px] font-black ${cert.isActive ? 'text-emerald-500' : 'text-slate-500'}`}>{cert.isActive ? 'ACTIVE' : 'REVOKED'}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* Activity & Forensics Logs */}
+                        <section className="bg-slate-950 rounded-2xl border border-slate-800 flex-1 flex flex-col min-h-0 overflow-hidden">
+                            <div className="p-4 bg-slate-900/50 border-b border-slate-800">
+                                <h3 className="text-xs font-black text-white uppercase tracking-widest">Forensic Activity Log</h3>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {/* Incident Reports Merge */}
+                                {selectedDevice.incidents?.map((inc: any) => (
+                                    <div key={inc.id} className="relative pl-6 border-l-2 border-red-500/30 pb-4">
+                                        <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-950 border-2 border-red-500 flex items-center justify-center">
+                                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></div>
+                                        </div>
+                                        <div className="bg-red-500/5 rounded-xl p-3 border border-red-500/10">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">INCIDENT REPORTED: {inc.type}</span>
+                                                <span className="text-[10px] text-slate-500 font-bold">{new Date(inc.createdAt).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 font-medium">{inc.description}</p>
+                                            <div className="mt-2 flex justify-between items-center">
+                                                <span className="text-[9px] text-slate-500 italic">Reporter: {inc.reporter?.email}</span>
+                                                <span className="text-[9px] font-black bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">{inc.status}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Transaction History */}
+                                {selectedDevice.history?.map((hist: any) => (
+                                    <div key={hist.id} className="relative pl-6 border-l-2 border-slate-800 pb-4">
+                                        <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-slate-700"></div>
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{hist.type}</p>
+                                                <p className="text-xs text-white mt-1">{hist.description}</p>
+                                                {hist.actor && <p className="text-[9px] text-slate-600 mt-1 uppercase font-bold italic">Signed By: {hist.actor.email} ({hist.actor.role})</p>}
+                                            </div>
+                                            <span className="text-[10px] text-slate-500 font-bold">{new Date(hist.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {(!selectedDevice.history?.length && !selectedDevice.incidents?.length) && (
+                                    <p className="text-xs text-slate-600 italic text-center py-10">No physical or digital logs recorded for this device.</p>
+                                )}
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+                    <button onClick={() => setIsDeviceDetailsModalOpen(false)} className="px-5 py-2 rounded-xl text-sm font-bold text-slate-400 hover:text-white transition-colors">Close Console</button>
+                    <button onClick={() => { setIsDeviceDetailsModalOpen(false); setLiveTrackingImei(selectedDevice.imei); }} className="px-5 py-2 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-500 text-white transition-all shadow-lg shadow-red-600/20 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        Engage Live Tracking
+                    </button>
+                </div>
             </div>
         </div>
+    )
+}
+
+{/* HIDDEN DOSSIER TEMPLATE FOR PDF GENERATION */ }
+<div className="fixed -left-[4000px] top-0 pointer-events-none">
+    {dossierData && (
+        <div ref={dossierRef} className="w-[800px] p-12 bg-white text-slate-900 font-sans shadow-2xl flex flex-col min-h-[1123px]">
+            {/* Dossier Header */}
+            <div className="flex justify-between items-start border-b-[6px] border-slate-900 pb-8 mb-10">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-slate-200">PTS</div>
+                    <div>
+                        <h1 className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">Forensic Asset Dossier</h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">National Device Registry • Forensic Intelligence Division</p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-none mb-1">Dossier ID</p>
+                    <p className="text-sm font-mono font-black text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-100">{dossierData.reportId}</p>
+                </div>
+            </div>
+
+            {/* Metadata Header */}
+            <div className="grid grid-cols-3 gap-6 mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Generated Date</p>
+                    <p className="text-sm font-bold text-slate-800">{new Date(dossierData.generatedAt).toLocaleString()}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Authorizing Official</p>
+                    <p className="text-sm font-bold text-slate-800 truncate">{dossierData.generatedBy}</p>
+                </div>
+                <div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Security Clearance</p>
+                    <p className="text-sm font-bold text-red-600">CENTRAL ADMIN / RESTRICTED</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-8 flex-1">
+                {/* Left Panel: Subject Data */}
+                <div className="col-span-2 space-y-8">
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Asset Manifest</h3>
+                        <div className="space-y-4">
+                            <div className="w-full aspect-square bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden shadow-inner flex items-center justify-center">
+                                {dossierData.asset.photos && dossierData.asset.photos.length > 0 ? (
+                                    <img src={dossierData.asset.photos[0]} alt="Primary Evidence" className="w-full h-full object-cover" />
+                                ) : (
+                                    <svg className="w-20 h-20 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                )}
+                            </div>
+                            <div className="bg-slate-950 text-white p-5 rounded-2xl space-y-3 font-mono">
+                                <div>
+                                    <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Brand / Model</p>
+                                    <p className="text-sm font-bold">{dossierData.asset.brand} {dossierData.asset.model}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">IMEI Identity</p>
+                                    <p className="text-sm font-bold tracking-widest">{dossierData.asset.imei}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[8px] text-slate-500 uppercase font-black mb-0.5">Serial Identity</p>
+                                    <p className="text-sm font-bold">{dossierData.asset.serial || 'NOT_LOGGED'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Active Status</h3>
+                        <div className="p-4 rounded-xl border-2 border-red-600 bg-red-600/[0.03]">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] text-slate-500 uppercase font-bold">Network Status</span>
+                                <span className="text-xs font-black text-red-600 uppercase tracking-wider">{dossierData.asset.status}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-slate-500 uppercase font-bold">Risk Index</span>
+                                <span className="text-xs font-black text-slate-900">{dossierData.asset.riskScore}/100</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Current Custodian</h3>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <p className="text-sm font-bold text-slate-900 mb-1">{dossierData.ownership.current}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase italic">Verified Legal Registrant</p>
+                        </div>
+                    </section>
+                </div>
+
+                {/* Right Panel: Timeline & Logs */}
+                <div className="col-span-3 space-y-8">
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Ownership Chain-of-Custody</h3>
+                        <div className="space-y-4">
+                            {dossierData.ownership.chain.map((link: any, idx: number) => (
+                                <div key={idx} className="flex gap-4 items-start bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shrink-0">{idx + 1}</div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-800">Transfer from {link.from} to {link.to}</p>
+                                        <p className="text-[10px] text-slate-500 mt-1 font-mono uppercase font-bold">{new Date(link.date).toLocaleDateString()} • TS-VERIFIED</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {dossierData.ownership.chain.length === 0 && <p className="text-xs text-slate-400 italic">No historical ownership transfers recorded in PTS Ledger.</p>}
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Forensic Transaction Ledger</h3>
+                        <div className="bg-slate-950 text-slate-300 p-6 rounded-2xl space-y-6 font-mono border-t-[4px] border-emerald-500">
+                            {(dossierData.ledger || []).slice(0, 8).map((entry: any, idx: number) => (
+                                <div key={idx} className="flex gap-4">
+                                    <div className="text-[10px] font-black text-slate-600 shrink-0 border-r border-slate-800 pr-3 w-16 leading-tight">
+                                        {new Date(entry.date).toLocaleDateString()}<br />
+                                        {new Date(entry.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-emerald-400 leading-none mb-1">{entry.type}</p>
+                                        <p className="text-[11px] font-bold text-slate-200 mb-1 leading-tight">{entry.details}</p>
+                                        <p className="text-[9px] text-slate-600 font-black italic">SGN: {entry.actor}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xs font-black text-slate-900 border-b-2 border-slate-900 pb-2 mb-4 uppercase tracking-widest">Service & Technical Log</h3>
+                        <div className="space-y-3">
+                            {(dossierData.maintenance || []).map((m: any, idx: number) => (
+                                <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-800 uppercase leading-none mb-1">{m.type}</p>
+                                        <p className="text-[10px] text-slate-500 font-bold">{m.provider}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-mono text-slate-900 font-black">{new Date(m.date).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {(!dossierData.maintenance || dossierData.maintenance.length === 0) && <p className="text-xs text-slate-400 italic">No technical service history available for this asset.</p>}
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            {/* Dossier Footer */}
+            <div className="mt-auto pt-10 border-t border-slate-200 flex justify-between items-end">
+                <div className="flex gap-6 items-center">
+                    <div className="w-20 h-20 bg-slate-900 p-2 rounded-lg flex items-center justify-center">
+                        <div className="w-full h-full bg-slate-800 rounded flex items-center justify-center text-[8px] text-slate-500 text-center uppercase tracking-tightest leading-none">PTS<br />FORENSIC<br />SEAL</div>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-2 underline">Confidentiality Notice</p>
+                        <p className="text-[9px] text-slate-400 italic max-w-xs leading-relaxed">
+                            This document is an immutable record from the National Property Tracking System. Data integrity is guaranteed via cryptographical hash verification for central administration.
+                        </p>
+                    </div>
+                </div>
+                <div className="text-right border-l-2 border-slate-900 pl-4">
+                    <p className="text-[10px] font-mono font-black text-slate-900 uppercase">ADMINISTRATIVE CLEARANCE VERIFIED</p>
+                    <p className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">PTS GLOBAL COMMAND • CORE v4.1</p>
+                </div>
+            </div>
+        </div>
+    )}
+</div>
+        </div >
     );
 }

@@ -8,6 +8,7 @@ import LiveView from '@/components/LiveView';
 import MapComponent from '@/components/MapComponent';
 import MeshScanner from '@/components/MeshScanner';
 import DynamicGeoFenceMap from '@/components/Map/DynamicGeoFenceMap';
+import { APP_CONFIG } from '@/lib/pts.config';
 
 export default function PoliceDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -58,7 +59,7 @@ export default function PoliceDashboard() {
         if (!window.confirm(`⚠️ WARNING: You are about to BRICK this device (${imei}) permanentely. This will disable all hardware functionality via the National Kill-Switch API. Proceed?`)) return;
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/devices/${imei}/brick`, {
                 method: 'POST',
                 headers: {
@@ -78,7 +79,7 @@ export default function PoliceDashboard() {
 
     const handleUnbrick = async (imei: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/devices/${imei}/unbrick`, {
                 method: 'POST',
                 headers: {
@@ -97,7 +98,7 @@ export default function PoliceDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
 
             // Fetch metrics
@@ -148,7 +149,7 @@ export default function PoliceDashboard() {
         if (searchQuery.length < 2) return;
         setIsSearching(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/search?q=${encodeURIComponent(searchQuery)}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
             });
@@ -164,7 +165,7 @@ export default function PoliceDashboard() {
 
     const shareLocation = async (incidentId: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/share-location`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
@@ -180,7 +181,7 @@ export default function PoliceDashboard() {
     const clearIncident = async (incidentId: string) => {
         if (!confirm('Mark this incident as cleared/resolved?')) return;
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/clear`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
@@ -192,7 +193,7 @@ export default function PoliceDashboard() {
 
     const updateSuspectStatus = async (suspectId: string, status: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/suspects/${suspectId}/status`, {
                 method: 'PUT',
                 headers: {
@@ -210,7 +211,7 @@ export default function PoliceDashboard() {
         e.preventDefault();
         setIsSubmittingSuspect(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/suspects`, {
                 method: 'POST',
                 headers: {
@@ -234,7 +235,7 @@ export default function PoliceDashboard() {
     const exportDossier = async (imei: string) => {
         setIsGeneratingDossier(imei);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/export-evidence/${imei}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
             });
@@ -382,7 +383,7 @@ export default function PoliceDashboard() {
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/messages`, {
                 method: 'POST',
                 headers: {
@@ -413,7 +414,7 @@ export default function PoliceDashboard() {
         setStatusMessage({ type: 'success', text: `✓ ${actionLabel} for IMEI: ${imei}` });
         setTimeout(() => setStatusMessage(null), 4000);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/police/devices/${imei}/status`, {
                 method: 'PUT',
                 headers: {
@@ -594,7 +595,7 @@ export default function PoliceDashboard() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         Active Warrants
                     </button>
-                    <button onClick={() => { setActiveTab('geofence'); const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'; fetch(`${apiUrl}/devices/geofence`).then(r => r.json()).then(d => setActiveFences(d.customPerimeters || [])).catch(() => { }); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'geofence' ? 'bg-cyan-900/30 text-cyan-400 shadow-lg border border-cyan-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                    <button onClick={() => { setActiveTab('geofence'); const apiUrl = APP_CONFIG.API_URL; fetch(`${apiUrl}/devices/geofence`).then(r => r.json()).then(d => setActiveFences(d.customPerimeters || [])).catch(() => { }); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'geofence' ? 'bg-cyan-900/30 text-cyan-400 shadow-lg border border-cyan-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         🛰 Geo-Fence Deployer
                     </button>
@@ -1085,7 +1086,7 @@ export default function PoliceDashboard() {
                                 onSavePolygon={async (name, coordinates) => {
                                     setIsSavingFence(true);
                                     try {
-                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                                        const apiUrl = APP_CONFIG.API_URL;
                                         const res = await fetch(`${apiUrl}/devices/geofence`, {
                                             method: 'POST',
                                             headers: {

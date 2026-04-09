@@ -752,5 +752,95 @@ router.post('/forensic-scan', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// GEOSPATIAL DATA: Geofencing & Perimeters
+// ============================================================
+router.get('/geofence', async (req, res) => {
+    try {
+        const perimeters = await prisma.regionalGeoFence.findMany({
+            where: { isActive: true }
+        });
+
+        // Map to format frontend expects
+        const customPerimeters = perimeters.map(p => ({
+            id: p.id,
+            name: p.name,
+            polygon: typeof p.geometryJson === 'string' ? JSON.parse(p.geometryJson) : p.geometryJson
+        }));
+
+        res.json({ customPerimeters });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch perimeters' });
+    }
+});
+
+router.post('/geofence', async (req, res) => {
+    try {
+        const { name, geometryJson } = req.body;
+
+        const fence = await prisma.regionalGeoFence.create({
+            data: {
+                name,
+                geometryJson: typeof geometryJson === 'string' ? geometryJson : JSON.stringify(geometryJson),
+                isActive: true
+            }
+        });
+
+        // Broadcast to Police logs
+        await prisma.transactionHistory.create({
+            data: {
+                deviceId: "SYSTEM_LEVEL",
+                type: "GEOFENCE_DEPLOYED",
+                description: `Tactical containment perimeter "${name}" deployed to national grid.`,
+                metadata: JSON.stringify({ perimeterId: fence.id })
+            }
+        });
+
+        res.status(201).json({ message: 'Perimeter deployed', fence });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to deploy perimeter' });
+    }
+});
+
+// ============================================================
+// PUBLIC THREAT RADAR — Heatmap data for stolen device hotspots
+// ============================================================
+router.get('/public/threat-radar', async (req, res) => {
+    try {
+        const stolenDevices = await prisma.device.findMany({
+            where: { status: 'STOLEN' },
+            select: {
+                id: true,
+                brand: true,
+                model: true,
+                riskScore: true,
+                lastPings: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                    select: { latitude: true, longitude: true, createdAt: true }
+                }
+            }
+        });
+
+        // Convert pings to heatmap points
+        const hotspots = stolenDevices
+            .filter(d => d.lastPings.length > 0)
+            .map(d => ({
+                lat: d.lastPings[0].latitude,
+                lng: d.lastPings[0].longitude,
+                intensity: d.riskScore || 0.5, // Intensity based on risk or just 0.5
+                timestamp: d.lastPings[0].createdAt
+            }));
+
+        res.json({
+            count: hotspots.length,
+            hotspots,
+            gridStatus: "Active surveillance grid live-synced."
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to generate threat radar' });
+    }
+});
+
 module.exports = router;
 

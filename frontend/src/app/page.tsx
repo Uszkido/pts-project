@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { APP_CONFIG } from '@/lib/pts.config';
 import BananaSlides from '@/components/BananaSlides';
+import MapComponent from '@/components/MapComponent';
 
 export default function Home() {
     const router = useRouter();
@@ -11,6 +12,8 @@ export default function Home() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [systemStatus, setSystemStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+    const [hotspots, setHotspots] = useState<any[]>([]);
+    const [stats, setStats] = useState<any>(null);
 
     useEffect(() => {
         if (APP_CONFIG.TYPE === 'MERCHANT') {
@@ -40,11 +43,9 @@ export default function Home() {
     useEffect(() => {
         const checkSystemHealth = async () => {
             try {
-                // Use the environment variable, or fallback to localhost for local development
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                // Use the centralized configuration
+                const apiUrl = APP_CONFIG.API_URL;
                 // we want to hit /health, which is at the root of the backend server (not under /api/v1/)
-                // So if NEXT_PUBLIC_API_URL is "https://pts-backend-40w4.onrender.com/api/v1", we need the root.
-                // A safer way is to construct the base URL from the API URL.
                 const baseUrl = apiUrl.replace('/api/v1', '');
 
                 const res = await fetch(`${baseUrl}/health`);
@@ -60,7 +61,29 @@ export default function Home() {
 
         checkSystemHealth();
         // Ping every 30 seconds
-        const interval = setInterval(checkSystemHealth, 30000);
+        const fetchThreatRadar = async () => {
+            try {
+                const apiUrl = APP_CONFIG.API_URL;
+                const res = await fetch(`${apiUrl}/devices/public/threat-radar`);
+                const data = await res.json();
+                if (res.ok) setHotspots(data.hotspots);
+
+                // Fetch public counts
+                const statsRes = await fetch(`${apiUrl}/public/stats`);
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    setStats(statsData);
+                }
+            } catch (err) { }
+        };
+
+        checkSystemHealth();
+        fetchThreatRadar();
+        // Ping every 30 seconds
+        const interval = setInterval(() => {
+            checkSystemHealth();
+            fetchThreatRadar();
+        }, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -75,7 +98,7 @@ export default function Home() {
         setResult(null);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = APP_CONFIG.API_URL;
             const res = await fetch(`${apiUrl}/devices/verify/${imei}`);
             const data = await res.json();
 
@@ -239,6 +262,63 @@ export default function Home() {
                         </div>
                     </div>
                 )}
+
+                {/* Live Grid Stats */}
+                {stats && (
+                    <div className="mt-32 grid grid-cols-2 md:grid-cols-4 gap-6 animate-fade-in">
+                        {[
+                            { label: 'Shielded Assets', value: stats.totalDevices, color: 'blue' },
+                            { label: 'Active Guardians', value: stats.totalUsers, color: 'emerald' },
+                            { label: 'Stolen Alerts', value: stats.stolenCount, color: 'red' },
+                            { label: 'Recovered', value: stats.recoveredCount, color: 'indigo' }
+                        ].map(s => (
+                            <div key={s.label} className="bg-slate-900/40 border border-slate-800/60 p-6 rounded-3xl text-center backdrop-blur-sm">
+                                <p className={`text-4xl font-black text-${s.color}-500 mb-1`}>{s.value.toLocaleString()}</p>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black leading-tight">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* National Threat Radar Map */}
+                <div className="mt-32 space-y-8 pb-10">
+                    <div className="text-center">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-black tracking-widest text-red-400 uppercase mb-4">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                            Live Grid Feed
+                        </div>
+                        <h2 className="text-4xl font-black text-white">National Threat Radar</h2>
+                        <p className="text-slate-500 max-w-xl mx-auto mt-4 font-medium">Real-time heatmaps of reported device thefts across the federation. Visualization of current risk hotspots to aid public vigilance.</p>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/5 relative group p-2">
+                        <div className="h-[500px] w-full rounded-[2rem] overflow-hidden grayscale-[0.5] contrast-[1.2]">
+                            <MapComponent
+                                zoom={6}
+                                markers={hotspots.map(h => ({
+                                    lat: h.lat,
+                                    lng: h.lng,
+                                    label: `INCIDENT RECORDED: ${new Date(h.timestamp).toLocaleDateString()}`,
+                                    color: "#ef4444"
+                                }))}
+                            />
+                        </div>
+                        <div className="absolute top-8 right-8 bg-slate-950/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-700/50 shadow-2xl z-[40]">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full bg-red-500 animate-ping"></div>
+                                <div>
+                                    <p className="text-xs font-black text-white uppercase tracking-wider leading-none">High Frequency Zone</p>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 tracking-tighter">SURVEILLANCE GRID STATUS: ACTIVE</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="absolute bottom-10 left-10 z-[40]">
+                            <div className="px-5 py-3 rounded-xl bg-slate-950/90 border border-slate-800 text-[10px] text-slate-300 font-bold backdrop-blur-md">
+                                DISCLAMER: Coordinates are approximate for community privacy.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
 
             {/* Footer */}
