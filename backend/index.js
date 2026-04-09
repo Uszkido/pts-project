@@ -1,12 +1,21 @@
 require('dotenv').config();
 
 // Global Crash Handlers for Vercel Stability
-process.on('uncaughtException', (err) => console.error('🔥 UNCAUGHT:', err.message, err.stack));
-process.on('unhandledRejection', (reason) => console.error('🌊 UNHANDLED:', reason));
+process.on('uncaughtException', (err) => {
+    console.error('🔥 UNCAUGHT STARTUP ERROR:', err.message, err.stack);
+    // On Vercel, we can't do much but log, but let's try to keep going
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('🌊 UNHANDLED PROMISE REJECTION:', reason);
+});
 
 const express = require('express');
 const cors = require('cors');
-// const { initTelegramOracle } = require('./src/services/telegramOracle'); // Moved below for better safety in production
+
+// DATABASE (Loaded early to establish fail-safe)
+const prisma = require('./src/db');
+
+// ROUTES
 const authRoutes = require('./src/routes/auth');
 const deviceRoutes = require('./src/routes/devices');
 const policeRoutes = require('./src/routes/police');
