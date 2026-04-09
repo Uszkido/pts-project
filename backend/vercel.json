@@ -1,7 +1,7 @@
 {
     "version": 2,
     "functions": {
-        "index.js": {
+        "api/index.js": {
             "memory": 1024,
             "maxDuration": 30
         }
@@ -9,7 +9,7 @@
     "rewrites": [
         {
             "source": "/(.*)",
-            "destination": "index.js"
+            "destination": "api/index.js"
         }
     ]
 }
