@@ -82,7 +82,7 @@ app.get('/ping', (req, res) => {
 app.get('/health', async (req, res) => {
     try {
         await prisma.$queryRaw`SELECT 1`;
-        res.json({ status: 'ok', database: 'connected', message: 'PTS Sentinel is fully operational' });
+        res.json({ status: 'ok', database: 'connected', message: 'PTS Sentinel is fully operational (' + new Date().toISOString() + ')' });
     } catch (err) {
         // Return 200 but with a warning status so the frontend shows "Degraded" instead of crashing
         res.status(200).json({
