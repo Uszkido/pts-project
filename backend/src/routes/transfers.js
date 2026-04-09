@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const prisma = require('../db');
 const jwt = require('jsonwebtoken');
@@ -48,7 +49,7 @@ router.post('/initiate', authenticateToken, async (req, res) => {
         }
 
         // Generate 6-digit Handover Code (2FA)
-        const crypto = require('crypto');
+
         const handoverCode = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
         const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours validity
 
@@ -153,7 +154,7 @@ router.post('/accept/:transferId', authenticateToken, async (req, res) => {
             });
 
             // 4. Issue new certificate (DDOC)
-            const crypto = require('crypto');
+
             const ddocHash = crypto.createHash('sha256').update(`${transfer.deviceId}-${req.user.id}-${Date.now()}`).digest('hex');
 
             const newCertificate = await tx.certificate.create({

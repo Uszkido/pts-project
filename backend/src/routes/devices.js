@@ -479,7 +479,7 @@ router.post('/transfer', authenticateToken, async (req, res) => {
             data: { isActive: false }
         });
 
-        const crypto = require('crypto');
+
         const ddocHash = crypto.createHash('sha256').update(`${deviceId}-${buyer.id}-${Date.now()}`).digest('hex');
         await prisma.certificate.create({
             data: { deviceId, ownerId: buyer.id, qrHash: ddocHash }
@@ -522,7 +522,7 @@ router.post('/dna-scan', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Incomplete hardware component profile. Motherboard and Battery serials required.' });
         }
 
-        const crypto = require('crypto');
+
         const hardwareDnaHash = crypto.createHash('sha256').update(`${motherboardSerialNumber}-${batterySerialNumber}-${cameraSerialNumber || 'U'}`).digest('hex');
 
         // Check if this DNA belongs to a PREVIOUSLY marked STOLEN device
