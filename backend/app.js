@@ -42,6 +42,7 @@ app.get('/health', async (req, res) => {
     res.status(200).json({ status: 'ok', routes: loadedRoutes });
 });
 
-app.listen(PORT, () => console.log(`✅ Auth Only boot running on port ${PORT}`));
+// On Vercel, we don't call app.listen()
+// app.listen(PORT, () => console.log(`✅ Auth Only boot running on port ${PORT}`));
 
 module.exports = app;
