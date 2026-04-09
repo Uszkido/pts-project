@@ -32,7 +32,7 @@ export default function PoliceIntelligence() {
         try {
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
 
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const [incidentsRes, alertsRes, suspectsRes] = await Promise.all([
                 fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/police/incidents`, { headers }),
                 fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/police/vendor-alerts`, { headers }),
@@ -75,7 +75,7 @@ export default function PoliceIntelligence() {
     const shareLocationWithOwner = async (incidentId: string) => {
         if (!confirm('Are you sure you want to share real-time tracking with the device owner?')) return;
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/share-location`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
@@ -89,7 +89,7 @@ export default function PoliceIntelligence() {
     const submitSuspect = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/suspects`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
@@ -106,7 +106,7 @@ export default function PoliceIntelligence() {
         e.preventDefault();
         setIsSubmittingTracking(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/tracking-log`, {
                 method: 'POST',
                 headers: {
@@ -135,7 +135,7 @@ export default function PoliceIntelligence() {
 
     const fetchTrackingLogs = async (imei: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/tracking-logs/${imei}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
             });
@@ -150,7 +150,7 @@ export default function PoliceIntelligence() {
     const handleTriangulation = async (method: string) => {
         setIsTriangulating(method);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/triangulate`, {
                 method: 'POST',
                 headers: {

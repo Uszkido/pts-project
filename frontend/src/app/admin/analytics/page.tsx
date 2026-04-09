@@ -11,7 +11,7 @@ export default function MetabaseAnalytics() {
         const fetchEmbedUrl = async () => {
             try {
                 const adminToken = localStorage.getItem('adminToken');
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
 
                 const res = await fetch(`${apiUrl}/analytics/metabase/embed`, {
                     headers: {

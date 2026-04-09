@@ -55,7 +55,7 @@ export default function MeshScanner({ observerId, onClose }: { observerId: strin
     // Send the telemetry to our Node.js Backend
     const triggerGuardianPing = async (imei: string | null, signalStrength: number) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
 
             // Simulating a GPS location fetch
             const latitude = 6.5244 + (Math.random() * 0.01);

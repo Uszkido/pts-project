@@ -18,7 +18,7 @@ function TransferForm() {
     useEffect(() => {
         const fetchDevices = async () => {
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
                 const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/consumers/dashboard`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
                 });
@@ -39,7 +39,7 @@ function TransferForm() {
         setError('');
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/transfers/initiate`, {
                 method: 'POST',
                 headers: {

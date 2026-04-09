@@ -39,7 +39,7 @@ export default function ConsumerLogin() {
         }
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
 
             if (isForgotPassword) {
                 const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/reset-password`, {
@@ -129,7 +129,7 @@ export default function ConsumerLogin() {
         setIsSubmitting(true);
         setError('');
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const endpoint = otpType === 'REGISTER' ? '/api/v1/auth/verify-email' : '/api/v1/auth/verify-reset-otp';
             const res = await fetch(`${apiUrl.replace('/api/v1', '')}${endpoint}`, {
                 method: 'POST',

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { generateCapSign } from '@/lib/capsign';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
 
 export default function ConsumerDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
@@ -91,7 +91,7 @@ export default function ConsumerDashboard() {
     const fetchDashboardAndMessages = async () => {
         setLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
             const [dashRes, msgsRes] = await Promise.all([
                 fetch(`${apiUrl}/consumers/dashboard`, { headers }),
@@ -151,7 +151,7 @@ export default function ConsumerDashboard() {
     const handleEmergencyReport = async (deviceImei: string) => {
         setEmergencyProcessing(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const headers = {
                 'Authorization': `Bearer ${localStorage.getItem('pts_token')}`,
                 'Content-Type': 'application/json'

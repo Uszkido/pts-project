@@ -38,7 +38,7 @@ export default function VendorRegister() {
     const [shopPhotoUrl, setShopPhotoUrl] = useState('');
     const [cacCertificateUrl, setCacCertificateUrl] = useState('');
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
 
     const uploadFile = async (file: File, type: string) => {
         setUploading(type);

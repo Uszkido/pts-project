@@ -11,7 +11,7 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
 
     const fetchTracking = async () => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
 
             // In a real app, this would be a specific tracking endpoint
@@ -35,7 +35,7 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('deploy');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/deploy-team`, {
                 method: 'POST',
                 headers: {
@@ -58,7 +58,7 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('alert');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/police/alert-vendors`, {
                 method: 'POST',
                 headers: {
@@ -86,7 +86,7 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('share');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const headers = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('pts_token')}`

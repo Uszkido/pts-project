@@ -73,7 +73,7 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
 
             const [dashRes, msgRes] = await Promise.all([
@@ -115,7 +115,7 @@ export default function Dashboard() {
         setMessage(''); setError('');
         setIsRegistering(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             let devicePhotoUrls: string[] = [];
             if (devicePhotos.length > 0) {
                 const formData = new FormData();
@@ -176,7 +176,7 @@ export default function Dashboard() {
         setMessage('');
         setError('');
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/vendors/suspicious-alert`, {
                 method: 'POST',
                 headers: {
@@ -206,7 +206,7 @@ export default function Dashboard() {
 
     const initiateSale = async (deviceId: string, buyerEmail: string, price: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/transfers/initiate`, {
                 method: 'POST',
                 headers: {
@@ -237,7 +237,7 @@ export default function Dashboard() {
     const handleReportDevice = async (imei: string, status: 'STOLEN' | 'LOST') => {
         if (!confirm(`Are you sure you want to report this device as ${status}? This will lock the device.`)) return;
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/devices/${imei}/report`, {
                 method: 'POST',
                 headers: {
@@ -261,7 +261,7 @@ export default function Dashboard() {
         if (!handoverCode) return;
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/transfers/accept/${transferId}`, {
                 method: 'POST',
                 headers: {
@@ -289,7 +289,7 @@ export default function Dashboard() {
         setError('');
         setFoundDevice(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/passports/${searchImei}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
             });
@@ -411,7 +411,7 @@ export default function Dashboard() {
         setIsLoggingRepair(true);
         setMessage(''); setError('');
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/maintenance/log`, {
                 method: 'POST',
                 headers: {

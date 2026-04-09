@@ -14,7 +14,7 @@ export default function VerificationClient() {
     useEffect(() => {
         const verifyDevice = async () => {
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
                 const res = await fetch(`${apiUrl}/devices/verify/${imei}`);
                 const data = await res.json();
 
@@ -150,7 +150,7 @@ export default function VerificationClient() {
         e.preventDefault();
         setScLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
             const res = await fetch(`${apiUrl}/public/safe-contact/${imei}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

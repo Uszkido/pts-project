@@ -76,7 +76,7 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                     } else {
                         // Demo fallback if Regula API returns unauthorized without a license key
                         console.log("Regula API unavailable, falling back to PTS Sovereign AI...");
-                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/ai-public/extract-id`, {
+                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1'}/ai-public/extract-id`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ idImageUrl: `data:${file.type};base64,${base64Data}` })
@@ -96,7 +96,7 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                     // Final backup check with Gemini if not already tried
                     try {
                         const base64Data = (reader.result as string).split(',')[1];
-                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/ai-public/extract-id`, {
+                        const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1'}/ai-public/extract-id`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ idImageUrl: `data:${file.type};base64,${base64Data}` })

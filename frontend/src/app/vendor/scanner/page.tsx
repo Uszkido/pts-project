@@ -30,7 +30,7 @@ export default function VendorScanner() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
     const token = typeof window !== 'undefined' ? localStorage.getItem('pts_token') || '' : '';
 
     // ──────────────────────────────────────────────
