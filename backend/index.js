@@ -1,11 +1,10 @@
 require('dotenv').config();
 
-// Global Crash Handlers for Vercel Stability
 process.on('uncaughtException', (err) => {
-    console.error('🔥 UNCAUGHT STARTUP ERROR:', err.message, err.stack);
+    console.error('🔥 UNCAUGHT:', err.message, err.stack);
 });
 process.on('unhandledRejection', (reason) => {
-    console.error('🌊 UNHANDLED PROMISE REJECTION:', reason);
+    console.error('🌊 UNHANDLED:', reason);
 });
 
 const express = require('express');
@@ -15,80 +14,100 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// DATABASE — loaded once as singleton
-const prisma = require('./src/db');
+// STAGE 1: Only safe, lightweight routes (no native deps)
+const loadedRoutes = [];
 
-// ─── RESILIENT ROUTE LOADER ──────────────────────────────────────────────────
-// Wraps each require() so a single broken native module doesn't crash everything
-function safeRoute(path) {
+function safeUse(path, routeFile) {
     try {
-        return require(path);
+        const route = require(routeFile);
+        app.use(path, route);
+        loadedRoutes.push({ path, status: 'ok' });
     } catch (e) {
-        console.error(`⚠️ Failed to load route: ${path}`, e.message);
-        const router = express.Router();
-        router.all('*', (req, res) => res.status(503).json({ error: `Module offline: ${path}`, details: e.message }));
-        return router;
+        console.error(`❌ Route load failed [${routeFile}]:`, e.message);
+        loadedRoutes.push({ path, status: 'failed', error: e.message });
+        const r = express.Router();
+        r.all('*', (req, res) => res.status(503).json({ error: `Module offline`, module: routeFile, details: e.message }));
+        app.use(path, r);
     }
 }
 
-// ─── ROUTES ──────────────────────────────────────────────────────────────────
-app.use('/api/v1/auth', safeRoute('./src/routes/auth'));
-app.use('/api/v1/devices', safeRoute('./src/routes/devices'));
-app.use('/api/v1/police', safeRoute('./src/routes/police'));
-app.use('/api/v1/consumers', safeRoute('./src/routes/consumers'));
-app.use('/api/v1/transfers', safeRoute('./src/routes/transfers'));
-app.use('/api/v1/telecom', safeRoute('./src/routes/telecom'));
-app.use('/api/v1/incidents', safeRoute('./src/routes/incidents'));
-app.use('/api/v1/vendors', safeRoute('./src/routes/vendors'));
-app.use('/api/v1/registry', safeRoute('./src/routes/registry'));
-app.use('/api/v1/passports', safeRoute('./src/routes/passports'));
-app.use('/api/v1/upload', safeRoute('./src/routes/upload'));
-app.use('/api/v1/admin', safeRoute('./src/routes/admin'));
-app.use('/api/v1/maintenance', safeRoute('./src/routes/maintenance'));
-app.use('/api/v1/public', safeRoute('./src/routes/public'));
-app.use('/api/v1/swap', safeRoute('./src/routes/swap'));
-app.use('/api/v1/guardian', safeRoute('./src/routes/guardian'));
-app.use('/api/v1/ai', safeRoute('./src/routes/ai'));
-app.use('/api/v1/ai-public', safeRoute('./src/routes/ai_public'));
-app.use('/api/v1/whatsapp', safeRoute('./src/routes/whatsapp'));
-app.use('/api/v1/telegram', safeRoute('./src/routes/telegram'));
-app.use('/api/v1/tracking', safeRoute('./src/routes/tracking'));
-app.use('/api/v1/b2b', safeRoute('./src/routes/apiKeys'));
-app.use('/api/v1/payments', safeRoute('./src/routes/payments'));
-app.use('/api/v1/analytics', safeRoute('./src/routes/analytics'));
-app.use('/api/v1/ussd', safeRoute('./src/routes/ussd'));
+// Load db
+let prisma;
+try {
+    prisma = require('./src/db');
+} catch (e) {
+    console.error('❌ db.js failed:', e.message);
+    prisma = null;
+}
 
-// ─── HEALTH & UTILITY ENDPOINTS ──────────────────────────────────────────────
+// Routes — loaded one by one
+safeUse('/api/v1/auth', './src/routes/auth');
+safeUse('/api/v1/devices', './src/routes/devices');
+safeUse('/api/v1/police', './src/routes/police');
+safeUse('/api/v1/consumers', './src/routes/consumers');
+safeUse('/api/v1/transfers', './src/routes/transfers');
+safeUse('/api/v1/telecom', './src/routes/telecom');
+safeUse('/api/v1/incidents', './src/routes/incidents');
+safeUse('/api/v1/vendors', './src/routes/vendors');
+safeUse('/api/v1/registry', './src/routes/registry');
+safeUse('/api/v1/passports', './src/routes/passports');
+safeUse('/api/v1/upload', './src/routes/upload');
+safeUse('/api/v1/admin', './src/routes/admin');
+safeUse('/api/v1/maintenance', './src/routes/maintenance');
+safeUse('/api/v1/public', './src/routes/public');
+safeUse('/api/v1/swap', './src/routes/swap');
+safeUse('/api/v1/guardian', './src/routes/guardian');
+safeUse('/api/v1/ai', './src/routes/ai');
+safeUse('/api/v1/ai-public', './src/routes/ai_public');
+safeUse('/api/v1/whatsapp', './src/routes/whatsapp');
+safeUse('/api/v1/telegram', './src/routes/telegram');
+safeUse('/api/v1/tracking', './src/routes/tracking');
+safeUse('/api/v1/b2b', './src/routes/apiKeys');
+safeUse('/api/v1/payments', './src/routes/payments');
+safeUse('/api/v1/analytics', './src/routes/analytics');
+safeUse('/api/v1/ussd', './src/routes/ussd');
+
+// Health endpoints
 app.get('/ping', (req, res) => {
     res.json({ status: 'ok', message: 'Pong!', time: new Date() });
 });
 
 app.get('/health', async (req, res) => {
+    let dbStatus = 'unknown';
+    let dbError = null;
     try {
-        await prisma.$queryRaw`SELECT 1`;
-        res.json({ status: 'ok', database: 'connected', message: 'PTS Sentinel is fully operational' });
+        if (prisma) {
+            await prisma.$queryRaw`SELECT 1`;
+            dbStatus = 'connected';
+        } else {
+            dbStatus = 'offline';
+            dbError = 'db.js failed to load';
+        }
     } catch (err) {
-        res.status(200).json({
-            status: 'degraded',
-            database: 'offline',
-            message: 'PTS Backend is up, but Global Registry is currently unreachable.',
-            error: err.message
-        });
+        dbStatus = 'offline';
+        dbError = err.message;
     }
+    res.status(200).json({
+        status: dbStatus === 'connected' ? 'ok' : 'degraded',
+        database: dbStatus,
+        routes: loadedRoutes,
+        message: dbStatus === 'connected' ? 'PTS Sentinel is fully operational' : 'API is up but database is unreachable',
+        error: dbError
+    });
 });
 
 app.get('/debug-env', (req, res) => {
     res.json({
-        envKeys: Object.keys(process.env),
         nodeEnv: process.env.NODE_ENV,
         hasDatabaseUrl: !!process.env.DATABASE_URL,
-        hasTelegramToken: !!process.env.TELEGRAM_BOT_TOKEN
+        hasDirectUrl: !!process.env.DIRECT_URL,
+        hasTelegram: !!process.env.TELEGRAM_BOT_TOKEN,
+        hasGemini: !!process.env.GEMINI_API_KEY
     });
 });
 
-// ─── LAZY TELEGRAM INIT ───────────────────────────────────────────────────────
+// Lazy telegram init
 let telegramInitialized = false;
 app.use((req, res, next) => {
     if (!telegramInitialized && process.env.TELEGRAM_BOT_TOKEN) {
@@ -97,15 +116,12 @@ app.use((req, res, next) => {
             initTelegramOracle();
             telegramInitialized = true;
         } catch (e) {
-            console.warn('⚠️ Telegram Oracle initialization delayed:', e.message);
+            console.warn('⚠️ Telegram Oracle delayed:', e.message);
         }
     }
     next();
 });
 
-// ─── SERVER ───────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-    console.log(`✅ PTS Sentinel Backend running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ PTS Sentinel running on port ${PORT}`));
 
 module.exports = app;
