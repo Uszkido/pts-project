@@ -87,15 +87,21 @@ app.get('/debug-env', (req, res) => {
     });
 });
 
-// Initialize Telegram Oracle in ALL environments.
-// In production (Vercel), it runs in webhook mode (no polling).
-// In dev, it runs with polling.
-try {
-    const { initTelegramOracle } = require('./src/services/telegramOracle');
-    initTelegramOracle();
-} catch (e) {
-    console.warn('⚠️ Skipping Telegram Oracle startup:', e.message);
-}
+// ─── LAZY INITIALIZATION ─────────────────────────────────────────────────────
+// We delay heavy module loading until after the primary app engine is ready.
+let telegramInitialized = false;
+app.use((req, res, next) => {
+    if (!telegramInitialized && process.env.TELEGRAM_BOT_TOKEN) {
+        try {
+            const { initTelegramOracle } = require('./src/services/telegramOracle');
+            initTelegramOracle();
+            telegramInitialized = true;
+        } catch (e) {
+            console.warn('⚠️ Telegram Oracle initialization delayed:', e.message);
+        }
+    }
+    next();
+});
 
 // Start the HTTP server only in local development (not on Vercel).
 if (process.env.NODE_ENV !== 'production') {
