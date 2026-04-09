@@ -1,13 +1,13 @@
 {
   "name": "backend",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "main": "api/index.js",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "vercel-build": "echo 'Build bypass'",
-    "build": "echo 'Build bypass'",
+    "vercel-build": "npx prisma generate",
+    "build": "npx prisma generate",
     "start": "node api/index.js",
     "dev": "nodemon api/index.js"
   },
