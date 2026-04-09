@@ -27,7 +27,7 @@ export default function AdminDashboard() {
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence' | 'bulk-load' | 'telecom-eir' | 'warrants'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'intelligence' | 'bulk-load' | 'telecom-eir' | 'warrants' | 'forensics'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
     // New feature states
