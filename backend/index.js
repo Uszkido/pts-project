@@ -15,10 +15,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// 🛑 ALL ROUTES DISABLED FOR ISOLATION
 const loadedRoutes = [];
 
-/*
 function safeUse(path, routeFile) {
     try {
         const route = require(routeFile);
@@ -37,37 +35,37 @@ function safeUse(path, routeFile) {
 let prisma;
 try {
     prisma = require('./src/db');
-} catch(e) {
+} catch (e) {
     console.error('❌ db.js failed:', e.message);
     prisma = null;
 }
 
-safeUse('/api/v1/auth',        './src/routes/auth');
-safeUse('/api/v1/devices',     './src/routes/devices');
-safeUse('/api/v1/police',      './src/routes/police');
-safeUse('/api/v1/consumers',   './src/routes/consumers');
-safeUse('/api/v1/transfers',   './src/routes/transfers');
-safeUse('/api/v1/telecom',     './src/routes/telecom');
-safeUse('/api/v1/incidents',   './src/routes/incidents');
-safeUse('/api/v1/vendors',     './src/routes/vendors');
-safeUse('/api/v1/registry',    './src/routes/registry');
-safeUse('/api/v1/passports',   './src/routes/passports');
-safeUse('/api/v1/upload',      './src/routes/upload');
-safeUse('/api/v1/admin',       './src/routes/admin');
+// Routes
+safeUse('/api/v1/auth', './src/routes/auth');
+safeUse('/api/v1/devices', './src/routes/devices');
+safeUse('/api/v1/police', './src/routes/police');
+safeUse('/api/v1/consumers', './src/routes/consumers');
+safeUse('/api/v1/transfers', './src/routes/transfers');
+safeUse('/api/v1/telecom', './src/routes/telecom');
+safeUse('/api/v1/incidents', './src/routes/incidents');
+safeUse('/api/v1/vendors', './src/routes/vendors');
+safeUse('/api/v1/registry', './src/routes/registry');
+safeUse('/api/v1/passports', './src/routes/passports');
+safeUse('/api/v1/upload', './src/routes/upload');
+safeUse('/api/v1/admin', './src/routes/admin');
 safeUse('/api/v1/maintenance', './src/routes/maintenance');
-safeUse('/api/v1/public',      './src/routes/public');
-safeUse('/api/v1/swap',        './src/routes/swap');
-safeUse('/api/v1/guardian',    './src/routes/guardian');
-safeUse('/api/v1/ai',          './src/routes/ai');
-safeUse('/api/v1/ai-public',   './src/routes/ai_public');
-safeUse('/api/v1/whatsapp',    './src/routes/whatsapp');
-safeUse('/api/v1/telegram',    './src/routes/telegram');
-safeUse('/api/v1/tracking',    './src/routes/tracking');
-safeUse('/api/v1/b2b',         './src/routes/apiKeys');
-safeUse('/api/v1/payments',    './src/routes/payments');
-safeUse('/api/v1/analytics',   './src/routes/analytics');
-safeUse('/api/v1/ussd',        './src/routes/ussd');
-*/
+safeUse('/api/v1/public', './src/routes/public');
+safeUse('/api/v1/swap', './src/routes/swap');
+safeUse('/api/v1/guardian', './src/routes/guardian');
+safeUse('/api/v1/ai', './src/routes/ai');
+safeUse('/api/v1/ai-public', './src/routes/ai_public');
+safeUse('/api/v1/whatsapp', './src/routes/whatsapp');
+safeUse('/api/v1/telegram', './src/routes/telegram');
+safeUse('/api/v1/tracking', './src/routes/tracking');
+safeUse('/api/v1/b2b', './src/routes/apiKeys');
+safeUse('/api/v1/payments', './src/routes/payments');
+safeUse('/api/v1/analytics', './src/routes/analytics');
+safeUse('/api/v1/ussd', './src/routes/ussd');
 
 // Health endpoints
 app.get('/ping', (req, res) => {
@@ -75,13 +73,54 @@ app.get('/ping', (req, res) => {
 });
 
 app.get('/health', async (req, res) => {
+    let dbStatus = 'unknown';
+    let dbError = null;
+    try {
+        if (prisma) {
+            await prisma.$queryRaw`SELECT 1`;
+            dbStatus = 'connected';
+        } else {
+            dbStatus = 'offline';
+            dbError = 'db.js failed to load';
+        }
+    } catch (err) {
+        dbStatus = 'offline';
+        dbError = err.message;
+    }
     res.status(200).json({
-        status: 'ok',
-        message: 'ISOLATION BOOT SUCCESSFUL',
-        routes: loadedRoutes
+        status: dbStatus === 'connected' ? 'ok' : 'degraded',
+        database: dbStatus,
+        routes: loadedRoutes,
+        message: dbStatus === 'connected' ? 'PTS Sentinel is fully operational' : 'API is up but database is unreachable',
+        error: dbError
     });
 });
 
-app.listen(PORT, () => console.log(`✅ PTS Sentinel ISOLATION BOOT running on port ${PORT}`));
+app.get('/debug-env', (req, res) => {
+    res.json({
+        nodeEnv: process.env.NODE_ENV,
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        hasDirectUrl: !!process.env.DIRECT_URL,
+        hasTelegram: !!process.env.TELEGRAM_BOT_TOKEN,
+        hasGemini: !!process.env.GEMINI_API_KEY
+    });
+});
+
+// Lazy telegram init
+let telegramInitialized = false;
+app.use((req, res, next) => {
+    if (!telegramInitialized && process.env.TELEGRAM_BOT_TOKEN) {
+        try {
+            const { initTelegramOracle } = require('./src/services/telegramOracle');
+            initTelegramOracle();
+            telegramInitialized = true;
+        } catch (e) {
+            console.warn('⚠️ Telegram Oracle delayed:', e.message);
+        }
+    }
+    next();
+});
+
+app.listen(PORT, () => console.log(`✅ PTS Sentinel running on port ${PORT}`));
 
 module.exports = app;
