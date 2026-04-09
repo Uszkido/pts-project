@@ -9,6 +9,7 @@ process.on('unhandledRejection', (reason) => {
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const app = express();
 
 app.use(cors());
@@ -16,51 +17,53 @@ app.use(express.json({ limit: '50mb' }));
 
 const loadedRoutes = [];
 
-function safeUse(path, routeFile) {
+function safeUse(apiPath, routeFile) {
     try {
-        const route = require(routeFile);
-        app.use(path, route);
-        loadedRoutes.push({ path, status: 'ok' });
+        // Use path.join to help Vercel bundler track the dependency
+        const fullPath = path.join(__dirname, '..', 'src_backend', 'routes', routeFile);
+        const route = require(fullPath);
+        app.use(apiPath, route);
+        loadedRoutes.push({ path: apiPath, status: 'ok' });
     } catch (e) {
         console.error(`❌ Route load failed [${routeFile}]:`, e.message);
-        loadedRoutes.push({ path, status: 'failed', error: e.message });
+        loadedRoutes.push({ path: apiPath, status: 'failed', error: e.message });
         const r = express.Router();
         r.all('*', (req, res) => res.status(503).json({
             error: `Module offline`,
             module: routeFile,
             details: e.message
         }));
-        app.use(path, r);
+        app.use(apiPath, r);
     }
 }
 
 // RESTORE DATABASE
 let prisma;
 try {
-    // Note: Internal folder is _src (hidden from Vercel function count)
-    prisma = require('./_src/db');
+    const dbPath = path.join(__dirname, '..', 'src_backend', 'db');
+    prisma = require(dbPath);
 } catch (e) {
     console.error('❌ db.js failed:', e.message);
 }
 
-// CORE ROUTES (Relative to api/index.js)
-safeUse('/api/v1/auth', './_src/routes/auth');
-safeUse('/api/v1/devices', './_src/routes/devices');
-safeUse('/api/v1/police', './_src/routes/police');
-safeUse('/api/v1/consumers', './_src/routes/consumers');
-safeUse('/api/v1/transfers', './_src/routes/transfers');
-safeUse('/api/v1/public', './_src/routes/public');
-safeUse('/api/v1/admin', './_src/routes/admin');
-safeUse('/api/v1/registry', './_src/routes/registry');
-safeUse('/api/v1/upload', './_src/routes/upload');
-safeUse('/api/v1/telecom', './_src/routes/telecom');
-safeUse('/api/v1/ussd', './_src/routes/ussd');
+// CORE ROUTES (Point to root/src_backend/routes)
+safeUse('/api/v1/auth', 'auth');
+safeUse('/api/v1/devices', 'devices');
+safeUse('/api/v1/police', 'police');
+safeUse('/api/v1/consumers', 'consumers');
+safeUse('/api/v1/transfers', 'transfers');
+safeUse('/api/v1/public', 'public');
+safeUse('/api/v1/admin', 'admin');
+safeUse('/api/v1/registry', 'registry');
+safeUse('/api/v1/upload', 'upload');
+safeUse('/api/v1/telecom', 'telecom');
+safeUse('/api/v1/ussd', 'ussd');
 
 // BASE HANDLER
 app.get('/api/v1', (req, res) => {
     res.json({
         status: 'ok',
-        message: 'PTS Sentinel API v1.7.3 (Monolith) is operational',
+        message: 'PTS Sentinel API v1.7.4 (Monolith Bridge) is operational',
         endpoints: loadedRoutes.map(r => r.path)
     });
 });
