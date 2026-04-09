@@ -14,9 +14,17 @@
  * 7. Calculate a tamper score from the statistical distribution of differences.
  */
 
-const sharp = require('sharp');
 const fetch = require('node-fetch');
 const crypto = require('crypto');
+
+// Lazy-load sharp to avoid native module boot-time issues on Vercel
+let sharp = null;
+function getSharp() {
+    if (!sharp) {
+        try { sharp = require('sharp'); } catch (e) { console.error('⚠️ sharp unavailable:', e.message); }
+    }
+    return sharp;
+}
 
 /**
  * Downloads an image from a URL and returns a raw buffer.
@@ -48,21 +56,24 @@ const analyzeImageELA = async (imageUrl) => {
         // ─── Step 1: Hash the original for fingerprint ──────────────────────
         const sha256 = crypto.createHash('sha256').update(originalBuffer).digest('hex');
 
+        const currentSharp = getSharp();
+        if (!currentSharp) throw new Error("Sharp forensics engine is unavailable");
+
         // ─── Step 2: Get original pixel data (resized to 512px for speed) ──
-        const { data: originalPixels, info } = await sharp(originalBuffer)
+        const { data: originalPixels, info } = await currentSharp(originalBuffer)
             .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
             .toFormat('raw', { depth: 'uchar' })
             .raw()
             .toBuffer({ resolveWithObject: true });
 
         // ─── Step 3: Re-compress at JPEG quality 75 ─────────────────────────
-        const recompressedBuffer = await sharp(originalBuffer)
+        const recompressedBuffer = await currentSharp(originalBuffer)
             .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
             .jpeg({ quality: 75, mozjpeg: true })
             .toBuffer();
 
         // ─── Step 4: Get recompressed pixel data ────────────────────────────
-        const { data: recompPixels } = await sharp(recompressedBuffer)
+        const { data: recompPixels } = await currentSharp(recompressedBuffer)
             .toFormat('raw', { depth: 'uchar' })
             .raw()
             .toBuffer({ resolveWithObject: true });
