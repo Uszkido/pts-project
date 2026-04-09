@@ -4,6 +4,7 @@ const prisma = require('../db');
 const jwt = require('jsonwebtoken');
 const { calculateValuation } = require('../utils/valuation');
 const { analyzeReceiptForFraud, analyzeDeviceHardwareCondition, extractImeiFromImage, generateVendorTrustSummary } = require('../services/aiService');
+const { analyzeImageELA } = require('../services/elaForensics');
 const { calculateDeviceTrustIndex } = require('../services/RiskEngine');
 const {
     evaluateLazarusProtocol,
@@ -47,25 +48,43 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Device with this IMEI already registered' });
         }
 
-        // --- AI RECEIPT FRAUD DETECTION ---
+        // --- ⚖️ ELA FORENSICS RECEIPT SCAN (Local, Zero-Cost, No Python) ---
         if (purchaseReceiptUrl) {
-            const receiptAnalysis = await analyzeReceiptForFraud(purchaseReceiptUrl, brand, model);
+            const elaResult = await analyzeImageELA(purchaseReceiptUrl);
+            console.log(`[ELA] Receipt scan for vendor ${req.user.id}: TamperScore=${elaResult.tamperScore}, Confidence=${elaResult.confidence}`);
 
-            // If the AI is highly confident the receipt is a forgery:
-            if (receiptAnalysis && receiptAnalysis.isLikelyFake && receiptAnalysis.confidenceScore > 80) {
-                // Here we could proactively flag the Vendor or create a suspicious alert
+            // EXIF Anomaly auto-flag (always log regardless of ELA score)
+            if (elaResult.exifAnomalies && elaResult.exifAnomalies.length > 0) {
+                console.warn(`[ELA EXIF] Anomalies detected: ${elaResult.exifAnomalies.join(' | ')}`);
+            }
+
+            // Block if highly confident it's a forgery
+            if (elaResult.isLikelyFaked && elaResult.confidence === 'HIGH') {
                 await prisma.vendorSuspiciousAlert.create({
                     data: {
-                        deviceId: "FORGERY_ATTEMPT", // We don't have a device ID yet
+                        deviceId: 'FORGERY_ATTEMPT',
                         vendorId: req.user.id,
-                        description: `AI flagged purchase receipt as forged/tampered with ${receiptAnalysis.confidenceScore}% confidence. Reason: ${receiptAnalysis.reasonText}`
+                        description: `🔬 ELA Engine flagged receipt as FORGED (${elaResult.tamperScore}/100 tamper score). Verdict: ${elaResult.verdict}. EXIF: ${elaResult.exifAnomalies?.join(' | ') || 'None'}`
                     }
-                });
+                }).catch(() => { });
 
                 return res.status(400).json({
-                    error: 'Receipt Analysis Failed',
-                    details: 'The uploaded purchase receipt failed our AI authenticity checks. Please upload a clear, unaltered original receipt.'
+                    error: 'Document Forgery Detected',
+                    details: elaResult.verdict,
+                    forensicScore: elaResult.tamperScore,
+                    exifAnomalies: elaResult.exifAnomalies
                 });
+            }
+
+            // Medium confidence: allow but flag for admin review
+            if (elaResult.isLikelyFaked && elaResult.confidence === 'MEDIUM') {
+                await prisma.vendorSuspiciousAlert.create({
+                    data: {
+                        deviceId: 'SUSPICIOUS_RECEIPT',
+                        vendorId: req.user.id,
+                        description: `⚠️ ELA Engine flagged receipt as SUSPICIOUS (${elaResult.tamperScore}/100). Allowed through but needs admin review. Verdict: ${elaResult.verdict}`
+                    }
+                }).catch(() => { });
             }
         }
 
@@ -707,6 +726,29 @@ router.get('/geofence', async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch tactical perimeters' });
+    }
+});
+
+// ============================================================
+// FORENSIC SCAN API — Standalone ELA scan for any image URL
+// Used by Admin Dashboard, Police Dossier, or external B2B callers
+// ============================================================
+router.post('/forensic-scan', authenticateToken, async (req, res) => {
+    try {
+        const { imageUrl, context } = req.body;
+        if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+
+        console.log(`[Forensic API] ELA scan requested by ${req.user.id} for context: ${context || 'general'}`);
+        const result = await analyzeImageELA(imageUrl);
+
+        res.json({
+            forensicEngine: 'PTS-ELA-v1 (Sharp/C++ Native)',
+            context: context || 'general',
+            ...result
+        });
+    } catch (err) {
+        console.error('[Forensic API Error]', err);
+        res.status(500).json({ error: 'Forensic scan failed internally' });
     }
 });
 
