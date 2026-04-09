@@ -56,6 +56,15 @@ safeUse('/api/v1/upload', '../src/routes/upload');
 safeUse('/api/v1/telecom', '../src/routes/telecom');
 safeUse('/api/v1/ussd', '../src/routes/ussd');
 
+// BASE HANDLER
+app.get('/api/v1', (req, res) => {
+    res.json({
+        status: 'ok',
+        message: 'PTS Sentinel API v1.7.1 is operational',
+        endpoints: loadedRoutes.map(r => r.path)
+    });
+});
+
 // PING
 app.get('/ping', (req, res) => {
     res.json({ status: 'ok', msg: 'PTS_SENTINEL_STABLE_PROD_V1' });
