@@ -7,8 +7,8 @@
   },
   "scripts": {
     "vercel-build": "prisma generate && (prisma migrate deploy || echo 'Migration skipped or failed')",
-    "dev": "nodemon index.js",
-    "start": "node index.js",
+    "dev": "nodemon app.js",
+    "start": "node app.js",
     "postinstall": "npx prisma generate",
     "build": "npx prisma generate && npx prisma migrate deploy"
   },
