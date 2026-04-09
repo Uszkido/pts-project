@@ -9,8 +9,8 @@
     "vercel-build": "prisma generate && (prisma migrate deploy || echo 'Migration skipped or failed')",
     "dev": "nodemon app.js",
     "start": "node app.js",
-    "postinstall": "npx prisma generate",
-    "build": "npx prisma generate && npx prisma migrate deploy"
+    "postinstall": "echo 'Postinstall disabled for stability'",
+    "build": "echo 'Build handled by Vercel'"
   },
   "keywords": [],
   "author": "",
