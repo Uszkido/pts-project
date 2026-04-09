@@ -76,7 +76,7 @@ app.get('/health', async (req, res) => {
                 if (adminUser) {
                     await prisma.user.update({
                         where: { id: adminUser.id },
-                        data: { role: 'ADMIN', isAdmin: true }
+                        data: { role: 'ADMIN' }
                     });
                     adminFix = 'SUCCESS: admin@pts.ng restored to ADMIN role';
                 } else {
