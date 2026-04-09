@@ -93,7 +93,8 @@ export default function Dashboard() {
             setPendingTransfers(data.pendingTransfers || []);
         } catch (err: any) {
             setError(err.message);
-            if (err.message.includes('401') || err.message.includes('403')) {
+            if (err.message.includes('Unauthorized') || err.message.includes('Forbidden') || err.message.includes('401') || err.message.includes('403')) {
+                localStorage.removeItem('pts_token');
                 window.location.href = '/vendor/login';
             }
         } finally {
