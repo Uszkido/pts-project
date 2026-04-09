@@ -33,6 +33,7 @@ const paymentRoutes = require('./src/routes/payments');
 const analyticsRoutes = require('./src/routes/analytics');
 const ussdRoutes = require('./src/routes/ussd');
 
+const prisma = require('./src/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -71,7 +72,6 @@ app.get('/ping', (req, res) => {
 
 app.get('/health', async (req, res) => {
     try {
-        const prisma = require('./src/db');
         await prisma.$queryRaw`SELECT 1`;
         res.json({ status: 'ok', message: 'PTS Backend and Database are running' });
     } catch (err) {
@@ -105,19 +105,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 
-// ─── NEON DATABASE KEEP-ALIVE ────────────────────────────────────────────────
-// Neon free-tier suspends after 5 minutes of inactivity.
-// This silent ping runs every 4 minutes to keep the connection warm.
+// ─── NEON DATABASE SETUP ─────────────────────────────────────────────────────
+// Note: We use the shared prisma instance from ./src/db to prevent 
+// connection pool exhaustion in serverless environments.
 if (process.env.NODE_ENV === 'production') {
-    const prisma = require('./src/db');
-    setInterval(async () => {
-        try {
-            await prisma.$queryRaw`SELECT 1`;
-            console.log('💓 DB Keep-Alive Ping: OK');
-        } catch (e) {
-            console.warn('⚠️ DB Keep-Alive failed:', e.message);
-        }
-    }, 4 * 60 * 1000); // Every 4 minutes
+    console.log('🛡️ PTS Backend initialized in Production Mode');
 }
 
 module.exports = app;

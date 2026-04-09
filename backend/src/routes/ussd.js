@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 /**
  * @api {post} /api/v1/ussd Mock Africa's Talking USSD Gateway (*347*PTS#)

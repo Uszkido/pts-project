@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // In a real scenario, this would be validated against a DB of registered Enterprise Telecom API Keys
 const validTelecomKeys = ['TEL_MTN_123', 'TEL_AIRTEL_456', 'TEL_GLO_789'];
