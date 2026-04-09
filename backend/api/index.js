@@ -58,13 +58,13 @@ safeUse('/api/v1/upload', 'upload');
 safeUse('/api/v1/telecom', 'telecom');
 safeUse('/api/v1/ussd', 'ussd');
 
-// AUDIT ENV VARS (Safely check presence)
+// AUDIT ENV VARS
 const auditEnv = () => {
     const keys = [
-        'DATABASE_URL', 'JWT_SECRET', 'CLOUDINARY_URL',
+        'DATABASE_URL', 'JWT_SECRET',
+        'CLOUDINARY_URL', 'CLOUDINARY_CLOUD_NAME',
         'PAYSTACK_SECRET_KEY', 'TELEGRAM_BOT_TOKEN',
-        'GOOGLE_API_KEY', 'MONO_SECRET_KEY', 'EMAIL_USER',
-        'WHATSAPP_ACCESS_TOKEN'
+        'GOOGLE_API_KEY', 'MONO_SECRET_KEY', 'EMAIL_USER'
     ];
     const report = {};
     keys.forEach(k => {
@@ -77,7 +77,7 @@ const auditEnv = () => {
 app.get('/api/v1', (req, res) => {
     res.json({
         status: 'ok',
-        message: 'PTS Sentinel API v1.7.6 is operational',
+        message: 'PTS Sentinel API v1.7.9 is operational',
         env_audit: auditEnv(),
         endpoints: loadedRoutes.map(r => r.path)
     });
