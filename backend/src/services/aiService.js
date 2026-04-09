@@ -1,5 +1,14 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const Tesseract = require('tesseract.js');
+// Tesseract is lazy-loaded to avoid bundle-size / filesystem issues on Vercel
+let Tesseract = null;
+function getTesseract() {
+    if (!Tesseract) {
+        try { Tesseract = require('tesseract.js'); } catch (e) {
+            console.error('⚠️ tesseract.js unavailable:', e.message);
+        }
+    }
+    return Tesseract;
+}
 
 let genAI = null;
 if (process.env.GEMINI_API_KEY) {
@@ -334,7 +343,10 @@ const extractIdDataFromImage = async (idImageUrl) => {
         console.log(`[Tesseract.js OCR] Downloading Identity Document for scan: ${idImageUrl}`);
 
         // Use Tesseract to perform local OCR
-        const { data: { text } } = await Tesseract.recognize(
+        const tesseractInstance = getTesseract();
+        if (!tesseractInstance) throw new Error("OCR engine failed to initialize");
+
+        const { data: { text } } = await tesseractInstance.recognize(
             idImageUrl,
             'eng' // English language pack
         );
