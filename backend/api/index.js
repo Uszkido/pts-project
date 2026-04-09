@@ -57,6 +57,19 @@ safeUse('/api/v1/registry', 'registry');
 safeUse('/api/v1/upload', 'upload');
 safeUse('/api/v1/telecom', 'telecom');
 safeUse('/api/v1/ussd', 'ussd');
+safeUse('/api/v1/ai', 'ai');
+safeUse('/api/v1/analytics', 'analytics');
+safeUse('/api/v1/api-keys', 'apiKeys');
+safeUse('/api/v1/guardian', 'guardian');
+safeUse('/api/v1/incidents', 'incidents');
+safeUse('/api/v1/maintenance', 'maintenance');
+safeUse('/api/v1/passports', 'passports');
+safeUse('/api/v1/payments', 'payments');
+safeUse('/api/v1/swap', 'swap');
+safeUse('/api/v1/telegram', 'telegram');
+safeUse('/api/v1/tracking', 'tracking');
+safeUse('/api/v1/vendors', 'vendors');
+safeUse('/api/v1/whatsapp', 'whatsapp');
 
 // HEALTH & ADMIN RESTORE
 app.get('/health', async (req, res) => {
