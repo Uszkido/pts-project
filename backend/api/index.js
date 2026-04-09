@@ -1,3 +1,12 @@
-module.exports = (req, res) => {
-    res.status(200).send('RAW_NODE_HANDLER_SUCCESS');
-};
+const express = require('express');
+const app = express();
+
+app.get('/ping', (req, res) => {
+    res.json({ status: 'ok', msg: 'ULTRA_SKELETON_RECOMMIT' });
+});
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', skeleton: true });
+});
+
+module.exports = app;
