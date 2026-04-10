@@ -30,6 +30,10 @@ export default function Login() {
 
             const data = await api.post('/auth/login', { email, password });
 
+            if (data.user?.role !== 'VENDOR' && data.user?.role !== 'ADMIN') {
+                throw new Error('Unauthorized role. Merchant/Vendor personnel only.');
+            }
+
             localStorage.setItem('pts_token', data.token);
             window.location.href = '/vendor/dashboard';
         } catch (err: any) {

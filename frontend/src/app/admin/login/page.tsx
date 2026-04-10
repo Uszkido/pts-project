@@ -9,15 +9,12 @@ export default function AdminLogin() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-            if (data.role !== 'ADMIN') throw new Error('You do not have administrator privileges.');
+            const { api } = await import('@/lib/api');
+            const data = await api.post('/auth/login', { email, password });
+
+            // api client already unwraps data.success and data.data
+            // The object returned is { token, user: { role, ... } }
+            if (data.user?.role !== 'ADMIN') throw new Error('You do not have administrator privileges.');
 
             localStorage.setItem('pts_token', data.token);
             window.location.href = '/admin/dashboard';

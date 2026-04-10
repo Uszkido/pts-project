@@ -12,7 +12,7 @@ export default function PoliceLogin() {
             const { api } = await import('@/lib/api');
             const data = await api.post('/auth/login', { email, password });
 
-            if (data.role !== 'POLICE' && data.role !== 'ADMIN') {
+            if (data.user?.role !== 'POLICE' && data.user?.role !== 'ADMIN') {
                 throw new Error('Unauthorized role. Law enforcement personnel only.');
             }
 

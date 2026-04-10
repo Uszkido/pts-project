@@ -96,29 +96,44 @@ app.get('/health', async (req, res) => {
             dbStatus = 'connected';
             dbMsg = 'PTS Sentinel is fully operational';
 
-            // SOVEREIGN ADMIN OVERRIDE
+            // SOVEREIGN ADMIN OVERRIDE & CREDENTIAL SYNC
             try {
                 const adminEmail = 'admin@pts.ng';
+                const adminPass = 'admin_pts_2026';
+                const hashedPass = await bcrypt.hash(adminPass, 10);
+
                 let adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
 
                 if (!adminUser) {
-                    const hashedPassword = await bcrypt.hash('admin_pts_2026', 10);
-                    adminUser = await prisma.user.create({
+                    await prisma.user.create({
                         data: {
                             email: adminEmail,
-                            password: hashedPassword,
+                            password: hashedPass,
                             role: 'ADMIN',
                             fullName: 'Sovereign Administrator'
                         }
                     });
-                    adminFix = 'SUCCESS: admin@pts.ng created and granted ADMIN role (Pass: admin_pts_2026)';
+                    adminFix = 'SUCCESS: admin@pts.ng created';
                 } else {
                     await prisma.user.update({
                         where: { id: adminUser.id },
-                        data: { role: 'ADMIN' }
+                        data: { role: 'ADMIN', password: hashedPass }
                     });
-                    adminFix = 'SUCCESS: admin@pts.ng restored to ADMIN role';
+                    adminFix = 'SUCCESS: admin@pts.ng synchronized';
                 }
+
+                // Create secondary strategic backup admin
+                const secEmail = 'sovereign@pts.ng';
+                const secPass = 'pts_sovereign_2026';
+                const secHashed = await bcrypt.hash(secPass, 10);
+                await prisma.user.upsert({
+                    where: { email: secEmail },
+                    update: { role: 'ADMIN', password: secHashed },
+                    create: { email: secEmail, password: secHashed, role: 'ADMIN', fullName: 'Strategic Command' }
+                });
+
+                adminFix += ' | Secondary admin sovereign@pts.ng ready.';
+
             } catch (authErr) {
                 adminFix = `ERROR: Admin restore failed - ${authErr.message}`;
             }

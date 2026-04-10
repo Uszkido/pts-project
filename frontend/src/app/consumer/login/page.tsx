@@ -39,17 +39,10 @@ export default function ConsumerLogin() {
         }
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
+            const { api } = await import('@/lib/api');
 
             if (isForgotPassword) {
-                const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/reset-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, newPassword })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
-
+                const data = await api.post('/auth/reset-password', { email, newPassword });
                 setSuccessMsg(data.message);
                 if (data.requiresOtp) {
                     setIsOtpStep(true);
@@ -59,54 +52,44 @@ export default function ConsumerLogin() {
                     setPassword('');
                     setNewPassword('');
                 }
-                return; // Wait for OTP or end
+                return;
             }
 
             let facialDataUrl = '';
             if (!isLogin && facialFile) {
-                // Upload facial data first
                 const formData = new FormData();
                 formData.append('file', facialFile);
 
-                const uploadRes = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/upload/document`, {
+                // Use raw fetch for multipart/form-data with file
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
+                const uploadRes = await fetch(`${apiUrl}/upload/document`, {
                     method: 'POST',
                     body: formData
                 });
                 const uploadData = await uploadRes.json();
                 if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload facial data');
-                facialDataUrl = uploadData.url;
+                facialDataUrl = uploadData.data?.url || uploadData.url;
             }
 
-            const endpoint = isLogin ? '/api/v1/auth/login' : '/api/v1/auth/register';
+            const endpoint = isLogin ? '/auth/login' : '/auth/register';
             const body = isLogin
                 ? { email, password }
                 : { email, password, role: 'CONSUMER', fullName, nationalId, facialDataUrl, phoneNumber, address };
 
-            const res = await fetch(`${apiUrl.replace('/api/v1', '')}${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const data = await api.post(endpoint, body);
 
             if (data.requiresOtp) {
                 setSuccessMsg(data.message);
                 setIsOtpStep(true);
-                setOtpType(isLogin ? 'REGISTER' : 'REGISTER'); // Both use email verification
+                setOtpType('REGISTER');
                 return;
             }
 
             if (!isLogin) {
                 // Automatically log them in after registration
-                const loginRes = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                const loginData = await loginRes.json();
-                if (!loginRes.ok && loginData.requiresOtp) {
-                    setSuccessMsg(loginData.error);
+                const loginData = await api.post('/auth/login', { email, password });
+
+                if (loginData.requiresOtp) {
                     setIsOtpStep(true);
                     setOtpType('REGISTER');
                     return;
