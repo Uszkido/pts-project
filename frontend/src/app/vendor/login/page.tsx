@@ -17,17 +17,10 @@ export default function Login() {
         setSuccessMsg('');
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
+            const { api } = await import('@/lib/api');
 
             if (isForgotPassword) {
-                const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/reset-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, newPassword })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
-
+                const data = await api.post('/auth/reset-password', { email, newPassword });
                 setSuccessMsg(data.message);
                 setIsForgotPassword(false);
                 setPassword('');
@@ -35,13 +28,7 @@ export default function Login() {
                 return;
             }
 
-            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const data = await api.post('/auth/login', { email, password });
 
             localStorage.setItem('pts_token', data.token);
             window.location.href = '/vendor/dashboard';

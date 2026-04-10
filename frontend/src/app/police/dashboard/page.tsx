@@ -59,17 +59,8 @@ export default function PoliceDashboard() {
         if (!window.confirm(`⚠️ WARNING: You are about to BRICK this device (${imei}) permanentely. This will disable all hardware functionality via the National Kill-Switch API. Proceed?`)) return;
 
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/devices/${imei}/brick`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ reason })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Bricking failed');
+            const { api } = await import('@/lib/api');
+            await api.post(`/police/devices/${imei}/brick`, { reason });
             setStatusMessage({ type: 'success', text: `Kill-Switch Activated for ${imei}` });
             fetchData();
         } catch (err: any) {
@@ -79,15 +70,8 @@ export default function PoliceDashboard() {
 
     const handleUnbrick = async (imei: string) => {
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/devices/${imei}/unbrick`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Unbricking failed');
+            const { api } = await import('@/lib/api');
+            await api.post(`/police/devices/${imei}/unbrick`, {});
             setStatusMessage({ type: 'success', text: `Kill-Switch Deactivated for ${imei}` });
             fetchData();
         } catch (err: any) {
@@ -98,38 +82,28 @@ export default function PoliceDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
+            const { api } = await import('@/lib/api');
 
             // Fetch metrics
-            const metricsRes = await fetch(`${apiUrl}/police/dashboard-metrics`, { headers });
-            if (!metricsRes.ok) throw new Error('Failed to fetch metrics');
-            const metricsData = await metricsRes.json();
-            setMetrics(metricsData.metrics);
+            const metricsData = await api.get('/police/dashboard-metrics');
+            setMetrics(metricsData);
 
-            // Fetch devices — police only see actionable (STOLEN/LOST/INVESTIGATING) devices
+            // Fetch devices
             const devicesUrl = filter
-                ? `${apiUrl}/police/devices?status=${filter}`
-                : `${apiUrl}/police/devices?status=STOLEN,LOST`;
-            const devicesRes = await fetch(devicesUrl, { headers });
-            const devicesData = await devicesRes.json();
+                ? `/police/devices?status=${filter}`
+                : '/police/devices?status=STOLEN,LOST';
+            const devicesData = await api.get(devicesUrl);
             setDevices(devicesData.devices || []);
 
-            const [incidentsRes, alertsRes, messagesRes, suspectsRes, intelRes] = await Promise.all([
-                fetch(`${apiUrl}/police/incidents`, { headers }),
-                fetch(`${apiUrl}/police/vendor-alerts`, { headers }),
-                fetch(`${apiUrl}/police/messages`, { headers }),
-                fetch(`${apiUrl}/police/suspects`, { headers }),
-                fetch(`${apiUrl}/police/intel-feed`, { headers })
+            const [incidentsData, alertsData, messagesData, suspectsData, intelData] = await Promise.all([
+                api.get('/police/incidents'),
+                api.get('/police/vendor-alerts'),
+                api.get('/police/messages'),
+                api.get('/police/suspects'),
+                api.get('/police/intel-feed')
             ]);
 
-            const incidentsData = await incidentsRes.json();
-            const alertsData = await alertsRes.json();
-            const messagesData = await messagesRes.json();
-            const suspectsData = await suspectsRes.json();
-            const intelData = await intelRes.json();
-
-            setReports(incidentsData.incidents || []);
+            setReports(incidentsData.reports || []);
             setAlerts(alertsData.alerts || []);
             setMessages(messagesData.messages || []);
             setSuspects(suspectsData.suspects || []);
@@ -137,7 +111,7 @@ export default function PoliceDashboard() {
 
         } catch (err: any) {
             setError(err.message);
-            if (err.message.includes('Unauthorized') || err.message.includes('Forbidden') || err.message.includes('401') || err.message.includes('403')) {
+            if (err.message.includes('Unauthorized') || err.message.includes('Forbidden')) {
                 localStorage.removeItem('pts_token');
                 window.location.href = '/police/login';
             }
@@ -150,11 +124,8 @@ export default function PoliceDashboard() {
         if (searchQuery.length < 2) return;
         setIsSearching(true);
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/search?q=${encodeURIComponent(searchQuery)}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            const data = await res.json();
+            const { api } = await import('@/lib/api');
+            const data = await api.get(`/police/search?q=${encodeURIComponent(searchQuery)}`);
             setSearchResults(data.devices || []);
             setShowSearch(true);
         } catch (err: any) {
@@ -164,84 +135,11 @@ export default function PoliceDashboard() {
         }
     };
 
-    const shareLocation = async (incidentId: string) => {
-        try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/share-location`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            if (!res.ok) throw new Error('Failed to share location');
-            alert('Device location is now visible to the victim.');
-            fetchData();
-        } catch (err: any) {
-            alert(err.message);
-        }
-    };
-
-    const clearIncident = async (incidentId: string) => {
-        if (!confirm('Mark this incident as cleared/resolved?')) return;
-        try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/incidents/${incidentId}/clear`, {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            if (!res.ok) throw new Error('Failed to clear incident');
-            fetchData();
-        } catch (err: any) { alert(err.message); }
-    };
-
-    const updateSuspectStatus = async (suspectId: string, status: string) => {
-        try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/suspects/${suspectId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ status })
-            });
-            if (!res.ok) throw new Error('Failed to update suspect status');
-            fetchData();
-        } catch (err: any) { alert(err.message); }
-    };
-
-    const createSuspect = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmittingSuspect(true);
-        try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/suspects`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify(suspectForm)
-            });
-            if (!res.ok) throw new Error('Failed to create suspect record');
-            alert('Suspect record created.');
-            setIsAddSuspectOpen(false);
-            setSuspectForm({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
-            fetchData();
-        } catch (err: any) {
-            alert(err.message);
-        } finally {
-            setIsSubmittingSuspect(false);
-        }
-    };
-
     const exportDossier = async (imei: string) => {
         setIsGeneratingDossier(imei);
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/export-evidence/${imei}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const { api } = await import('@/lib/api');
+            const data = await api.get(`/police/export-evidence/${imei}`);
 
             const d = data.dossier;
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -384,16 +282,8 @@ export default function PoliceDashboard() {
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/messages`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ ...newMessage, receiverRole: 'ADMIN' })
-            });
-            if (!res.ok) throw new Error('Failed to send message');
+            const { api } = await import('@/lib/api');
+            await api.post('/police/messages', { ...newMessage, receiverRole: 'ADMIN' });
             setNewMessage({ subject: '', body: '' });
             fetchData();
             alert('Intelligence dispatched to System Administrator.');
@@ -415,19 +305,8 @@ export default function PoliceDashboard() {
         setStatusMessage({ type: 'success', text: `✓ ${actionLabel} for IMEI: ${imei}` });
         setTimeout(() => setStatusMessage(null), 4000);
         try {
-            const apiUrl = APP_CONFIG.API_URL;
-            const res = await fetch(`${apiUrl}/police/devices/${imei}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ status: newStatus })
-            });
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error);
-            }
+            const { api } = await import('@/lib/api');
+            await api.put(`/police/devices/${imei}/status`, { status: newStatus });
             // Refresh in background to sync with server
             fetchData();
         } catch (err: any) {
@@ -596,7 +475,14 @@ export default function PoliceDashboard() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         Active Warrants
                     </button>
-                    <button onClick={() => { setActiveTab('geofence'); const apiUrl = APP_CONFIG.API_URL; fetch(`${apiUrl}/devices/geofence`).then(r => r.json()).then(d => setActiveFences(d.customPerimeters || [])).catch(() => { }); }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'geofence' ? 'bg-cyan-900/30 text-cyan-400 shadow-lg border border-cyan-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
+                    <button onClick={async () => {
+                        setActiveTab('geofence');
+                        try {
+                            const { api } = await import('@/lib/api');
+                            const data = await api.get('/devices/geofence');
+                            setActiveFences(data.customPerimeters || []);
+                        } catch (err) { }
+                    }} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'geofence' ? 'bg-cyan-900/30 text-cyan-400 shadow-lg border border-cyan-800/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         🛰 Geo-Fence Deployer
                     </button>
@@ -1087,17 +973,8 @@ export default function PoliceDashboard() {
                                 onSavePolygon={async (name, coordinates) => {
                                     setIsSavingFence(true);
                                     try {
-                                        const apiUrl = APP_CONFIG.API_URL;
-                                        const res = await fetch(`${apiUrl}/devices/geofence`, {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                                            },
-                                            body: JSON.stringify({ name, geometryJson: coordinates })
-                                        });
-                                        if (!res.ok) throw new Error('Failed to deploy perimeter');
-                                        const data = await res.json();
+                                        const { api } = await import('@/lib/api');
+                                        const data = await api.post('/devices/geofence', { name, geometryJson: coordinates });
                                         setActiveFences(prev => [...prev, { id: data.fence.id, name: data.fence.name, polygon: coordinates }]);
                                         alert(`✅ Tactical perimeter "${name}" deployed successfully!`);
                                     } catch (e: any) {

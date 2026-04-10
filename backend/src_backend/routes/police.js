@@ -1,81 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../db');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const { authenticate, authorize } = require('../middleware/auth');
+const policeController = require('../controllers/policeController');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_pts_dev_key';
+// Police auth middleware
+const authenticatePolice = [authenticate, authorize(['POLICE', 'ADMIN'])];
 
-// Middleware to verify JWT and Police role
-const authenticatePolice = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+// Get devices filtered by status
+router.get('/devices', authenticatePolice, policeController.getDevices);
 
-    if (!token) return res.status(401).json({error: 'Unauthorized'});
+// Update device status
+router.put('/devices/:imei/status', authenticatePolice, policeController.updateStatus);
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({error: 'Forbidden'});
-        if (user.role !== 'POLICE' && user.role !== 'ADMIN') {
-            return res.status(403).json({ error: 'Access denied. Law enforcement personnel only.' });
-        }
-        req.user = user;
-        next();
-    });
-};
-
-// Get devices filtered by status — defaults to STOLEN,LOST for law enforcement
-router.get('/devices', authenticatePolice, async (req, res) => {
-    try {
-        const { status } = req.query;
-
-        // Default to STOLEN,LOST if not specified (law enforcement only sees actionable devices)
-        const rawStatus = status || 'STOLEN,LOST';
-        const statusList = rawStatus.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-
-        const devices = await prisma.device.findMany({
-            where: {
-                status: { in: statusList }
-            },
-            include: {
-                registeredOwner: {
-                    select: { email: true, companyName: true }
-                }
-            },
-            orderBy: { updatedAt: 'desc' }
-        });
-
-        res.json({ devices });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Update device status (e.g., mark as INVESTIGATING or RECOVERED)
-router.put('/devices/:imei/status', authenticatePolice, async (req, res) => {
-    try {
-        const { imei } = req.params;
-        const { status } = req.body; // e.g., INVESTIGATING, CLEAN
-
-        const allowedStatuses = ['CLEAN', 'STOLEN', 'LOST', 'INVESTIGATING'];
-        if (!allowedStatuses.includes(status)) {
-            return res.status(400).json({ error: 'Invalid status' });
-        }
-
-        const device = await prisma.device.update({
-            where: { imei },
-            data: { status }
-        });
-
-        res.json({ message: `Device status updated to ${status}`, device });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Fetch all consumer incident reports
-router.get('/incidents', authenticatePolice, async (req, res) => {
+// Fetch all consumer incident reports (TODO: Move to controller)
+router.get('/incidents', authenticatePolice, async (req, res, next) => {
     try {
         const reports = await prisma.incidentReport.findMany({
             include: {
@@ -86,13 +25,12 @@ router.get('/incidents', authenticatePolice, async (req, res) => {
         });
         res.json({ reports });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        next(error);
     }
 });
 
 // Fetch all vendor suspicious activity alerts
-router.get('/vendor-alerts', authenticatePolice, async (req, res) => {
+router.get('/vendor-alerts', authenticatePolice, async (req, res, next) => {
     try {
         const alerts = await prisma.vendorSuspiciousAlert.findMany({
             include: {
@@ -103,39 +41,12 @@ router.get('/vendor-alerts', authenticatePolice, async (req, res) => {
         });
         res.json({ alerts });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        next(error);
     }
 });
 
 // Fetch metrics for the dashboard
-router.get('/dashboard-metrics', authenticatePolice, async (req, res) => {
-    try {
-        const totalDevices = await prisma.device.count();
-        const cleanDevices = await prisma.device.count({ where: { status: 'CLEAN' } });
-        const stolenDevices = await prisma.device.count({ where: { status: 'STOLEN' } });
-        const lostDevices = await prisma.device.count({ where: { status: 'LOST' } });
-        const investigatingDevices = await prisma.device.count({ where: { status: 'INVESTIGATING' } });
-
-        const openIncidents = await prisma.incidentReport.count({ where: { status: 'OPEN' } });
-        const openAlerts = await prisma.vendorSuspiciousAlert.count();
-
-        res.json({
-            metrics: {
-                totalDevices,
-                cleanDevices,
-                stolenDevices,
-                lostDevices,
-                investigatingDevices,
-                openIncidents,
-                openAlerts
-            }
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+router.get('/dashboard-metrics', authenticatePolice, policeController.getMetrics);
 
 // ============ DEVICE SEARCH ============
 router.get('/search', authenticatePolice, async (req, res) => {
@@ -529,70 +440,8 @@ router.post('/alert-vendors', authenticatePolice, async (req, res) => {
 // ============ POLICE INTEL & EVIDENCE ============
 
 // Generate Forensic Evidence Report Data
-router.get('/export-evidence/:imei', authenticatePolice, async (req, res) => {
-    try {
-        const { imei } = req.params;
-        const device = await prisma.device.findUnique({
-            where: { imei },
-            include: {
-                registeredOwner: true,
-                history: { include: { actor: { select: { fullName: true, role: true, companyName: true } } }, orderBy: { createdAt: 'desc' } },
-                incidents: { include: { reporter: true } },
-                maintenance: { include: { vendor: true } },
-                transfersAsDevice: { include: { seller: true, buyer: true }, where: { status: 'COMPLETED' } },
-                proofsOfSale: { include: { vendor: true, buyer: true } }
-            }
-        });
-
-        if (!device) return res.status(404).json({ error: 'Device not found' });
-
-        // Compile Forensic Dossier
-        const dossier = {
-            reportId: `FOR-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
-            generatedAt: new Date(),
-            generatedBy: req.user.email || req.user.id || 'Unknown Official',
-            asset: {
-                brand: device.brand,
-                model: device.model,
-                imei: device.imei,
-                serial: device.serialNumber,
-                status: device.status,
-                riskScore: device.riskScore,
-                photos: device.devicePhotos || []
-            },
-            ownership: {
-                current: device.registeredOwner?.fullName || device.registeredOwner?.companyName || device.registeredOwner?.email || 'N/A',
-                chain: (device.transfersAsDevice || []).map(t => ({
-                    date: t.transferDate,
-                    from: t.seller?.email || 'Unknown',
-                    to: t.buyer?.email || 'Unknown'
-                }))
-            },
-            incidents: (device.incidents || []).map(i => ({
-                date: i.createdAt,
-                type: i.type || 'STOLEN', // Fallback as 'type' might be missing in schema
-                desc: i.description || 'No description provided',
-                policeRef: i.policeReportNo || 'Pending'
-            })),
-            maintenance: (device.maintenance || []).map(m => ({
-                date: m.serviceDate,
-                provider: m.vendor?.companyName || m.vendor?.fullName || 'Unknown Vendor',
-                type: m.serviceType || 'General Service'
-            })),
-            ledger: (device.history || []).map(h => ({
-                date: h.createdAt,
-                type: h.type,
-                actor: h.actor?.companyName || h.actor?.fullName || h.actor?.role || 'System',
-                details: h.description
-            }))
-        };
-
-        res.json({ dossier });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to generate evidence dossier' });
-    }
-});
+// Generate Forensic Evidence Report Data
+router.get('/export-evidence/:imei', authenticatePolice, policeController.getDossier);
 
 // AI Intelligence Feed (High-Risk Anomalies)
 router.get('/intel-feed', authenticatePolice, async (req, res) => {
@@ -631,67 +480,8 @@ router.get('/intel-feed', authenticatePolice, async (req, res) => {
 });
 
 // ============ NATIONAL KILL-SWITCH (BRICK/UNBRICK) ============
-router.post('/devices/:imei/brick', authenticatePolice, async (req, res) => {
-    try {
-        const { imei } = req.params;
-        const { reason } = req.body;
-
-        const device = await prisma.device.findUnique({ where: { imei } });
-        if (!device) return res.status(404).json({ error: 'Device not found' });
-
-        await prisma.device.update({
-            where: { imei },
-            data: {
-                isBricked: true,
-                status: 'STOLEN' // Force status to STOLEN if bricked
-            }
-        });
-
-        await prisma.transactionHistory.create({
-            data: {
-                deviceId: device.id,
-                actorId: req.user.id,
-                type: 'HARDWARE_BRICKED',
-                description: `DEVICE KILL-SWITCH ACTIVATED. Reason: ${reason || 'Reported Stolen/Malicious activity'}`,
-                metadata: JSON.stringify({ timestamp: new Date(), officialId: req.user.id })
-            }
-        });
-
-        res.json({ message: 'Kill-switch activated. Device hardware is now marked as BRICKED globally.', imei });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-router.post('/devices/:imei/unbrick', authenticatePolice, async (req, res) => {
-    try {
-        const { imei } = req.params;
-
-        const device = await prisma.device.findUnique({ where: { imei } });
-        if (!device) return res.status(404).json({ error: 'Device not found' });
-
-        await prisma.device.update({
-            where: { imei },
-            data: { isBricked: false }
-        });
-
-        await prisma.transactionHistory.create({
-            data: {
-                deviceId: device.id,
-                actorId: req.user.id,
-                type: 'HARDWARE_RESTORED',
-                description: 'Kill-switch deactivated. Device hardware functionality restored.',
-                metadata: JSON.stringify({ timestamp: new Date(), officialId: req.user.id })
-            }
-        });
-
-        res.json({ message: 'Kill-switch deactivated. Device hardware has been restored.', imei });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
+router.post('/devices/:imei/brick', authenticatePolice, policeController.brick);
+router.post('/devices/:imei/unbrick', authenticatePolice, policeController.unbrick);
 
 // ============ GEOSPATIAL DATA ============
 router.get('/map-data', authenticatePolice, async (req, res) => {

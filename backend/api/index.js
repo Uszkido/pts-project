@@ -1,19 +1,24 @@
 require('dotenv').config();
-
-process.on('uncaughtException', (err) => {
-    console.error('🔥 UNCAUGHT:', err.message, err.stack);
-});
-process.on('unhandledRejection', (reason) => {
-    console.error('🌊 UNHANDLED:', reason);
-});
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const logger = require('../src_backend/utils/logger');
+const errorHandler = require('../src_backend/middleware/errorHandler');
+
+process.on('uncaughtException', (err) => {
+    logger.error('🔥 UNCAUGHT EXCEPTION:', err.message, err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+    logger.error('🌊 UNHANDLED REJECTION:', reason);
+});
+
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const loadedRoutes = [];
 
@@ -24,8 +29,9 @@ function safeUse(apiPath, routeFile) {
         app.use(apiPath, route);
         loadedRoutes.push({ path: apiPath, status: 'ok' });
     } catch (e) {
-        console.error(`❌ Route load failed [${routeFile}]:`, e.message);
+        logger.error(`❌ Route load failed [${routeFile}]:`, e.message);
         loadedRoutes.push({ path: apiPath, status: 'failed', error: e.message });
+
         const r = express.Router();
         r.all('*', (req, res) => res.status(503).json({
             error: `Module offline`,
@@ -41,35 +47,40 @@ let prisma;
 try {
     const dbPath = path.join(__dirname, '..', 'src_backend', 'db');
     prisma = require(dbPath);
+    logger.info('🐘 Database client initialized');
 } catch (e) {
-    console.error('❌ db.js failed:', e.message);
+    logger.error('❌ db.js failed:', e.message);
 }
 
 // CORE ROUTES
-safeUse('/api/v1/auth', 'auth');
-safeUse('/api/v1/devices', 'devices');
-safeUse('/api/v1/police', 'police');
-safeUse('/api/v1/consumers', 'consumers');
-safeUse('/api/v1/transfers', 'transfers');
-safeUse('/api/v1/public', 'public');
-safeUse('/api/v1/admin', 'admin');
-safeUse('/api/v1/registry', 'registry');
-safeUse('/api/v1/upload', 'upload');
-safeUse('/api/v1/telecom', 'telecom');
-safeUse('/api/v1/ussd', 'ussd');
-safeUse('/api/v1/ai', 'ai');
-safeUse('/api/v1/analytics', 'analytics');
-safeUse('/api/v1/api-keys', 'apiKeys');
-safeUse('/api/v1/guardian', 'guardian');
-safeUse('/api/v1/incidents', 'incidents');
-safeUse('/api/v1/maintenance', 'maintenance');
-safeUse('/api/v1/passports', 'passports');
-safeUse('/api/v1/payments', 'payments');
-safeUse('/api/v1/swap', 'swap');
-safeUse('/api/v1/telegram', 'telegram');
-safeUse('/api/v1/tracking', 'tracking');
-safeUse('/api/v1/vendors', 'vendors');
-safeUse('/api/v1/whatsapp', 'whatsapp');
+const routes = [
+    { path: '/api/v1/auth', file: 'auth' },
+    { path: '/api/v1/devices', file: 'devices' },
+    { path: '/api/v1/police', file: 'police' },
+    { path: '/api/v1/consumers', file: 'consumers' },
+    { path: '/api/v1/transfers', file: 'transfers' },
+    { path: '/api/v1/public', file: 'public' },
+    { path: '/api/v1/admin', file: 'admin' },
+    { path: '/api/v1/registry', file: 'registry' },
+    { path: '/api/v1/upload', file: 'upload' },
+    { path: '/api/v1/telecom', file: 'telecom' },
+    { path: '/api/v1/ussd', file: 'ussd' },
+    { path: '/api/v1/ai', file: 'ai' },
+    { path: '/api/v1/analytics', file: 'analytics' },
+    { path: '/api/v1/api-keys', file: 'apiKeys' },
+    { path: '/api/v1/guardian', file: 'guardian' },
+    { path: '/api/v1/incidents', file: 'incidents' },
+    { path: '/api/v1/maintenance', file: 'maintenance' },
+    { path: '/api/v1/passports', file: 'passports' },
+    { path: '/api/v1/payments', file: 'payments' },
+    { path: '/api/v1/swap', file: 'swap' },
+    { path: '/api/v1/telegram', file: 'telegram' },
+    { path: '/api/v1/tracking', file: 'tracking' },
+    { path: '/api/v1/vendors', file: 'vendors' },
+    { path: '/api/v1/whatsapp', file: 'whatsapp' }
+];
+
+routes.forEach(route => safeUse(route.path, route.file));
 
 // HEALTH & ADMIN RESTORE
 app.get('/health', async (req, res) => {
@@ -105,6 +116,7 @@ app.get('/health', async (req, res) => {
     }
     res.json({
         status: dbStatus === 'connected' ? 'ok' : 'degraded',
+        version: '1.9.0',
         database: dbStatus,
         message: dbMsg,
         admin_fix: adminFix,
@@ -113,7 +125,16 @@ app.get('/health', async (req, res) => {
 });
 
 app.get('/api/v1', (req, res) => {
-    res.json({ status: 'ok', msg: 'PTS Sentinel API v1.8.0 Operational' });
+    res.json({ status: 'ok', msg: 'PTS Sentinel API v1.9.0 Operational' });
 });
 
+// Root path
+app.get('/', (req, res) => {
+    res.send('PTS Sentinel API Gateway. See /health for status.');
+});
+
+// Final Error Handling
+app.use(errorHandler);
+
 module.exports = app;
+

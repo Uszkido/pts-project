@@ -9,14 +9,8 @@ export default function PoliceLogin() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl.replace('/api/v1', '')}/api/v1/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const { api } = await import('@/lib/api');
+            const data = await api.post('/auth/login', { email, password });
 
             if (data.role !== 'POLICE' && data.role !== 'ADMIN') {
                 throw new Error('Unauthorized role. Law enforcement personnel only.');

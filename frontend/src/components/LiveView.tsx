@@ -11,13 +11,11 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
 
     const fetchTracking = async () => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
+            const { api } = await import('@/lib/api');
 
             // In a real app, this would be a specific tracking endpoint
             // For now, we fetch device details which includes lastKnownLocation
-            const res = await fetch(`${apiUrl}/police/search?q=${imei}`, { headers });
-            const data = await res.json();
+            const data = await api.get(`/police/search?q=${imei}`);
             if (data.devices && data.devices.length > 0) {
                 setTrackingData(data.devices[0]);
                 // Simulate some history points for the UI wow factor
@@ -35,17 +33,8 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('deploy');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/police/deploy-team`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ imei, location: trackingData?.lastKnownLocation })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const { api } = await import('@/lib/api');
+            const data = await api.post('/police/deploy-team', { imei, location: trackingData?.lastKnownLocation });
             setMessage({ type: 'success', text: data.message });
         } catch (err: any) {
             setMessage({ type: 'error', text: err.message });
@@ -58,22 +47,13 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('alert');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/police/alert-vendors`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({
-                    imei,
-                    brand: trackingData?.brand,
-                    model: trackingData?.model,
-                    location: trackingData?.lastKnownLocation
-                })
+            const { api } = await import('@/lib/api');
+            const data = await api.post('/police/alert-vendors', {
+                imei,
+                brand: trackingData?.brand,
+                model: trackingData?.model,
+                location: trackingData?.lastKnownLocation
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
             setMessage({ type: 'success', text: data.message });
         } catch (err: any) {
             setMessage({ type: 'error', text: err.message });
@@ -86,25 +66,15 @@ export default function LiveView({ imei, onClose }: { imei: string, onClose: () 
         setActionLoading('share');
         setMessage(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-            };
+            const { api } = await import('@/lib/api');
 
             // Check if we are in admin or police context (heuristic)
             const isAdmin = window.location.pathname.includes('/admin');
-            const url = isAdmin
-                ? `${apiUrl}/admin/devices/${trackingData?.id}/share-location`
-                : `${apiUrl}/police/devices/${imei}/share-location`;
+            const path = isAdmin
+                ? `/admin/devices/${trackingData?.id}/share-location`
+                : `/police/devices/${imei}/share-location`;
 
-            const res = await fetch(url, {
-                method: 'PUT',
-                headers,
-                body: JSON.stringify({ shared: !trackingData?.isLocationShared })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const data = await api.put(path, { shared: !trackingData?.isLocationShared });
 
             setTrackingData({ ...trackingData, isLocationShared: !trackingData?.isLocationShared });
             setMessage({ type: 'success', text: data.message });

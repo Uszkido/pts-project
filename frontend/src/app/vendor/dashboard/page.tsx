@@ -73,18 +73,12 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const headers = { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` };
-
-            const [dashRes, msgRes] = await Promise.all([
-                fetch(`${apiUrl}/vendors/dashboard`, { headers }),
-                fetch(`${apiUrl}/vendors/messages`, { headers })
+            const { api } = await import('@/lib/api');
+            const [data, msgData] = await Promise.all([
+                api.get('/vendors/dashboard'),
+                api.get('/vendors/messages')
             ]);
 
-            const data = await dashRes.json();
-            if (!dashRes.ok) throw new Error(data.error || 'Failed to fetch dashboard data');
-
-            const msgData = await msgRes.json();
             setProfile(data.profile);
             setMetrics(data.metrics);
             setInventory(data.inventory);
@@ -93,7 +87,7 @@ export default function Dashboard() {
             setPendingTransfers(data.pendingTransfers || []);
         } catch (err: any) {
             setError(err.message);
-            if (err.message.includes('Unauthorized') || err.message.includes('Forbidden') || err.message.includes('401') || err.message.includes('403')) {
+            if (err.message.includes('Unauthorized') || err.message.includes('Forbidden')) {
                 localStorage.removeItem('pts_token');
                 window.location.href = '/vendor/login';
             }
@@ -116,12 +110,15 @@ export default function Dashboard() {
         setMessage(''); setError('');
         setIsRegistering(true);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
+            const { api } = await import('@/lib/api');
             let devicePhotoUrls: string[] = [];
             if (devicePhotos.length > 0) {
                 const formData = new FormData();
                 devicePhotos.forEach(file => formData.append('files', file));
 
+                // For multipart form data
+                const { APP_CONFIG } = await import('@/lib/pts.config');
+                const apiUrl = APP_CONFIG.API_URL;
                 const uploadRes = await fetch(`${apiUrl}/upload/multi`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
@@ -132,26 +129,17 @@ export default function Dashboard() {
                 devicePhotoUrls = uploadData.urls;
             }
 
-            const res = await fetch(`${apiUrl}/devices`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({
-                    imei,
-                    brand,
-                    model,
-                    serialNumber: serial,
-                    devicePhotos: devicePhotoUrls,
-                    screenSerialNumber: screenSerial,
-                    batterySerialNumber: batterySerial,
-                    motherboardSerialNumber: motherboardSerial,
-                    cameraSerialNumber: cameraSerial
-                })
+            const data = await api.post('/devices', {
+                imei,
+                brand,
+                model,
+                serialNumber: serial,
+                devicePhotos: devicePhotoUrls,
+                screenSerialNumber: screenSerial,
+                batterySerialNumber: batterySerial,
+                motherboardSerialNumber: motherboardSerial,
+                cameraSerialNumber: cameraSerial
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
 
             setMessage(`Device registered securely. IMEI: ${data.device.imei}`);
             setImei(''); setBrand(''); setModel(''); setSerial(''); setDevicePhotos([]);
@@ -177,22 +165,12 @@ export default function Dashboard() {
         setMessage('');
         setError('');
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/vendors/suspicious-alert`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({
-                    imei: suspiciousImei,
-                    sellerEmail: suspectEmail,
-                    description: suspiciousDesc
-                })
+            const { api } = await import('@/lib/api');
+            await api.post('/vendors/suspicious-alert', {
+                imei: suspiciousImei,
+                sellerEmail: suspectEmail,
+                description: suspiciousDesc
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
             setMessage('Suspicious activity successfully exported to law enforcement.');
             setSuspiciousImei('');
             setSuspectEmail('');
@@ -207,23 +185,13 @@ export default function Dashboard() {
 
     const initiateSale = async (deviceId: string, buyerEmail: string, price: string) => {
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/transfers/initiate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ deviceId, buyerEmail, price })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
+            const { api } = await import('@/lib/api');
+            const data = await api.post('/transfers/initiate', { deviceId, buyerEmail, price });
             setMessage(`TRANSFER INITIATED. Mandatory Handover Code: ${data.handoverCode}. Give this code to the customer to complete the 2FA transfer.`);
         } catch (err: any) {
             setError(`Failed to initiate sale: ${err.message}`);
         } finally {
-            fetchDashboardData(); // Refresh inventory and sales lists
+            fetchDashboardData();
         }
     };
 
@@ -238,18 +206,8 @@ export default function Dashboard() {
     const handleReportDevice = async (imei: string, status: 'STOLEN' | 'LOST') => {
         if (!confirm(`Are you sure you want to report this device as ${status}? This will lock the device.`)) return;
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/devices/${imei}/report`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ status })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
+            const { api } = await import('@/lib/api');
+            await api.post(`/devices/${imei}/report`, { status });
             setMessage(`Device marked as ${status}`);
             fetchDashboardData();
         } catch (err: any) {
@@ -262,21 +220,8 @@ export default function Dashboard() {
         if (!handoverCode) return;
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/transfers/accept/${transferId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({ handoverCode })
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.error || 'Transfer verification failed.');
-            }
-
+            const { api } = await import('@/lib/api');
+            await api.post(`/transfers/accept/${transferId}`, { handoverCode });
             setMessage('Transfer Verified! Device is now cryptographically bound to your vendor portfolio.');
             fetchDashboardData();
         } catch (err: any) {
@@ -290,12 +235,8 @@ export default function Dashboard() {
         setError('');
         setFoundDevice(null);
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/passports/${searchImei}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` }
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Device not found in registry');
+            const { api } = await import('@/lib/api');
+            const data = await api.get(`/passports/${searchImei}`);
             setFoundDevice(data.device);
             setMaintenanceHistory(data.maintenance || []);
         } catch (err: any) {
@@ -412,23 +353,14 @@ export default function Dashboard() {
         setIsLoggingRepair(true);
         setMessage(''); setError('');
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-            const res = await fetch(`${apiUrl}/maintenance/log`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('pts_token')}`
-                },
-                body: JSON.stringify({
-                    imei: foundDevice.imei,
-                    serviceType,
-                    description: repairDesc,
-                    partsReplaced: parts,
-                    cost: repairCost
-                })
+            const { api } = await import('@/lib/api');
+            await api.post('/maintenance/log', {
+                imei: foundDevice.imei,
+                serviceType,
+                description: repairDesc,
+                partsReplaced: parts,
+                cost: repairCost
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
 
             setMessage(`Service record cryptographically signed and added to IMEI: ${foundDevice.imei}`);
             setFoundDevice(null); setSearchImei(''); setRepairDesc(''); setParts(''); setRepairCost('');

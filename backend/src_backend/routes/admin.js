@@ -3,88 +3,15 @@ const router = express.Router();
 const prisma = require('../db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_pts_dev_key';
+const { authenticate, authorize } = require('../middleware/auth');
+const adminController = require('../controllers/adminController');
 
-// Admin auth middleware
-const authenticateAdmin = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({error: 'Unauthorized'});
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({error: 'Forbidden'});
-        if (user.role !== 'ADMIN') return res.status(403).json({ error: 'Admin access required' });
-        req.user = user;
-        next();
-    });
-};
+// Admin Auth Middleware (Legacy support or switch to central authorize('ADMIN'))
+const authenticateAdmin = [authenticate, authorize('ADMIN')];
 
 // ============ ADMIN DASHBOARD ============
-router.get('/dashboard', authenticateAdmin, async (req, res) => {
-    try {
-        const [totalUsers, totalDevices, totalIncidents, totalSuspects, pendingVendors] = await Promise.all([
-            prisma.user.count(),
-            prisma.device.count(),
-            prisma.incidentReport.count(),
-            prisma.suspect.count(),
-            prisma.user.count({ where: { role: 'VENDOR', vendorStatus: 'PENDING' } })
-        ]);
-
-        const usersByRole = await prisma.user.groupBy({ by: ['role'], _count: true });
-        const devicesByStatus = await prisma.device.groupBy({ by: ['status'], _count: true });
-
-        res.json({
-            stats: { totalUsers, totalDevices, totalIncidents, totalSuspects, pendingVendors },
-            usersByRole: usersByRole.map(r => ({ role: r.role, count: r._count })),
-            devicesByStatus: devicesByStatus.map(d => ({ status: d.status, count: d._count }))
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-router.get('/map-data', authenticateAdmin, async (req, res) => {
-    try {
-        const [vendors, obsPings, trackingLogs] = await Promise.all([
-            prisma.user.findMany({
-                where: { role: 'VENDOR', shopLatitude: { not: null } },
-                select: { id: true, companyName: true, shopLatitude: true, shopLongitude: true, vendorTier: true }
-            }),
-            prisma.observationReport.findMany({
-                orderBy: { createdAt: 'desc' },
-                include: { device: { select: { brand: true, model: true, imei: true, status: true } } }
-            }),
-            prisma.deviceTrackingLog.findMany({
-                orderBy: { createdAt: 'desc' }
-            })
-        ]);
-
-        const pings = [...obsPings];
-
-        // Deduplicate tracking logs per IMEI so we only show the latest known location
-        const seenImeis = new Set(obsPings.map(p => p.device?.imei));
-
-        for (const log of trackingLogs) {
-            if (!seenImeis.has(log.deviceImei)) {
-                // Parse "lat, lng" out of the string like "6.5244, 3.3792 (GPS Node)"
-                const match = log.location && log.location.match(/([+-]?[0-9]*\.?[0-9]+)\s*,\s*([+-]?[0-9]*\.?[0-9]+)/);
-                if (match) {
-                    pings.push({
-                        latitude: parseFloat(match[1]),
-                        longitude: parseFloat(match[2]),
-                        device: { brand: "Device", model: "Log", imei: log.deviceImei, status: "KNOWN" }
-                    });
-                    seenImeis.add(log.deviceImei);
-                }
-            }
-        }
-
-        res.json({ vendors, pings });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to fetch map surveillance data' });
-    }
-});
+router.get('/dashboard', authenticateAdmin, adminController.getDashboard);
+router.get('/map-data', authenticateAdmin, adminController.getMap);
 
 // ============ AI INTELLIGENCE & ANALYTICS ============
 const { generateCrimeInsights } = require('../services/aiService');

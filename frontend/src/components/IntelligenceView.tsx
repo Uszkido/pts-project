@@ -32,19 +32,14 @@ export default function IntelligenceView({ apiUrl, headers }: IntelligenceViewPr
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const [briefingRes, trendsRes] = await Promise.all([
-                    fetch(`${apiUrl}/admin/intelligence/briefing`, { headers }),
-                    fetch(`${apiUrl}/admin/analytics/trends`, { headers })
+                const { api } = await import('@/lib/api');
+                const [briefingData, trendsData] = await Promise.all([
+                    api.get('/admin/intelligence/briefing'),
+                    api.get('/admin/analytics/trends')
                 ]);
 
-                if (briefingRes.ok) {
-                    const data = await briefingRes.json();
-                    setBriefing(data.briefing);
-                }
-                if (trendsRes.ok) {
-                    const data = await trendsRes.json();
-                    setTrends(data);
-                }
+                setBriefing(briefingData.briefing);
+                setTrends(trendsData);
             } catch (error) {
                 console.error('Failed to load intelligence data');
             } finally {
