@@ -120,6 +120,30 @@ export default function PoliceDashboard() {
         }
     };
 
+    const shareLocation = async (id: string) => {
+        if (!window.confirm('Are you sure you want to share real-time tracking with the device owner?')) return;
+        try {
+            const { api } = await import('@/lib/api');
+            await api.put(`/police/incidents/${id}/share-location`, {});
+            setStatusMessage({ type: 'success', text: 'Tracking data shared with owner' });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
+    const clearIncident = async (id: string) => {
+        if (!window.confirm('Are you sure the incident is resolved? This will mark it as CLEARED.')) return;
+        try {
+            const { api } = await import('@/lib/api');
+            await api.put(`/police/incidents/${id}/clear`, {});
+            setStatusMessage({ type: 'success', text: 'Incident cleared' });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
     const handleSearch = async () => {
         if (searchQuery.length < 2) return;
         setIsSearching(true);
