@@ -91,6 +91,13 @@ export function useGuardianMesh(enabled: boolean = true) {
 
         const initializeMeshNode = async () => {
             try {
+                // Feature Detection: Ensure browser supports Web Bluetooth before attempting to initialize
+                const isBluetoothSupported = typeof navigator !== 'undefined' && (navigator as any).bluetooth;
+                if (!isBluetoothSupported) {
+                    console.warn('[GUARDIAN MESH] Web Bluetooth API is not available/supported in this environment.');
+                    return;
+                }
+
                 await BleClient.initialize({ androidNeverForLocation: false });
                 console.log('[GUARDIAN MESH] Node Initialized. Hardware Access Granted.');
 
