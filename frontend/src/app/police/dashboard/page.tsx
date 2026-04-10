@@ -144,6 +144,58 @@ export default function PoliceDashboard() {
         }
     };
 
+    const createSuspect = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmittingSuspect(true);
+        try {
+            const { api } = await import('@/lib/api');
+            await api.post('/police/suspects', suspectForm);
+            setIsAddSuspectOpen(false);
+            setSuspectForm({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
+            setStatusMessage({ type: 'success', text: 'Suspect record created' });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        } finally {
+            setIsSubmittingSuspect(false);
+        }
+    };
+
+    const updateSuspectStatus = async (id: string, status: string) => {
+        try {
+            const { api } = await import('@/lib/api');
+            await api.put(`/police/suspects/${id}/status`, { status });
+            setStatusMessage({ type: 'success', text: `Suspect marked as ${status}` });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
+    const sendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const { api } = await import('@/lib/api');
+            await api.post('/police/messages', newMessage);
+            setNewMessage({ subject: '', body: '' });
+            setStatusMessage({ type: 'success', text: 'Message sent to HQ' });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
+    const updateStatus = async (imei: string, status: string) => {
+        try {
+            const { api } = await import('@/lib/api');
+            await api.put(`/police/devices/${imei}/status`, { status });
+            setStatusMessage({ type: 'success', text: `Device status updated to ${status}` });
+            fetchData();
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
     const handleSearch = async () => {
         if (searchQuery.length < 2) return;
         setIsSearching(true);
