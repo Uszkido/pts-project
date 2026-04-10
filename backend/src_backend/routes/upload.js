@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../upload');
-const authenticateToken = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // Upload a single public document (e.g. CAC, Selfie during registration)
 // We might not require authentication for registration uploads, but we do for evidence.

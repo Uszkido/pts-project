@@ -82,6 +82,8 @@ const routes = [
 
 routes.forEach(route => safeUse(route.path, route.file));
 
+const bcrypt = require('bcryptjs');
+
 // HEALTH & ADMIN RESTORE
 app.get('/health', async (req, res) => {
     let dbStatus = 'disconnected';
@@ -96,15 +98,26 @@ app.get('/health', async (req, res) => {
 
             // SOVEREIGN ADMIN OVERRIDE
             try {
-                const adminUser = await prisma.user.findFirst({ where: { email: 'admin@pts.ng' } });
-                if (adminUser) {
+                const adminEmail = 'admin@pts.ng';
+                let adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
+
+                if (!adminUser) {
+                    const hashedPassword = await bcrypt.hash('admin_pts_2026', 10);
+                    adminUser = await prisma.user.create({
+                        data: {
+                            email: adminEmail,
+                            password: hashedPassword,
+                            role: 'ADMIN',
+                            fullName: 'Sovereign Administrator'
+                        }
+                    });
+                    adminFix = 'SUCCESS: admin@pts.ng created and granted ADMIN role (Pass: admin_pts_2026)';
+                } else {
                     await prisma.user.update({
                         where: { id: adminUser.id },
                         data: { role: 'ADMIN' }
                     });
                     adminFix = 'SUCCESS: admin@pts.ng restored to ADMIN role';
-                } else {
-                    adminFix = 'NOTICE: admin@pts.ng not found in this database instance';
                 }
             } catch (authErr) {
                 adminFix = `ERROR: Admin restore failed - ${authErr.message}`;

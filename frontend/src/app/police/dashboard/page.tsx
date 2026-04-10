@@ -176,23 +176,28 @@ export default function PoliceDashboard() {
         e.preventDefault();
         try {
             const { api } = await import('@/lib/api');
-            await api.post('/police/messages', newMessage);
+            await api.post('/police/messages', { ...newMessage, receiverRole: 'ADMIN' });
             setNewMessage({ subject: '', body: '' });
-            setStatusMessage({ type: 'success', text: 'Message sent to HQ' });
+            setStatusMessage({ type: 'success', text: 'Intelligence dispatched to System Administrator.' });
             fetchData();
         } catch (err: any) {
             setStatusMessage({ type: 'error', text: err.message });
         }
     };
 
-    const updateStatus = async (imei: string, status: string) => {
+    const updateStatus = async (imei: string, newStatus: string) => {
+        // Optimistically update the device in the list for immediate feedback
+        setDevices(prev => prev.map(d => d.imei === imei ? { ...d, status: newStatus } : d));
+        const actionLabel = newStatus === 'INVESTIGATING' ? 'Marked as INVESTIGATING' : newStatus === 'CLEAN' ? 'Cleared — Device restored to CLEAN status' : `Status changed to ${newStatus}`;
+        setStatusMessage({ type: 'success', text: `✓ ${actionLabel} for IMEI: ${imei}` });
+
         try {
             const { api } = await import('@/lib/api');
-            await api.put(`/police/devices/${imei}/status`, { status });
-            setStatusMessage({ type: 'success', text: `Device status updated to ${status}` });
+            await api.put(`/police/devices/${imei}/status`, { status: newStatus });
             fetchData();
         } catch (err: any) {
-            setStatusMessage({ type: 'error', text: err.message });
+            setStatusMessage({ type: 'error', text: `✗ Failed: ${err.message}` });
+            fetchData(); // Revert
         }
     };
 
@@ -355,16 +360,6 @@ export default function PoliceDashboard() {
         }
     };
 
-    const sendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            const { api } = await import('@/lib/api');
-            await api.post('/police/messages', { ...newMessage, receiverRole: 'ADMIN' });
-            setNewMessage({ subject: '', body: '' });
-            fetchData();
-            alert('Intelligence dispatched to System Administrator.');
-        } catch (err: any) { alert(err.message); }
-    };
 
     useEffect(() => {
         if (!localStorage.getItem('pts_token')) {
@@ -374,24 +369,6 @@ export default function PoliceDashboard() {
         fetchData();
     }, [filter]);
 
-    const updateStatus = async (imei: string, newStatus: string) => {
-        // Optimistically update the device in the list for immediate feedback
-        setDevices(prev => prev.map(d => d.imei === imei ? { ...d, status: newStatus } : d));
-        const actionLabel = newStatus === 'INVESTIGATING' ? 'Marked as INVESTIGATING' : newStatus === 'CLEAN' ? 'Cleared — Device restored to CLEAN status' : `Status changed to ${newStatus}`;
-        setStatusMessage({ type: 'success', text: `✓ ${actionLabel} for IMEI: ${imei}` });
-        setTimeout(() => setStatusMessage(null), 4000);
-        try {
-            const { api } = await import('@/lib/api');
-            await api.put(`/police/devices/${imei}/status`, { status: newStatus });
-            // Refresh in background to sync with server
-            fetchData();
-        } catch (err: any) {
-            setStatusMessage({ type: 'error', text: `✗ Failed: ${err.message}` });
-            setTimeout(() => setStatusMessage(null), 5000);
-            // Revert optimistic update
-            fetchData();
-        }
-    };
 
     return (
         <div className="min-h-screen bg-slate-950 font-sans text-slate-200 selection:bg-red-500/30">
