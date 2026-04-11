@@ -398,6 +398,13 @@ export default function PoliceDashboard() {
             return;
         }
         fetchData();
+
+        // Aggressive Auto-Polling for hybrid real-time tracking
+        const intervalId = setInterval(() => {
+            fetchData();
+        }, 8000); // 8-second loop
+
+        return () => clearInterval(intervalId);
     }, [filter]);
 
 

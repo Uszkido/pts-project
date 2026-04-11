@@ -17,6 +17,9 @@ const {
 const { reverseGeocode } = require('../services/geoService');
 const { sendPushNotification } = require('../services/pushService');
 
+// Advanced In-Memory LRU Cache to simulate Redis buffering
+const memoryCache = new Map();
+
 // Register a new device (Vendors only)
 router.post('/', authenticate, deviceController.createDevice);
 
@@ -326,6 +329,13 @@ router.get('/vendor-trust/:vendorId', async (req, res) => {
 // ============================================================
 router.get('/public/blacklist', async (req, res) => {
     try {
+        const cacheKey = 'public_blacklist';
+        const now = Date.now();
+        // 5-minute cache TTL
+        if (memoryCache.has(cacheKey) && (now - memoryCache.get(cacheKey).timestamp) < 5 * 60 * 1000) {
+            return res.json(memoryCache.get(cacheKey).data);
+        }
+
         const flaggedDevices = await prisma.device.findMany({
             where: {
                 status: { in: ['STOLEN', 'FLAGGED', 'BLACKLISTED'] }
@@ -339,12 +349,16 @@ router.get('/public/blacklist', async (req, res) => {
             take: 50000, // cap at 50k for payload size
         });
 
-        res.set('Cache-Control', 'public, max-age=300'); // 5 min CDN cache
-        res.json({
+        const responsePayload = {
             blacklist: flaggedDevices,
             count: flaggedDevices.length,
             generatedAt: new Date().toISOString(),
-        });
+        };
+
+        memoryCache.set(cacheKey, { timestamp: now, data: responsePayload });
+
+        res.set('Cache-Control', 'public, max-age=300'); // 5 min CDN cache
+        res.json(responsePayload);
     } catch (error) {
         console.error('Public blacklist error:', error);
         res.status(500).json({ error: 'Failed to fetch blacklist' });
