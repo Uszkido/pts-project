@@ -145,6 +145,18 @@ export default function PoliceDashboard() {
         }
     };
 
+    const deleteFence = async (id: string, name: string) => {
+        if (!window.confirm(`Are you sure you want to completely deactivate the "${name}" perimeter?`)) return;
+        try {
+            const { api } = await import('@/lib/api');
+            await api.delete(`/devices/geofence/${id}`);
+            setActiveFences(prev => prev.filter(f => f.id !== id));
+            setStatusMessage({ type: 'success', text: `Perimeter "${name}" deactivated successfully` });
+        } catch (err: any) {
+            setStatusMessage({ type: 'error', text: err.message });
+        }
+    };
+
     const createSuspect = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmittingSuspect(true);
@@ -1087,7 +1099,12 @@ export default function PoliceDashboard() {
                                                     <span className="text-sm font-bold text-white">{f.name}</span>
                                                     <span className="text-xs text-slate-500 font-mono">{f.polygon?.length || 0} points</span>
                                                 </div>
-                                                <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-full border border-cyan-500/20 uppercase">ACTIVE</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-full border border-cyan-500/20 uppercase">ACTIVE</span>
+                                                    <button onClick={() => deleteFence(f.id, f.name)} className="text-xs text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors" title="Deactivate Perimeter">
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

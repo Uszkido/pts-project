@@ -512,6 +512,19 @@ router.post('/geofence', async (req, res) => {
     }
 });
 
+router.delete('/geofence/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.regionalGeoFence.delete({
+            where: { id }
+        });
+        res.json({ message: 'Perimeter deactivated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to deactivate perimeter' });
+    }
+});
+
 // ============================================================
 // PUBLIC THREAT RADAR — Heatmap data for stolen device hotspots
 // ============================================================
