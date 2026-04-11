@@ -9,7 +9,11 @@ const authenticate = (req, res, next) => {
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: 'Forbidden: Invalid token' });
-        req.user = user;
+        // Normalize the user object so both user.id and user.userId work
+        req.user = {
+            ...user,
+            id: user.id || user.userId
+        };
         next();
     });
 };

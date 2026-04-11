@@ -7,10 +7,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_pts_dev_key';
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({error: 'Unauthorized'});
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({error: 'Forbidden'});
-        req.user = user;
+        if (err) return res.status(403).json({ error: 'Forbidden' });
+        req.user = {
+            ...user,
+            id: user.id || user.userId
+        };
         next();
     });
 };
@@ -65,8 +68,8 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
         res.json({ devices: user.devices, pendingTransfers: user.purchases, pastDevices, fullName: user.fullName, email: user.email });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('DASHBOARD_ERROR:', error);
+        res.status(500).json({ error: `Dashboard Error: ${error.message}` });
     }
 });
 
@@ -87,8 +90,8 @@ router.get('/messages', authenticateToken, async (req, res) => {
         });
         res.json({ messages });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('MESSAGES_ERROR:', error);
+        res.status(500).json({ error: `Messages Error: ${error.message}` });
     }
 });
 
