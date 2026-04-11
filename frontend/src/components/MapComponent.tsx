@@ -87,6 +87,22 @@ export default function MapComponent({
                 attribution: '&copy; Google Maps'
             });
 
+            const esriMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri', maxZoom: 20
+            });
+
+            const cartoPositron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO', maxZoom: 20
+            });
+
+            const openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenTopoMap', maxZoom: 17
+            });
+
+            const nexrad = L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
+                opacity: 0.6, zIndex: 10
+            });
+
             // Add the default layer - Dark Mode for PTS Surveillance Aesthetic
             cartoDark.addTo(mapInstance.current);
 
@@ -94,12 +110,18 @@ export default function MapComponent({
             if (interactive) {
                 const baseMaps = {
                     "Surveillance Dark View": cartoDark,
+                    "ESRI World Imagery": esriMap,
+                    "CartoDB Positron": cartoPositron,
+                    "OpenTopoMap": openTopo,
                     "Google Hybrid": googleHybrid,
                     "Google Satellite": googleSat,
                     "Google Streets": googleStreets,
                     "Google Terrain": googleTerrain
                 };
-                L.control.layers(baseMaps).addTo(mapInstance.current);
+                const overlayMaps = {
+                    "Live Weather Radar (NEXRAD)": nexrad
+                };
+                L.control.layers(baseMaps, overlayMaps).addTo(mapInstance.current);
             }
 
             // Initialize Marker Layer
