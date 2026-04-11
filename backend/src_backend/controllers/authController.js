@@ -15,7 +15,7 @@ const registerStart = async (req, res, next) => {
         // Background dispatch
         sendOtp(result.pending, result.otp, "registration");
 
-        sendSuccess(res, { email: result.pending.email }, 'Registration started. OTP sent.', 200);
+        sendSuccess(res, { email: result.pending.email, requiresOtp: true }, 'Registration started. OTP sent.', 200);
     } catch (err) {
         next(err);
     }
