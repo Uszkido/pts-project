@@ -36,6 +36,7 @@ export default function PoliceDashboard() {
     const [suspects, setSuspects] = useState<any[]>([]);
     const [isAddSuspectOpen, setIsAddSuspectOpen] = useState(false);
     const [suspectForm, setSuspectForm] = useState({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
+    const [suspectPhoto, setSuspectPhoto] = useState<File | null>(null);
     const [isSubmittingSuspect, setIsSubmittingSuspect] = useState(false);
 
     // UI Tabs
@@ -149,9 +150,27 @@ export default function PoliceDashboard() {
         setIsSubmittingSuspect(true);
         try {
             const { api } = await import('@/lib/api');
-            await api.post('/police/suspects', suspectForm);
+            let photoUrl = null;
+            if (suspectPhoto) {
+                const formData = new FormData();
+                formData.append('files', suspectPhoto);
+
+                const { APP_CONFIG } = await import('@/lib/pts.config');
+                const uploadRes = await fetch(`${APP_CONFIG.API_URL}/upload/multi`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                    body: formData
+                });
+
+                const uploadData = await uploadRes.json();
+                if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload photo');
+                photoUrl = uploadData.urls[0];
+            }
+
+            await api.post('/police/suspects', { ...suspectForm, photoUrl });
             setIsAddSuspectOpen(false);
             setSuspectForm({ fullName: '', alias: '', nationalId: '', phoneNumber: '', description: '', knownAddresses: '', dangerLevel: 'UNKNOWN' });
+            setSuspectPhoto(null);
             setStatusMessage({ type: 'success', text: 'Suspect record created' });
             fetchData();
         } catch (err: any) {
@@ -1007,6 +1026,25 @@ export default function PoliceDashboard() {
                                 </div>
                             </div>
                         </div>
+                    ) : activeTab === 'warrants' ? (
+                        <div className="p-6 animate-fade-in">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">Active Warrants</h2>
+                                    <p className="text-sm text-slate-400">Search and fulfill law enforcement arrest warrants.</p>
+                                </div>
+                                <button className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-4 rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center gap-2">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg> Issue Warrant
+                                </button>
+                            </div>
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center shadow-inner">
+                                <div className="w-16 h-16 bg-amber-900/20 text-amber-500 border border-amber-500/30 mx-auto rounded-xl flex items-center justify-center mb-5">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Warrants Database Synchronizing...</h3>
+                                <p className="text-slate-400 max-w-md mx-auto text-sm leading-relaxed">The centralized judicial module is currently receiving data from the national courts infrastructure. Active warrants will populate shortly.</p>
+                            </div>
+                        </div>
                     ) : activeTab === 'geofence' ? (
                         <div className="p-6 space-y-6">
                             <div className="flex items-center gap-3 mb-2">
@@ -1080,6 +1118,10 @@ export default function PoliceDashboard() {
                             </button>
                         </div>
                         <form onSubmit={createSuspect} className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-1.5">Mugshot / Suspect Photo</label>
+                                <input type="file" accept="image/*" onChange={e => setSuspectPhoto(e.target.files?.[0] || null)} className="w-full bg-slate-950/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer" />
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name</label>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMapEvents, LayersControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -72,11 +72,27 @@ export default function GeoFenceMap({ onSavePolygon, activeFences = [] }: GeoFen
 
             <div className="h-[600px] w-full rounded-xl overflow-hidden border border-slate-800 relative z-0">
                 <MapContainer center={[9.0820, 8.6753]} zoom={6} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
-                    <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        className="map-tiles"
-                    />
+                    <LayersControl position="topright">
+                        <LayersControl.BaseLayer checked name="Surveillance Dark Network">
+                            <TileLayer
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                className="map-tiles"
+                            />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="Google Hybrid">
+                            <TileLayer url="http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="Google Satellite">
+                            <TileLayer url="http://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="Google Streets">
+                            <TileLayer url="http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="Google Terrain">
+                            <TileLayer url="http://mt0.google.com/vt/lyrs=p&hl=en&x={x}&y={y}&z={z}" />
+                        </LayersControl.BaseLayer>
+                    </LayersControl>
 
                     <LocationMarker points={points} setPoints={setPoints} />
 
