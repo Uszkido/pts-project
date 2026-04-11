@@ -73,12 +73,25 @@ export default function GeoFenceMap({ onSavePolygon, activeFences = [] }: GeoFen
             <div className="h-[600px] w-full rounded-xl overflow-hidden border border-slate-800 relative z-0">
                 <MapContainer center={[9.0820, 8.6753]} zoom={6} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
                     <LayersControl position="topright">
+                        {/* BASE MAPS */}
                         <LayersControl.BaseLayer checked name="Surveillance Dark Network">
                             <TileLayer
                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                 className="map-tiles"
                             />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="ESRI World Imagery">
+                            <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="CartoDB Dark Matter">
+                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; <a href='https://carto.com/'>CARTO</a>" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="CartoDB Positron">
+                            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution="&copy; <a href='https://carto.com/'>CARTO</a>" />
+                        </LayersControl.BaseLayer>
+                        <LayersControl.BaseLayer name="OpenTopoMap">
+                            <TileLayer url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png" attribution="&copy; <a href='https://opentopomap.org'>OpenTopoMap</a>" />
                         </LayersControl.BaseLayer>
                         <LayersControl.BaseLayer name="Google Hybrid">
                             <TileLayer url="http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}" />
@@ -92,6 +105,11 @@ export default function GeoFenceMap({ onSavePolygon, activeFences = [] }: GeoFen
                         <LayersControl.BaseLayer name="Google Terrain">
                             <TileLayer url="http://mt0.google.com/vt/lyrs=p&hl=en&x={x}&y={y}&z={z}" />
                         </LayersControl.BaseLayer>
+
+                        {/* TACTICAL OVERLAYS */}
+                        <LayersControl.Overlay name="Live Weather Radar (NEXRAD)">
+                            <TileLayer url="https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png" opacity={0.6} />
+                        </LayersControl.Overlay>
                     </LayersControl>
 
                     <LocationMarker points={points} setPoints={setPoints} />
