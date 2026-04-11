@@ -15,9 +15,10 @@ const authenticate = (req, res, next) => {
 };
 
 const authorize = (...roles) => {
+    const allowedRoles = roles.flat();
     return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({ error: `Forbidden: ${roles.join(' or ')} role required` });
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ error: `Forbidden: ${allowedRoles.join(' or ')} role required` });
         }
         next();
     };
