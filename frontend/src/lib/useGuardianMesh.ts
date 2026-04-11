@@ -92,9 +92,13 @@ export function useGuardianMesh(enabled: boolean = true) {
         const initializeMeshNode = async () => {
             try {
                 // Feature Detection: Ensure browser supports Web Bluetooth before attempting to initialize
-                const isBluetoothSupported = typeof navigator !== 'undefined' && (navigator as any).bluetooth;
-                if (!isBluetoothSupported) {
-                    console.warn('[GUARDIAN MESH] Web Bluetooth API is not available/supported in this environment.');
+                const isWebBluetoothSupported = typeof navigator !== 'undefined' && (navigator as any).bluetooth && (navigator as any).bluetooth.requestLEScan;
+
+                // Capacitor check - if we have the global Capacitor object, we might be in native land
+                const isNative = (window as any).Capacitor?.isNative;
+
+                if (!isWebBluetoothSupported && !isNative) {
+                    console.warn('[GUARDIAN MESH] Web Bluetooth API (or requestLEScan) is not available/supported in this environment.');
                     return;
                 }
 
