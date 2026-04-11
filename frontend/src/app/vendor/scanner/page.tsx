@@ -113,13 +113,17 @@ export default function VendorScanner() {
         if (navigator.onLine) {
             // ✅ ONLINE — hit the live API
             try {
-                const res = await fetch(`${apiUrl}/devices/verify/${imei}`);
-                const data = await res.json();
-                if (res.ok) setResult(data.device);
-                else setResult({ error: data.error || 'Device not found in registry' });
-            } catch {
-                // API failed — fall through to offline check
-                await runOfflineCheck();
+                const { api } = await import('@/lib/api');
+                const data = await api.get(`/devices/verify/${imei}`);
+                setResult(data.device);
+            } catch (err: any) {
+                // If 404, set the error state in result
+                if (err.message.includes('not found')) {
+                    setResult({ error: err.message });
+                } else {
+                    // Other API failed — fall through to offline check
+                    await runOfflineCheck();
+                }
             }
         } else {
             // 📵 OFFLINE — check local IndexedDB blacklist

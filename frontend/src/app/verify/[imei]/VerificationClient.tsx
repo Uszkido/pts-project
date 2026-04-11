@@ -14,17 +14,11 @@ export default function VerificationClient() {
     useEffect(() => {
         const verifyDevice = async () => {
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1';
-                const res = await fetch(`${apiUrl}/devices/verify/${imei}`);
-                const data = await res.json();
-
-                if (!res.ok) {
-                    setError(data.message || 'Verification failed');
-                } else {
-                    setStatus(data.device);
-                }
-            } catch (err) {
-                setError('Registry uplink failed. Please try again.');
+                const { api } = await import('@/lib/api');
+                const data = await api.get(`/devices/verify/${imei}`);
+                setStatus(data.device);
+            } catch (err: any) {
+                setError(err.message || 'Registry uplink failed. Please try again.');
             } finally {
                 setLoading(false);
             }
