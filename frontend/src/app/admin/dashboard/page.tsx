@@ -78,6 +78,7 @@ export default function AdminDashboard() {
     const [forensicsImageUrl, setForensicsImageUrl] = useState('');
     const [forensicsResult, setForensicsResult] = useState<any>(null);
     const [isScanningForensics, setIsScanningForensics] = useState(false);
+    const [isUploadingForensics, setIsUploadingForensics] = useState(false);
 
     const apiUrl = APP_CONFIG.API_URL;
     const headers = { 'Authorization': `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('pts_token') : ''}` };
@@ -622,6 +623,33 @@ export default function AdminDashboard() {
             alert('Forensic scan failed: ' + err.message);
         } finally {
             setIsScanningForensics(false);
+        }
+    };
+
+    const handleForensicsFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploadingForensics(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch(`${apiUrl}/upload/single`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('pts_token')}` },
+                body: formData
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+            setForensicsImageUrl(data.url);
+            alert('Image uploaded and ready for forensic analysis');
+        } catch (err: any) {
+            alert('Upload failed: ' + err.message);
+        } finally {
+            setIsUploadingForensics(false);
         }
     };
 
@@ -1220,15 +1248,37 @@ export default function AdminDashboard() {
                                 </div>
 
                                 <div className="max-w-3xl">
-                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Input Target Image URL / Base64</label>
-                                    <div className="flex gap-3">
-                                        <input
-                                            type="text"
-                                            value={forensicsImageUrl}
-                                            onChange={e => setForensicsImageUrl(e.target.value)}
-                                            placeholder="Paste image URL here (https://... or data:image/...)"
-                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white font-mono text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                                        />
+                                    <label className="block text-xs font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Input Target Image URL or Upload</label>
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="flex-1 flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={forensicsImageUrl}
+                                                onChange={e => setForensicsImageUrl(e.target.value)}
+                                                placeholder="Paste image URL here..."
+                                                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-4 text-white font-mono text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+                                            />
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    id="forensics-upload"
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                    onChange={handleForensicsFileUpload}
+                                                    disabled={isUploadingForensics}
+                                                />
+                                                <label
+                                                    htmlFor="forensics-upload"
+                                                    className={`flex items-center justify-center p-4 bg-slate-800 border border-slate-700 rounded-xl cursor-pointer hover:bg-slate-700 transition-colors ${isUploadingForensics ? 'opacity-50' : 'opacity-100'}`}
+                                                >
+                                                    {isUploadingForensics ? (
+                                                        <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                                                    ) : (
+                                                        <FileUp className="w-5 h-5 text-indigo-400" />
+                                                    )}
+                                                </label>
+                                            </div>
+                                        </div>
                                         <button
                                             onClick={runForensicScan}
                                             disabled={isScanningForensics || !forensicsImageUrl}
@@ -1237,6 +1287,7 @@ export default function AdminDashboard() {
                                             {isScanningForensics ? 'Analyzing...' : 'Execute Scan'}
                                         </button>
                                     </div>
+                                    <p className="mt-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">Supports JPG, PNG, WEBP • Max 5MB</p>
                                 </div>
                             </div>
 
