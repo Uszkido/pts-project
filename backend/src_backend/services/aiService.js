@@ -118,17 +118,63 @@ const analyzeDeviceHardwareCondition = async (photoUrls, brand, modelName) => {
 };
 
 /**
- * AI Localized Email OTP Content
+ * AI Localized Email OTP Content with Premium HTML Template
  */
 const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") => {
-    if (!genAI) return { subject: "OTP", body: `Your OTP is ${otp}` };
+    const defaultHtml = (subject, intro) => `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #020617; color: #f8fafc; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden;">
+                <div style="background: linear-gradient(to right, #10b981, #06b6d4); padding: 30px; text-align: center;">
+                    <div style="background-color: #020617; color: #10b981; font-weight: 900; font-size: 24px; width: 60px; height: 60px; line-height: 60px; border-radius: 12px; margin: 0 auto 10px; border: 2px solid #10b981; display: inline-block;">PTS</div>
+                    <h1 style="margin: 0; color: white; font-size: 18px; text-transform: uppercase; letter-spacing: 2px;">Sovereign National Registry</h1>
+                </div>
+                <div style="padding: 40px; text-align: center;">
+                    <h2 style="color: #f8fafc; margin-bottom: 20px;">${subject}</h2>
+                    <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">${intro}</p>
+                    <div style="font-size: 48px; font-weight: 900; color: #10b981; letter-spacing: 12px; margin: 30px 0; padding: 20px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; border: 1px dashed #10b981;">${otp}</div>
+                    <div style="margin-top: 30px; padding: 20px; background-color: rgba(239, 68, 68, 0.1); border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.2); font-size: 13px; color: #fca5a5; text-align: left;">
+                        <strong>⚠️ SECURITY CAUTION:</strong>
+                        <p style="margin: 5px 0;">Never share this OTP with anyone, including individuals claiming to be PTS or Police officials. This code provides legal access to your sovereign digital devices. If you did not request this, please disregard and change your registry password immediately.</p>
+                    </div>
+                </div>
+                <div style="padding: 20px; background-color: #020617; color: #475569; font-size: 11px; text-align: center;">
+                    &copy; 2026 PTS Sentinel Sovereign Platforms. Powered by Vexel Innovations.
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (!genAI) return {
+        subject: "🔐 PTS Identity Verification",
+        body: defaultHtml("Account Verification", `Hello ${fullName}, use the code below to verify your digital identity for the ${mode} request.`)
+    };
+
     try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", generationConfig: { responseMimeType: "application/json" } });
-        const prompt = `Write a premium, friendly email body for ${fullName}. Action: ${mode}. OTP: ${otp}. Mix in Nigerian English/Hausa. Keep under 60 words. 
-        Respond with ONLY a JSON object: { "subject": "String", "body": "String" }`;
+        const prompt = `You are the PTS Communication AI. Generate a premium, authoritative, and friendly email content for ${fullName}. 
+        Action: ${mode} (registration or password reset). 
+        OTP: ${otp}. 
+        
+        Requirements:
+        1. Mix in standard Nigerian English with subtle professional Hausa/Pidgin terms (e.g., 'Sanu', 'Oga').
+        2. Provide a 'subject' and an 'introText' (Keep introText under 50 words).
+        
+        Respond with ONLY a JSON object: { "subject": "String", "introText": "String" }`;
+
         const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
-    } catch (e) { console.error(e); return { subject: "Security OTP", body: `Hello ${fullName}, your OTP is ${otp}.` }; }
+        const data = JSON.parse(result.response.text());
+
+        return {
+            subject: data.subject,
+            body: defaultHtml(data.subject, data.introText)
+        };
+    } catch (e) {
+        console.error(e);
+        return {
+            subject: "🔐 PTS Security OTP",
+            body: defaultHtml("Security Verification", `Hello ${fullName}, your one-time password for the requested ${mode} is provided below.`)
+        };
+    }
 };
 
 /**
