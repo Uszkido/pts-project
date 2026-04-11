@@ -40,7 +40,7 @@ const login = async (req, res, next) => {
             return sendError(res, 'Invalid credentials', 401);
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
 
         logger.info(`User logged in: ${user.email}`);
 

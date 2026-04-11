@@ -28,7 +28,7 @@ const getTransporter = () => {
  */
 const sendOtp = async (user, otp, mode = "verification") => {
     logger.info(`📡 Attempting to send OTP (${otp}) to user ${user.email || user.id}`);
-    const text = `🔐 *PTS National Registry*\n\nYour Verification OTP is: *${otp}*\n\nPlease use this to verify your account.`;
+    const text = `🔐 *PTS National Registry - SOVEREIGN SECURITY NOTICE*\n\nYour Verification OTP is: *${otp}*\n\n⚠️ *CAUTION:* Never share this code with anyone. PTS officials will NEVER ask for your OTP. This code verifies your legal ownership of digital assets. If you did not request this, please contact the PTS Cyber-Response unit immediately.`;
 
     try {
         // 1. WhatsApp
