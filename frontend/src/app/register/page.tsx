@@ -555,11 +555,7 @@ export default function UnifiedRegister() {
                                     <svg className="w-5 h-5 text-slate-600 group-hover:text-blue-400 ml-auto shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </button>
 
-                                <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 mt-2">
-                                    <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-                                        <span className="text-amber-400 font-bold">Admin</span> &amp; <span className="text-red-400 font-bold">Law Enforcement</span> accounts are provisioned by PTS administrators only. Contact <span className="text-blue-400">vexelvision@gmail.com</span> if you need such access.
-                                    </p>
-                                </div>
+
                             </div>
                         ) : (
                             /* ── Registration Form ────────────────────────────── */

@@ -119,8 +119,6 @@ export default function UnifiedLogin() {
                         {!isForgotPassword && !isOtpStep && (
                             <div className="flex gap-2 flex-wrap justify-center mb-7">
                                 {[
-                                    { label: 'Admin', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-                                    { label: 'Law Enforcement', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
                                     { label: 'Vendor', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
                                     { label: 'Device Owner', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
                                 ].map(r => (
