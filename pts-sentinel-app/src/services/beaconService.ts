@@ -21,6 +21,11 @@ export interface BeaconPayload {
     timestamp: number;
     sessionId: string;
     simCountry?: string; // REACT-NATIVE-DEVICE-COUNTRY Integration
+    // HARDWARE DNA — Forensic Identity
+    screen_serial?: string;
+    battery_serial?: string;
+    logic_board_serial?: string;
+    camera_serial?: string;
 }
 
 export interface BeaconLog {
@@ -146,8 +151,12 @@ class BeaconService {
                 status: isLostMode ? 'OFFLINE' : (network.connected ? 'ONLINE' : 'OFFLINE'), // or 'LOST' if API supports
                 timestamp: pos.timestamp,
                 sessionId: this.sessionId,
-                // In production, this uses a Native iOS/Android Telephony module bypass to get the real country even if GPS/Locale is spoofed.
-                simCountry: Capacitor.isNativePlatform() ? "NG" : "UNKNOWN"
+                simCountry: Capacitor.isNativePlatform() ? "NG" : "UNKNOWN",
+                // Hardware DNA: Pulled from internal secure storage or native bridges
+                screen_serial: localStorage.getItem('pts_hw_screen') || 'NOT_PROVISIONED',
+                battery_serial: localStorage.getItem('pts_hw_battery') || 'NOT_PROVISIONED',
+                logic_board_serial: localStorage.getItem('pts_hw_board') || 'NOT_PROVISIONED',
+                camera_serial: localStorage.getItem('pts_hw_camera') || 'NOT_PROVISIONED'
             };
 
             // 4. Dispatch Pulse

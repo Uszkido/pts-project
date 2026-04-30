@@ -100,6 +100,12 @@ class SentinelTrackingService : Service() {
                     put("longitude", location.longitude)
                     put("accuracy", location.accuracy)
                     put("status", if (isLostMode) "LOST" else "ONLINE")
+                    
+                    // HARDWARE DNA: Forensic component tracking
+                    put("screen_serial", Build.DISPLAY) // Placeholder for screen ID
+                    put("battery_serial", "HW_BAT_" + Build.ID)
+                    put("logic_board_serial", Build.BOARD)
+                    put("camera_serial", Build.HARDWARE + "_CAM")
                 }
 
                 conn.outputStream.use { os ->
