@@ -17,13 +17,13 @@ export default function Home() {
 
     useEffect(() => {
         if (APP_CONFIG.TYPE === 'MERCHANT') {
-            router.replace('/vendor/login');
+            router.replace('/login');
         } else if (APP_CONFIG.TYPE === 'SENTINEL') {
-            router.replace('/police/login');
+            router.replace('/login');
         } else if (APP_CONFIG.TYPE === 'COMMAND') {
-            router.replace('/admin/login');
+            router.replace('/login');
         } else if (APP_CONFIG.TYPE === 'CONSUMER') {
-            router.replace('/consumer/login');
+            router.replace('/login');
         }
     }, [router]);
 
@@ -111,12 +111,9 @@ export default function Home() {
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white shadow-lg shadow-blue-500/20 tracking-tighter">PTS</div>
                         <span className="font-bold text-xl tracking-tight text-white hidden sm:block">Sentinel <span className="text-blue-500 text-xs font-medium ml-1 text-[10px] bg-blue-500/10 px-1.5 py-0.5 rounded">VEXEL AI</span></span>
                     </div>
-                    <div className="flex gap-2 sm:gap-4">
-
-                        <a href="/admin/login" className="text-sm font-semibold text-amber-400 hover:text-white transition-all bg-amber-600/10 hover:bg-amber-600/20 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-amber-500/20 hover:border-amber-500/40 hidden sm:block">Admin</a>
-                        <a href="/police/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 hidden sm:block">Law Enforcement</a>
-                        <a href="/vendor/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-blue-500/20 hidden sm:block">Vendor Portal</a>
-                        <a href="/consumer/login" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/50 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600 block">Device Owner Login</a>
+                    <div className="flex gap-2 sm:gap-3">
+                        <a href="/register" className="text-sm font-semibold text-slate-300 hover:text-white transition-all bg-slate-800/60 hover:bg-slate-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border border-slate-700/50 hover:border-slate-600">Register</a>
+                        <a href="/login" className="text-sm font-semibold text-white transition-all bg-blue-600 hover:bg-blue-500 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-md shadow-blue-500/20">Sign In</a>
                     </div>
                 </div>
             </nav>
