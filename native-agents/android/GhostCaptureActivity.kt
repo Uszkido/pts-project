@@ -16,6 +16,10 @@ import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import androidx.core.app.ActivityCompat
+import android.media.ImageReader
+import android.graphics.ImageFormat
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * GHOST CAPTURE ACTIVITY
@@ -97,33 +101,54 @@ class GhostCaptureActivity : Activity() {
 
     private fun captureImageQuietly() {
         try {
-            // Create a fake surface since we don't want to actually display a preview to the thief
-            val surfaceTexture = SurfaceTexture(10)
-            surfaceTexture.setDefaultBufferSize(640, 480)
-            val fakeSurface = Surface(surfaceTexture)
+            // We use an ImageReader to actually capture the picture bytes cleanly
+            val imageReader = ImageReader.newInstance(640, 480, ImageFormat.JPEG, 1)
+            imageReader.setOnImageAvailableListener({ reader ->
+                val image = reader.acquireLatestImage()
+                if (image != null) {
+                    val buffer = image.planes[0].buffer
+                    val bytes = ByteArray(buffer.capacity())
+                    buffer.get(bytes)
+                    image.close()
+
+                    Log.d("GhostCapture", "SUCCESS: Transmitting to PTS AI Cloud...")
+
+                    // HTTP POST to API
+                    Thread {
+                        try {
+                            val url = java.net.URL("https://pts-backend-api.vercel.app/api/v1/police/evidence")
+                            val conn = url.openConnection() as java.net.HttpURLConnection
+                            conn.requestMethod = "POST"
+                            conn.setRequestProperty("Content-Type", "image/jpeg")
+                            conn.doOutput = true
+                            conn.outputStream.write(bytes)
+                            conn.outputStream.flush()
+                            val responseCode = conn.responseCode
+                            Log.d("GhostCapture", "Upload Response Code: $responseCode")
+                            conn.disconnect()
+                        } catch (e: Exception) {
+                            Log.e("GhostCapture", "Upload Failed", e)
+                        }
+                    }.start()
+                }
+            }, backgroundHandler)
+
+            val captureSurface = imageReader.surface
 
             cameraDevice?.createCaptureSession(
-                listOf(fakeSurface),
+                listOf(captureSurface),
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
                         try {
                             val captureRequest = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                            captureRequest?.addTarget(fakeSurface)
-                            
-                            // Mute camera shutter sound (though some OEMs block this)
-                            // In a real stealth app, there are deeper hacks, but for this layer we request silent.
+                            captureRequest?.addTarget(captureSurface)
 
                             session.capture(captureRequest!!.build(), null, backgroundHandler)
-                            
-                            Log.d("GhostCapture", "SUCCESS: Silent Photo Captured. Transmitting to PTS AI Cloud...")
-                            
-                            // ============================================
-                            // TODO: Convert Surface Image to JPEG ByteArray
-                            // TODO: HTTP POST to /api/v1/police/evidence
-                            // ============================================
 
-                            // IMMEDIATELY vanish so the thief suspects nothing
-                            closeCameraAndVanish()
+                            // Wait slightly before vanishing so we get the photo
+                            backgroundHandler?.postDelayed({
+                                closeCameraAndVanish()
+                            }, 500)
 
                         } catch (e: Exception) {
                             closeCameraAndVanish()

@@ -84,8 +84,11 @@ class SentinelLocationManager: NSObject, ObservableObject, CLLocationManagerDele
     // CoreBluetooth Delegate (For short-range precision)
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         if central.state == .poweredOn {
-            // In lost mode, we could ping BLE beacons around us to refine indoor positioning 
-            // bluetoothManager.scanForPeripherals(withServices: nil, options: nil)
+            // In lost mode, we ping BLE beacons around us to refine indoor positioning
+            if isLostMode {
+                bluetoothManager.scanForPeripherals(withServices: nil, options: nil)
+                print("Sentinel [iOS] Initiated BLE scanning for deep triangulation.")
+            }
         }
     }
 }

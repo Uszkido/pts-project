@@ -30,6 +30,21 @@ class SentinelAdminReceiver : DeviceAdminReceiver() {
         Log.e("SentinelShield", "CRITICAL: Anti-Delete Shield has been DISABLED.")
         
         // Fired when the user somehow disables the Device Admin.
-        // In a true enterprise scenario, we would trigger an immediate "LOST MODE" alert to the backend.
+        // Trigger an immediate "COMPROMISED/LOST MODE" alert to the backend.
+        Thread {
+            try {
+                val url = java.net.URL("https://pts-backend-api.vercel.app/api/v1/guardian/beacon")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json")
+                conn.doOutput = true
+                val payload = "{\"status\":\"LOST\",\"alert\":\"DEVICE_ADMIN_DISABLED\",\"priority\":\"CRITICAL\"}"
+                conn.outputStream.write(payload.toByteArray())
+                conn.outputStream.flush()
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e("SentinelShield", "Failed to send alert", e)
+            }
+        }.start()
     }
 }
