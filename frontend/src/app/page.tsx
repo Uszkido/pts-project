@@ -292,7 +292,7 @@ export default function Home() {
                                 }))}
                             />
                         </div>
-                        <div className="absolute top-8 right-8 bg-slate-950/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-700/50 shadow-2xl z-[40]">
+                        <div className="absolute bottom-14 right-6 bg-slate-950/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-700/50 shadow-2xl z-[40]">
                             <div className="flex items-center gap-3">
                                 <div className="w-3 h-3 rounded-full bg-red-500 animate-ping"></div>
                                 <div>
