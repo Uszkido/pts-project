@@ -102,7 +102,7 @@ function OtpStep({ email, setError, setSuccessMsg, successMsg, error }: {
                 />
                 <p className="text-[11px] text-slate-500 mt-2 text-center">Code sent to {email}. Contact admin if not received.</p>
             </div>
-            <button type="submit" disabled={loading || otp.length < 6} className="w-full py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading || otp.length < 6} className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-violet-600 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
                 {loading && <Spinner />}
                 Complete Verification
             </button>
@@ -208,7 +208,7 @@ function ConsumerRegisterForm({ onOtp, onSuccessMsg }: { onOtp: (email: string) 
                 </div>
             </div>
 
-            <button type="submit" disabled={loading || !!uploading} className="w-full py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mt-2">
+            <button type="submit" disabled={loading || !!uploading} className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-cyan-600 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2">
                 {(loading || uploading) && <Spinner />}
                 {uploading ? 'Uploading...' : loading ? 'Creating Account...' : 'Create Device Owner Account →'}
             </button>
@@ -456,7 +456,7 @@ function VendorRegisterForm({ onOtp, onSuccessMsg }: { onOtp: (email: string) =>
 
                     <div className="flex gap-3 mt-2">
                         <button onClick={() => setStep(2)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors text-sm">← Back</button>
-                        <button onClick={handleSubmit} disabled={loading || !!uploading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
+                        <button onClick={handleSubmit} disabled={loading || !!uploading} className="flex-1 bg-gradient-to-r from-emerald-600 to-blue-600 hover:opacity-90 text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm">
                             {(loading || uploading) && <Spinner />}
                             {loading ? 'Submitting...' : 'Submit Registration'}
                         </button>
@@ -490,18 +490,23 @@ export default function UnifiedRegister() {
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-            <div className="w-full max-w-lg relative z-10">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/6 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/6 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="w-full max-w-lg relative">
+                <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl shadow-2xl shadow-black/40 backdrop-blur-xl overflow-hidden">
+                    <div className={`h-[3px] w-full bg-gradient-to-r ${accentClass} transition-all duration-500`} />
+
                     <div className="p-8">
                         {/* Header */}
                         <div className="flex flex-col items-center mb-7">
-                            <div className="w-12 h-12 rounded bg-blue-700 flex items-center justify-center font-bold text-white text-xl mb-4">
+                            <div className={`w-13 h-13 w-14 h-14 rounded-2xl bg-gradient-to-br ${accentClass} flex items-center justify-center font-black text-white text-xl tracking-tighter shadow-xl shadow-blue-500/25 mb-4`}>
                                 PTS
                             </div>
-                            <h1 className="text-2xl font-bold text-white">
+                            <h1 className="text-2xl font-extrabold text-white tracking-tight">
                                 {isOtpStep ? 'Verify Your Email' : accountType ? (accountType === 'VENDOR' ? 'Vendor Registration' : 'Device Owner Registration') : 'Create Your Account'}
                             </h1>
-                            <p className="text-slate-400 text-sm mt-1 text-center">
+                            <p className="text-slate-500 text-sm mt-1 text-center">
                                 {isOtpStep ? `Code sent to ${otpEmail}` : accountType ? 'Fill in your details below' : 'Choose the account type that applies to you'}
                             </p>
                         </div>
@@ -523,22 +528,22 @@ export default function UnifiedRegister() {
                                 {/* Device Owner */}
                                 <button
                                     onClick={() => setAccountType('CONSUMER')}
-                                    className="w-full group flex items-center gap-5 bg-slate-950 border border-slate-700 hover:border-blue-500 rounded-lg p-5 transition-colors text-left"
+                                    className="w-full group flex items-center gap-5 bg-slate-800/50 hover:bg-emerald-500/10 border border-slate-700/60 hover:border-emerald-500/40 rounded-2xl p-5 transition-all duration-200 text-left"
                                 >
-                                    <div className="w-12 h-12 rounded bg-slate-800 text-blue-400 flex items-center justify-center shrink-0">
+                                    <div className="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-white">Device Owner</p>
-                                        <p className="text-xs text-slate-400 mt-0.5">Register your phone, manage ownership certificates &amp; report theft</p>
+                                        <p className="font-bold text-white group-hover:text-emerald-300 transition-colors">Device Owner</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">Register your phone, manage ownership certificates &amp; report theft</p>
                                     </div>
-                                    <svg className="w-5 h-5 text-slate-600 group-hover:text-blue-500 ml-auto shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                    <svg className="w-5 h-5 text-slate-600 group-hover:text-emerald-400 ml-auto shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </button>
 
                                 {/* Vendor */}
                                 <button
                                     onClick={() => setAccountType('VENDOR')}
-                                    className="w-full group flex items-center gap-5 bg-slate-950 border border-slate-700 hover:border-blue-500 rounded-lg p-5 transition-colors text-left"
+                                    className="w-full group flex items-center gap-5 bg-slate-800/50 hover:bg-blue-500/10 border border-slate-700/60 hover:border-blue-500/40 rounded-2xl p-5 transition-all duration-200 text-left"
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>

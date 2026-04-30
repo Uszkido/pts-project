@@ -87,13 +87,20 @@ export default function UnifiedLogin() {
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-            <div className="w-full max-w-md relative z-10">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+            {/* Background glow orbs */}
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/8 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="w-full max-w-md relative">
+                {/* Card */}
+                <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl shadow-2xl shadow-black/40 backdrop-blur-xl overflow-hidden">
+                    {/* Top accent bar */}
+                    <div className={`h-[3px] w-full bg-gradient-to-r ${accentClass}`} />
 
                     <div className="p-8 sm:p-10">
                         {/* Logo */}
                         <div className="flex flex-col items-center mb-8">
-                            <div className="w-12 h-12 rounded bg-blue-700 flex items-center justify-center font-bold text-white text-xl mb-4">
+                            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${accentClass} flex items-center justify-center font-black text-white text-xl tracking-tighter shadow-xl shadow-blue-500/25 mb-4`}>
                                 PTS
                             </div>
                             <h1 className="text-2xl font-extrabold text-white tracking-tight">
@@ -104,7 +111,7 @@ export default function UnifiedLogin() {
                                     ? 'Enter the 6-digit code sent to your email'
                                     : isForgotPassword
                                         ? 'Enter your email and choose a new password'
-                                        : 'Sign in to access your dashboard.'}
+                                        : 'One portal. Your role determines your destination.'}
                             </p>
                         </div>
 
@@ -146,7 +153,7 @@ export default function UnifiedLogin() {
                                         value={otp}
                                         onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                         placeholder="· · · · · ·"
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-4 text-white text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:border-blue-500 transition-colors"
+                                        className="w-full bg-slate-950/60 border border-slate-700/60 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
                                         required
                                         maxLength={6}
                                     />
@@ -154,7 +161,7 @@ export default function UnifiedLogin() {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting || otp.length < 6}
-                                    className="w-full py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                                    className={`w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r ${accentClass} hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2`}
                                 >
                                     {isSubmitting && <Spinner />}
                                     Verify Code
@@ -171,7 +178,7 @@ export default function UnifiedLogin() {
                                         value={email}
                                         onChange={e => setEmail(e.target.value)}
                                         placeholder="you@example.com"
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                                        className="w-full bg-slate-950/60 border border-slate-700/60 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
                                         required
                                     />
                                 </div>
@@ -180,11 +187,11 @@ export default function UnifiedLogin() {
                                     <>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-300 mb-1.5">New Password</label>
-                                            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" required minLength={6} />
+                                            <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/60 border border-slate-700/60 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all" required minLength={6} />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm New Password</label>
-                                            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" required minLength={6} />
+                                            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950/60 border border-slate-700/60 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all" required minLength={6} />
                                         </div>
                                     </>
                                 ) : (
@@ -195,7 +202,7 @@ export default function UnifiedLogin() {
                                             value={password}
                                             onChange={e => setPassword(e.target.value)}
                                             placeholder="••••••••"
-                                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                            className="w-full bg-slate-950/60 border border-slate-700/60 hover:border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
                                             required
                                         />
                                     </div>
@@ -204,7 +211,7 @@ export default function UnifiedLogin() {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="w-full py-3 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mt-2"
+                                    className={`w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r ${accentClass} hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 mt-2`}
                                 >
                                     {isSubmitting && <Spinner />}
                                     {isForgotPassword ? 'Reset Password' : isSubmitting ? 'Authenticating...' : 'Sign In →'}
@@ -234,7 +241,7 @@ export default function UnifiedLogin() {
                         {/* Register CTA */}
                         <a
                             href="/register"
-                            className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors text-sm"
+                            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-slate-300 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 transition-all text-sm"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                             Create an Account
