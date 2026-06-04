@@ -1,4 +1,6 @@
 const Groq = require("groq-sdk");
+const LEGAL_DATASET = require('./legalKnowledge');
+const SCAM_PATTERNS = require('./scamPatterns');
 // Tesseract is lazy-loaded to avoid bundle-size / filesystem issues on Vercel
 let Tesseract = null;
 function getTesseract() {
@@ -325,11 +327,16 @@ const analyzePhishingMessage = async (messageText) => {
 
     try {
         const prompt = `You are the PTS Phishing Shield AI. Analyze this message for social engineering common in Nigeria.
+        
         Message: "${messageText}"
+        
+        Known Scam Patterns for Reference: ${JSON.stringify(SCAM_PATTERNS.SCAM_TYPES)}
+        Common Red Flags: ${JSON.stringify(SCAM_PATTERNS.RED_FLAGS)}
+        
         Respond with ONLY a JSON object: 
-        { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
+        { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string from patterns", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
 
-        const responseText = await generateGroqText(prompt, "You are a cybersecurity expert specializing in social engineering.", "llama-3.1-8b-instant", true);
+        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. Trusted knowledge: ${SCAM_PATTERNS.TRUSTED_CHANNELS}`, "llama-3.1-8b-instant", true);
         return JSON.parse(responseText);
     } catch (e) {
         return { isScam: false, confidence: 0, warning: "Checking offline...", action: "NONE" };
@@ -343,18 +350,19 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
     if (!groq || !userQuery) return "[OFFICIAL PTS] Consult a legal professional for specific inquiries.";
 
     try {
-        const BASE_KNOWLEDGE = `
-        - Section 427 of Nigerian Criminal Code: Possession of stolen property (up to 14 years).
-        - Cybercrime Act 2015: Forged receipts, tampered identities.
-        `;
-
-        const prompt = `You are a Legal AI Advisor.
+        const prompt = `You are a Legal AI Advisor specialized in Nigerian Law.
+        
+        System Knowledge:
+        - Criminal Codes: ${JSON.stringify(LEGAL_DATASET.CRIMINAL_CODES)}
+        - Cyber Laws: ${JSON.stringify(LEGAL_DATASET.CYBER_LAWS)}
+        - Mandate: ${LEGAL_DATASET.LEGAL_ADVICE_MANDATE}
+        
         Language Tone: ${language}
-        Knowledge: ${BASE_KNOWLEDGE}
         User Query: "${userQuery}"
-        Start with [OFFICIAL PTS LEGAL COUNSEL].`;
+        
+        Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context.`;
 
-        return await generateGroqText(prompt, "You are a legal oracle specializing in Nigerian law.");
+        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. Source: ${LEGAL_DATASET.CONSTITUTION}`);
     } catch (e) {
         return "[OFFICIAL PTS LEGAL COUNSEL] Use caution when purchasing unknown high-value assets.";
     }
