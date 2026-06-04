@@ -93,7 +93,7 @@ export default function RegulaDocumentScanner({ onExtracted }: RegulaDocumentSca
                     console.error("Extraction Error:", e);
                     setError(e.message || "Document was unreadable. Using remote backup...");
 
-                    // Final backup check with Gemini if not already tried
+                    // Final backup check with Groq if not already tried
                     try {
                         const base64Data = (reader.result as string).split(',')[1];
                         const aiRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://pts-backend-api.vercel.app/api/v1'}/ai-public/extract-id`, {

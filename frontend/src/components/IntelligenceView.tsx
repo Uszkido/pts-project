@@ -79,7 +79,7 @@ export default function IntelligenceView({ apiUrl, headers }: IntelligenceViewPr
                     <div className="mt-8 flex items-center space-x-4 text-xs font-mono text-slate-500">
                         <span className="flex items-center"><Activity size={14} className="mr-1" /> LIVE ANALYSIS</span>
                         <span className="flex items-center"><Database size={14} className="mr-1" /> PTS CENTRAL DB</span>
-                        <span className="flex items-center text-indigo-400"><Cpu size={14} className="mr-1" /> GEMINI 1.5 PRO ACTIVE</span>
+                        <span className="flex items-center text-indigo-400"><Cpu size={14} className="mr-1" /> GROQ LLAMA 3.1 ACTIVE</span>
                     </div>
                 </div>
 

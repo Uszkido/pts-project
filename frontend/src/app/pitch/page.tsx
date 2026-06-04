@@ -27,7 +27,7 @@ const STEPS = [
 const TECH = [
     { icon: '⚡', name: 'Next.js / Vercel Edge', desc: 'Sub-100ms response times globally. Scales to millions of concurrent device verifications.' },
     { icon: '🔐', name: 'Neon PostgreSQL Ledger', desc: 'Serverless, ACID-compliant database. Every transfer is immutable and cryptographically signed.' },
-    { icon: '🤖', name: 'Google Gemini AI', desc: 'Sentinel AI analyzes receipt fraud, hardware tampering, and history for automated risk scoring.' },
+    { icon: '🤖', name: 'Groq Llama 3 AI', desc: 'Sovereign AI analyzes receipt fraud, hardware tampering, and history for automated risk scoring.' },
     { icon: '🖼️', name: 'Cloudinary Forensics', desc: 'Encrypted CDN storage for device photo evidence — accessible to law enforcement anytime.' },
     { icon: '🌍', name: 'Real-Time Surveillance Map', desc: 'Dark-mode geospatial intelligence with pulsing alert markers and triangulation visualization.' },
     { icon: '🔑', name: 'JWT Role Architecture', desc: 'Five distinct permission tiers — all cryptographically enforced at every API endpoint.' },
@@ -209,7 +209,7 @@ export default function PitchPage() {
                             <div className="flex flex-col gap-6">
                                 {[
                                     ['🔒', 'Cryptographic Ownership Chain', 'Every device transfer is permanently hashed and verified through a tamper-proof digital ledger.'],
-                                    ['🤖', 'Sentinel AI Risk Engine', 'Gemini-powered AI analyzes device history, receipt authenticity, and hardware tampering.'],
+                                    ['🤖', 'Sentinel AI Risk Engine', 'Groq-powered AI analyzes device history, receipt authenticity, and hardware tampering.'],
                                     ['🌍', 'National Surveillance Map', 'Real-time geospatial visualization of stolen device pings and police deployment zones.'],
                                     ['📱', 'Public QR Verification', 'Anyone can scan to instantly verify a device\'s registry status before purchase.'],
                                     ['⚡', 'National Kill-Switch', 'Law enforcement permanently flags devices — blacklisted from all vendor networks nationwide.'],

@@ -94,7 +94,7 @@ const initTelegramOracle = () => {
                 const response = await fetch(fileUrl);
                 const buffer = Buffer.from(await response.arrayBuffer());
 
-                // Transcribe using Gemini
+                // Transcribe using Groq
                 const transcribedText = await transcribeAudio(buffer, 'audio/ogg');
                 if (transcribedText) {
                     text = transcribedText;
