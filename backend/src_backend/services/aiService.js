@@ -24,7 +24,7 @@ if (process.env.GROQ_API_KEY) {
 /**
  * Core text generation wrapper for Groq
  */
-const generateGroqText = async (prompt, systemPrompt = "You are the PTS AI Sentinel.", model = "llama-3.1-70b-versatile", jsonMode = false) => {
+const generateGroqText = async (prompt, systemPrompt = "You are the PTS AI Sentinel.", model = "llama3-70b-8192", jsonMode = false) => {
     if (!groq) throw new Error("No Groq AI available. Check GROQ_API_KEY.");
 
     const options = {
@@ -33,8 +33,8 @@ const generateGroqText = async (prompt, systemPrompt = "You are the PTS AI Senti
             { role: "user", content: prompt }
         ],
         model: model,
-        temperature: 0.5,
-        max_tokens: 1024,
+        temperature: 0.3, // Lower temperature for more factual legal/scam analysis
+        max_tokens: 1536,
     };
 
     if (jsonMode) {
@@ -368,7 +368,7 @@ const analyzePhishingMessage = async (messageText) => {
         Respond with ONLY a JSON object: 
         { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string from patterns", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
 
-        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. You MUST use the provided datasets (SCAM_PATTERNS and FRAUDULENT_SAMPLES) for your analysis. Your tone must be strictly professional and authoritative.`, "llama-3.1-70b-versatile", true);
+        const responseText = await generateGroqText(prompt, `You are a high-level cybersecurity threat analyst specializing in West African social engineering. Analyze the provided message against the SCAM_PATTERNS and FRAUDULENT_SAMPLES datasets. Your response must be an objective JSON analysis.`, "llama3-70b-8192", true);
         return JSON.parse(responseText);
     } catch (e) {
         return { isScam: false, confidence: 0, warning: "Checking offline...", action: "NONE" };
@@ -382,24 +382,27 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
     if (!groq || !userQuery) return "[OFFICIAL PTS] Consult a legal professional for specific inquiries.";
 
     try {
-        const prompt = `You are a Legal AI Advisor specialized in Nigerian Law.
-        
-        System Knowledge:
-        - Constitution: ${LEGAL_DATASET.CONSTITUTION}
-        - Criminal Codes: ${JSON.stringify(LEGAL_DATASET.CRIMINAL_CODES)}
-        - Cyber Laws (2024 Amendment): ${JSON.stringify(LEGAL_DATASET.CYBER_LAWS)}
-        - Evidence Act (Electronic Proof): ${LEGAL_DATASET.CYBER_LAWS.EVIDENCE_ACT_SECTION_84}
-        - Enforcement Channels: ${JSON.stringify(CRIMINAL_DATASET.ENFORCEMENT_CHANNELS)}
-        - Mandate: ${LEGAL_DATASET.LEGAL_ADVICE_MANDATE}
-        
-        Language Tone: ${language}
-        User Query: "${userQuery}"
-        
-        Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context. Use Nigerian professional legal terminology.`;
+        const prompt = `
+            USER INQUIRY: "${userQuery}"
+            PREFERRED LANGUAGE: ${language}
 
-        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. You MUST use the provided LEGAL_DATASET and CRIMINAL_DATASET. ALWAYS cite specific Section numbers (e.g., Section 427 of the Criminal Code) in your response. Your tone must be strictly professional, formal, and authoritative.`, "llama-3.1-70b-versatile");
+            INTERNAL KNOWLEDGE BASE (Source of Truth):
+            1. Constitution: ${LEGAL_DATASET.CONSTITUTION}
+            2. Southern Jurisdictions (LFN 2004): ${LEGAL_DATASET.CRIMINAL_CODES.SOUTHERN}
+            3. Northern Jurisdictions (Penal Code): ${LEGAL_DATASET.CRIMINAL_CODES.NORTHERN}
+            4. Federal Cyber Laws (2024): ${LEGAL_DATASET.CRIMINAL_CODES.FEDERAL}
+            5. Electronic Evidence: ${LEGAL_DATASET.CYBER_LAWS.EVIDENCE_ACT_SECTION_84}
+            6. Regulatory Mandate: ${LEGAL_DATASET.LEGAL_ADVICE_MANDATE}
+
+            INSTRUCTION:
+            Synthesize a response that directly answers the user's inquiry using the source of truth above. 
+            Start immediately with '[OFFICIAL PTS LEGAL COUNSEL]'. 
+            Be authoritative, cite specific sections, and use professional Nigerian legal terminology.
+        `;
+
+        return await generateGroqText(prompt, `You are the Sentinel Legal AI, a senior legal authority for the National Property Tracking System. Your purpose is to provide precise, section-specific legal advice grounded in the Nigerian Criminal and Penal codes. Do not provide vague or generic advice.`, "llama3-70b-8192");
     } catch (e) {
-        return "[OFFICIAL PTS LEGAL COUNSEL] Use caution when purchasing unknown high-value assets.";
+        return "[OFFICIAL PTS LEGAL COUNSEL] System high-load. Please consult the PTS Constitution handbook for Section 427 compliance.";
     }
 };
 
