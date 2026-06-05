@@ -28,6 +28,11 @@ module.exports = {
             name: "Job/Processing Fee Scam",
             patterns: ["Congratulations, you are hired", "Pay ₦5,000 for training materials", "Government job slot available for a fee"],
             dangerLevel: "HIGH"
+        },
+        {
+            name: "Fake Job / Ushering Trick",
+            patterns: ["Meeting at a hotel for 'interview'", "Requirement to leave phone/belongings outside", "Thief vanishes with device during 'briefing'"],
+            dangerLevel: "MODERATE"
         }
     ],
 

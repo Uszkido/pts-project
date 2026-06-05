@@ -1,6 +1,8 @@
 const Groq = require("groq-sdk");
 const LEGAL_DATASET = require('./legalKnowledge');
 const SCAM_PATTERNS = require('./scamPatterns');
+const CRIMINAL_DATASET = require('./criminalDataset');
+const FRAUDULENT_SAMPLES = require('./fraudulentMessages');
 // Tesseract is lazy-loaded to avoid bundle-size / filesystem issues on Vercel
 let Tesseract = null;
 function getTesseract() {
@@ -84,11 +86,12 @@ Your response MUST:
 1. Greet them warmly and professionally. Respond in the requested language/tone: ${language} (Options are: ENGLISH, HAUSA, YORUBA, IGBO, PIDGIN).
 2. IF CLEAN: Be VERY ENCOURAGING. Congratulate them on finding a genuine device. Use phrases like "This is a great find!" or "You're making a safe choice". 
 3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "bad news" and "criminal property". Use phrases like "Stay far away from this" or "This will only bring you trouble".
-4. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snared). 
+4. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snatched). 
 5. Use the specific cultural tone of ${language} (e.g. if PIDGIN use "O boy", if YORUBA use "E nle", if IGBO use "Nno").
 6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition based on current Nigerian secondary market prices (e.g., Computer Village). Explicitly say "PTS Bluebook Estimate: ₦X".
-7. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code and they should report it immediately.
-8. Keep it concise, authoritative, and friendly.
+7. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code (Receiving Stolen Property) and Section 15 of the Cybercrimes Act 2024. Mention that they could face up to 14 years imprisonment.
+8. IF ASKED FOR PROOF: Mention that PTS records are admissible as digital evidence in court under Section 84 of the Evidence Act.
+9. Keep it concise, authoritative, and friendly.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
@@ -247,8 +250,16 @@ const transcribeAudio = async (audioBuffer, mimeType) => {
 const generateCrimeInsights = async (reports) => {
     if (!groq || !reports?.length) return "Hotspot data is being updated.";
     try {
-        const prompt = `Analyze these reports and summarize hotspots/methods: ${JSON.stringify(reports)}. Be brief.`;
-        return await generateGroqText(prompt, "You are a criminal intelligence analyst.");
+        const prompt = `Analyze these reports and summarize hotspots/methods: ${JSON.stringify(reports)}.
+        
+        Criminal Intelligence Context:
+        - Syndicates & Hubs: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.RESALE_HUBS)}
+        - Smuggling Tactics: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.SMUGGLING_ROUTES)}
+        - Modus Operandi: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.MODUS_OPERANDI)}
+        - Hotspot Metrics: ${JSON.stringify(CRIMINAL_DATASET.HOTSPOT_METRICS)}
+        
+        Respond with a localized, brief investigative summary in a professional tone for law enforcement. Mention specific market hubs or border routes if the data suggests a pattern.`;
+        return await generateGroqText(prompt, "You are a criminal intelligence analyst specializing in Nigerian mobile crime.");
     } catch (e) { console.error(e); return "Stay vigilant in high-traffic zones."; }
 };
 
@@ -311,10 +322,16 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
         const prompt = `Analyze this stolen device movement in Nigeria. 
         Last Scan City: ${lastLocation}
         Current Scan City: ${currentLocation}
-        Does this move suggest professional smuggling or a syndicate (crossing state lines rapidly while stolen)?
-        Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Professional alert message" }`;
+        
+        Smuggling Intelligence:
+        - Common Routes: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.SMUGGLING_ROUTES)}
+        - Modus Operandi Cache: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.MODUS_OPERANDI)}
+        - Known Hubs: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.RESALE_HUBS)}
+        
+        Does this move suggest professional smuggling, a regional syndicate swap, or rapid interstate transit?
+        Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Localized professional alert message mentioning potential hub or route" }`;
 
-        const responseText = await generateGroqText(prompt, "You are an anti-smuggling detective.", "llama-3.1-8b-instant", true);
+        const responseText = await generateGroqText(prompt, "You are an anti-smuggling detective specializing in West African border tech crime.", "llama-3.1-8b-instant", true);
         return JSON.parse(responseText);
     } catch (e) { console.error(e); return { isSmuggled: false, warning: null }; }
 };
@@ -330,8 +347,14 @@ const analyzePhishingMessage = async (messageText) => {
         
         Message: "${messageText}"
         
-        Known Scam Patterns for Reference: ${JSON.stringify(SCAM_PATTERNS.SCAM_TYPES)}
+        Known Scam Patterns: ${JSON.stringify(SCAM_PATTERNS.SCAM_TYPES)}
         Common Red Flags: ${JSON.stringify(SCAM_PATTERNS.RED_FLAGS)}
+        
+        Real-World Fraudulent Samples for Comparison:
+        - Fake Alerts: ${JSON.stringify(FRAUDULENT_SAMPLES.FAKE_BANK_ALERTS)}
+        - Phishing: ${JSON.stringify(FRAUDULENT_SAMPLES.PHISHING_NIN_BVN)}
+        - WhatsApp Scams: ${JSON.stringify(FRAUDULENT_SAMPLES.WHATSAPP_SCAMS)}
+        - Recruitment Scams: ${JSON.stringify(FRAUDULENT_SAMPLES.RECRUITMENT_SCAMS)}
         
         Respond with ONLY a JSON object: 
         { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string from patterns", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
@@ -353,14 +376,17 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
         const prompt = `You are a Legal AI Advisor specialized in Nigerian Law.
         
         System Knowledge:
+        - Constitution: ${LEGAL_DATASET.CONSTITUTION}
         - Criminal Codes: ${JSON.stringify(LEGAL_DATASET.CRIMINAL_CODES)}
-        - Cyber Laws: ${JSON.stringify(LEGAL_DATASET.CYBER_LAWS)}
+        - Cyber Laws (2024 Amendment): ${JSON.stringify(LEGAL_DATASET.CYBER_LAWS)}
+        - Evidence Act (Electronic Proof): ${LEGAL_DATASET.CYBER_LAWS.EVIDENCE_ACT_SECTION_84}
+        - Enforcement Channels: ${JSON.stringify(CRIMINAL_DATASET.ENFORCEMENT_CHANNELS)}
         - Mandate: ${LEGAL_DATASET.LEGAL_ADVICE_MANDATE}
         
         Language Tone: ${language}
         User Query: "${userQuery}"
         
-        Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context.`;
+        Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context. Use Nigerian professional legal terminology.`;
 
         return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. Source: ${LEGAL_DATASET.CONSTITUTION}`);
     } catch (e) {
