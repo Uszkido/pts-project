@@ -27,7 +27,7 @@ export default function AdminDashboard() {
     const [devices, setDevices] = useState<any[]>([]);
     const [incidents, setIncidents] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(''); // Deployment trigger
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'vendors' | 'devices' | 'incidents' | 'documents' | 'messages' | 'suspects' | 'auth-requests' | 'otp-center' | 'intelligence' | 'bulk-load' | 'telecom-eir' | 'warrants' | 'forensics'>('overview');
     const [roleFilter, setRoleFilter] = useState('');
 
