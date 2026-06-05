@@ -91,13 +91,14 @@ User Interaction: "${userQuery}"
 Your response MUST:
 1. Greet them warmly and professionally in formal English.
 2. IF CLEAN: Be encouraging. Congratulate them on finding a genuine device. Use phrases like "This device has been verified as clean and safe for transaction." 
-3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "illicit property". Mention specific laws from the dataset (e.g., Section 427 of the Criminal Code).
+3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "illicit property". MANDATORY: Cite Section 427 of the Criminal Code (Receiving Stolen Property) or relevant Penal Code sections.
 4. Clearly state if the phone is SAFE to buy or DANGEROUS. 
 5. Maintain a high-fidelity, professional tone at all times.
 6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition.
 7. IF STOLEN/SNATCHED: Warn them that buying this is a CRIME. Mention potential 14-year imprisonment under the Cybercrimes Act 2024.
-8. Mention that PTS records are admissible as digital evidence under Section 84 of the Evidence Act.
-9. Keep it concise, authoritative, and friendly.
+8. MANDATORY: Mention that PTS records are admissible as digital evidence under Section 84 of the Evidence Act.
+9. Use the provided LEGAL_DATASET and CRIMINAL_DATASET to ground your response. Avoid any informal language or slang.
+10. Keep it concise, authoritative, and friendly.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
@@ -265,8 +266,9 @@ const generateCrimeInsights = async (reports) => {
         - Modus Operandi: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.MODUS_OPERANDI)}
         - Hotspot Metrics: ${JSON.stringify(CRIMINAL_DATASET.HOTSPOT_METRICS)}
         
-        Respond with a localized, brief investigative summary in a professional tone for law enforcement. Mention specific market hubs or border routes if the data suggests a pattern.`;
-        return await generateGroqText(prompt, "You are a criminal intelligence analyst specializing in Nigerian mobile crime.");
+        Respond with a localized, brief investigative summary in a professional tone for law enforcement. Mention specific market hubs or border routes from the CRIMINAL_DATASET if the reports suggest a pattern. You MUST use the provided criminal context to ground your insights.
+        Tone: Official Intelligence Briefing. Use Nigerian professional law enforcement terminology.`;
+        return await generateGroqText(prompt, "You are a senior criminal intelligence analyst specializing in Nigerian mobile crime.", "llama-3.1-70b-versatile");
     } catch (e) { console.error(e); return "Stay vigilant in high-traffic zones."; }
 };
 
@@ -366,7 +368,7 @@ const analyzePhishingMessage = async (messageText) => {
         Respond with ONLY a JSON object: 
         { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string from patterns", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
 
-        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. You MUST use the provided datasets for analysis.`, "llama-3.1-8b-instant", true);
+        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. You MUST use the provided datasets (SCAM_PATTERNS and FRAUDULENT_SAMPLES) for your analysis. Your tone must be strictly professional and authoritative.`, "llama-3.1-70b-versatile", true);
         return JSON.parse(responseText);
     } catch (e) {
         return { isScam: false, confidence: 0, warning: "Checking offline...", action: "NONE" };
@@ -395,7 +397,7 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
         
         Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context. Use Nigerian professional legal terminology.`;
 
-        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. Use the provided LEGAL_DATASET and CRIMINAL_DATASET to provide accurate, authoritative advice.`);
+        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. You MUST use the provided LEGAL_DATASET and CRIMINAL_DATASET. ALWAYS cite specific Section numbers (e.g., Section 427 of the Criminal Code) in your response. Your tone must be strictly professional, formal, and authoritative.`, "llama-3.1-70b-versatile");
     } catch (e) {
         return "[OFFICIAL PTS LEGAL COUNSEL] Use caution when purchasing unknown high-value assets.";
     }
