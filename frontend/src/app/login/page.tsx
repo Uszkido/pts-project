@@ -38,10 +38,8 @@ export default function UnifiedLogin() {
                     return;
                 }
                 const data = await api.post('/auth/reset-password', { email, newPassword });
-                setSuccessMsg(data.message || 'Password reset successful. You can now log in.');
-                setIsForgotPassword(false);
-                setNewPassword('');
-                setConfirmPassword('');
+                setSuccessMsg(data.message || 'Verification OTP sent to your email.');
+                setIsOtpStep(true);
                 return;
             }
 
@@ -70,8 +68,17 @@ export default function UnifiedLogin() {
         setError('');
         try {
             const { api } = await import('@/lib/api');
-            const data = await api.post('/auth/verify-email', { email, otp });
-            setSuccessMsg(data.message || 'Email verified. You can now log in.');
+            if (isForgotPassword) {
+                // Specialized endpoint for reset OTP
+                const data = await api.post('/auth/verify-reset-otp', { email, otp });
+                setSuccessMsg(data.message || 'Password reset successful. You can now log in.');
+                setIsForgotPassword(false);
+                setNewPassword('');
+                setConfirmPassword('');
+            } else {
+                const data = await api.post('/auth/verify-email', { email, otp });
+                setSuccessMsg(data.message || 'Email verified. You can now log in.');
+            }
             setIsOtpStep(false);
             setOtp('');
         } catch (err: any) {

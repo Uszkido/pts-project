@@ -779,15 +779,16 @@ export default function AdminDashboard() {
 
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 flex-wrap">
-                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'bulk-load', 'telecom-eir', 'warrants', 'forensics'] as const).map(tab => (
+                    {(['overview', 'intelligence', 'vendors', 'users', 'devices', 'incidents', 'suspects', 'documents', 'messages', 'auth-requests', 'otp-center', 'bulk-load', 'telecom-eir', 'warrants', 'forensics'] as const).map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all capitalize ${activeTab === tab ? 'bg-indigo-600/20 text-indigo-400 shadow-lg border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/50'}`}>
                             {tab === 'vendors' ? `Vendors (${users.filter(u => u.role === 'VENDOR' && u.vendorStatus === 'PENDING').length} pending)` :
-                                tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length + users.filter(u => !u.isEmailConfirmed && u.emailVerificationOtp).length})` :
-                                    tab === 'intelligence' ? 'AI Intelligence' :
-                                        tab === 'bulk-load' ? 'Bulk Load' :
-                                            tab === 'telecom-eir' ? 'Telecom EIR' :
-                                                tab === 'warrants' ? 'Active Warrants' :
-                                                    tab === 'forensics' ? '🔬 Forensics' : tab}
+                                tab === 'auth-requests' ? `Auth Requests (${authRequests.filter(r => r.status === 'PENDING').length})` :
+                                    tab === 'otp-center' ? `🔑 OTP Center` :
+                                        tab === 'intelligence' ? 'AI Intelligence' :
+                                            tab === 'bulk-load' ? 'Bulk Load' :
+                                                tab === 'telecom-eir' ? 'Telecom EIR' :
+                                                    tab === 'warrants' ? 'Active Warrants' :
+                                                        tab === 'forensics' ? '🔬 Forensics' : tab}
                         </button>
                     ))}
                 </div>
@@ -1519,6 +1520,90 @@ export default function AdminDashboard() {
 ]`}
                                         </pre>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+                {
+                    activeTab === 'otp-center' && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 border border-amber-500/30">
+                                        <Key className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white">Sovereign OTP Command Center</h3>
+                                        <p className="text-sm text-slate-400">View and provide verification codes for users experiencing delivery delays.</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-xs text-slate-300 uppercase bg-slate-950/50 border-b border-slate-800 font-black tracking-widest">
+                                            <tr>
+                                                <th className="px-6 py-4">User Identity</th>
+                                                <th className="px-6 py-4">Purpose</th>
+                                                <th className="px-6 py-4">Active OTP</th>
+                                                <th className="px-6 py-4">Timestamp</th>
+                                                <th className="px-6 py-4 text-right">Emergency Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {/* Registration OTPs */}
+                                            {users.filter(u => u.emailVerificationOtp).map(user => (
+                                                <tr key={`otp-reg-${user.id}`} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-white">{user.fullName || 'New Sentinel'}</div>
+                                                        <div className="text-xs text-slate-500">{user.email}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded border border-blue-500/20 font-black uppercase">Registration</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-mono text-xl text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded tracking-[0.2em] font-black border border-amber-500/30 shadow-inner shadow-amber-500/5">{user.emailVerificationOtp}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-slate-500">
+                                                        {new Date(user.createdAt).toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => manualVerifyUser(user.id)} className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded transition-all uppercase">Bypass & Verify</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+
+                                            {/* Password Reset OTPs */}
+                                            {authRequests.filter(r => r.status === 'PENDING' && r.otp).map(req => (
+                                                <tr key={`otp-reset-${req.id}`} className="hover:bg-slate-800/30 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-white">{req.user?.fullName || 'Sentinel Account'}</div>
+                                                        <div className="text-xs text-slate-500">{req.user?.email}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-1 rounded border border-red-500/20 font-black uppercase">Password Reset</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="font-mono text-xl text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded tracking-[0.2em] font-black border border-amber-500/30 shadow-inner shadow-amber-500/5">{req.otp}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-slate-500">
+                                                        {new Date(req.createdAt).toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => approveReset(req.id)} className="text-[10px] font-black text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded transition-all uppercase">Force Approve</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+
+                                            {users.filter(u => u.emailVerificationOtp).length === 0 && authRequests.filter(r => r.status === 'PENDING' && r.otp).length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="px-6 py-20 text-center">
+                                                        <p className="text-slate-500 font-medium italic">No active verification codes detected in the network.</p>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
