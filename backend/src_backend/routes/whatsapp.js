@@ -551,7 +551,7 @@ router.post('/webhook', async (req, res) => {
     const imeiMatch = msgBody.match(/\b\d{15}\b/);
 
     if (!imeiMatch) {
-        replyText = `Hello there! 👋 Barka da zuwa! I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nI can help you verify any phone in Nigeria.\n\nCommands:\n- *register* / *login*\n- *report* (Flag stolen device)\n- *panic* (Selective device lock)\n- *legal [question]* (NPF Legal Guidance)\n- *scam [message]* (Check for fraud)\n- *safety* (AI security alerts)\n- *language* (ENG, HAU, YOR, IGB, PID)\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm ready! 😊`;
+        replyText = `Hello! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nWelcome to the National Identity & Device Security Registry. I am here to facilitate legal device verification across Nigeria.\n\nCommands:\n- *register* / *login*\n- *report* (Flag stolen device)\n- *panic* (Selective device lock)\n- *legal [question]* (Legal Guidance)\n- *scam [message]* (Fraud analysis)\n- *safety* (Security hotspots)\n- *language* (Change language)\n\nPlease provide a *15-digit IMEI* to begin verification.`;
     } else {
         const imei = imeiMatch[0];
         try {
@@ -561,7 +561,7 @@ router.post('/webhook', async (req, res) => {
             });
 
             if (!device) {
-                replyText = `❌ I couldn't find this IMEI (${imei}) in our National Registry.\n\nThis means the device isn't registered yet, or it could be compromised.\n\nIf you are the owner, please log in and register it via the web dashboard.\n\nPlease be careful when buying unregistered devices. A kiyaye siyayya babu tabbaci (Do not buy without verification).`;
+                replyText = `❌ I could not find IMEI (${imei}) in the National Registry.\n\nThis device is currently unregistered or requires verification. Exercise caution before proceeding with a transaction.`;
             } else {
                 // 1.5. Fraud Engine Anomaly Check
                 const anomalyWarning = await detectClonedImeiAnomaly(imei, "WHATSAPP", from);
@@ -616,7 +616,7 @@ router.post('/webhook', async (req, res) => {
             }
         } catch (error) {
             console.error("DB/AI Error in WhatsApp webhook:", error);
-            replyText = "Oh no! 😟 It looks like our servers are a bit too busy right now and I can't connect.\n\nTuba, don Allah a sake jarrabawa an jima (Please try checking again in a little while).";
+            replyText = "The National Registry is currently experiencing high traffic and cannot process your request at this time. Please try again shortly.";
         }
     }
 

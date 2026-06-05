@@ -71,7 +71,7 @@ const generateLocalizedOracleResponse = async (deviceStatus, deviceBrand, device
     }
 
     const systemPrompt = `You are the "PTS AI Sentinel" (National Device Identity & Security AI).
-A user has asked you to verify a mobile phone. You must reply using a mix of formal, clear Nigerian English and standard Hausa/Pidgin where appropriate.`;
+A user has asked you to verify a mobile phone. You must reply using a professional, authoritative, and formal Nigerian English tone. Avoid slang or informal language unless specifically requested.`;
 
     const prompt = `
 Device Info:
@@ -80,17 +80,23 @@ Device Info:
 - Current Status: ${deviceStatus}
 - Safety Risk Score: ${riskScore}/100
 
+Legal & Criminal Context (Use this data):
+- Criminal Laws: ${JSON.stringify(LEGAL_DATASET.CRIMINAL_CODES)}
+- Cyber Laws: ${JSON.stringify(LEGAL_DATASET.CYBER_LAWS)}
+- Syndicate Operations: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS)}
+- Enforcement Channels: ${JSON.stringify(CRIMINAL_DATASET.ENFORCEMENT_CHANNELS)}
+
 User Interaction: "${userQuery}"
 
 Your response MUST:
-1. Greet them warmly and professionally. Respond in the requested language/tone: ${language} (Options are: ENGLISH, HAUSA, YORUBA, IGBO, PIDGIN).
-2. IF CLEAN: Be VERY ENCOURAGING. Congratulate them on finding a genuine device. Use phrases like "This is a great find!" or "You're making a safe choice". 
-3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "bad news" and "criminal property". Use phrases like "Stay far away from this" or "This will only bring you trouble".
-4. Clearly state if the phone is SAFE to buy or DANGEROUS (Stolen/Snatched). 
-5. Use the specific cultural tone of ${language} (e.g. if PIDGIN use "O boy", if YORUBA use "E nle", if IGBO use "Nno").
-6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition based on current Nigerian secondary market prices (e.g., Computer Village). Explicitly say "PTS Bluebook Estimate: ₦X".
-7. IF STOLEN/SNATCHED: Warn them strongly (in ${language}) that buying this device is a CRIME under Section 427 of the Criminal Code (Receiving Stolen Property) and Section 15 of the Cybercrimes Act 2024. Mention that they could face up to 14 years imprisonment.
-8. IF ASKED FOR PROOF: Mention that PTS records are admissible as digital evidence in court under Section 84 of the Evidence Act.
+1. Greet them warmly and professionally in formal English.
+2. IF CLEAN: Be encouraging. Congratulate them on finding a genuine device. Use phrases like "This device has been verified as clean and safe for transaction." 
+3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "illicit property". Mention specific laws from the dataset (e.g., Section 427 of the Criminal Code).
+4. Clearly state if the phone is SAFE to buy or DANGEROUS. 
+5. Maintain a high-fidelity, professional tone at all times.
+6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition.
+7. IF STOLEN/SNATCHED: Warn them that buying this is a CRIME. Mention potential 14-year imprisonment under the Cybercrimes Act 2024.
+8. Mention that PTS records are admissible as digital evidence under Section 84 of the Evidence Act.
 9. Keep it concise, authoritative, and friendly.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
@@ -190,13 +196,14 @@ const generateAiOtpEmailContent = async (fullName, otp, mode = "verification") =
     };
 
     try {
-        const prompt = `You are the PTS Communication AI. Generate a premium, authoritative, and friendly email content for ${fullName}. 
+        const prompt = `You are the PTS Communication AI. Generate a premium, authoritative, and formal email content for ${fullName}. 
         Action: ${mode} (registration or password reset). 
         OTP: ${otp}. 
         
         Requirements:
-        1. Mix in standard Nigerian English with subtle professional Hausa/Pidgin terms (e.g., 'Sanu', 'Oga').
+        1. Use STRICTLY Professional Nigerian English. Do NOT use Hausa, Pidgin, or informal terms.
         2. Provide a 'subject' and an 'introText' (Keep introText under 50 words).
+        3. The tone must be secure, official, and reassuring.
         
         Respond with ONLY a JSON object: { "subject": "String", "introText": "String" }`;
 
@@ -359,7 +366,7 @@ const analyzePhishingMessage = async (messageText) => {
         Respond with ONLY a JSON object: 
         { "isScam": boolean, "confidence": 0-100, "scamType": "detailed string from patterns", "warning": "Localized message", "action": "BLOCK_AND_REPORT | ALLOW" }`;
 
-        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. Trusted knowledge: ${SCAM_PATTERNS.TRUSTED_CHANNELS}`, "llama-3.1-8b-instant", true);
+        const responseText = await generateGroqText(prompt, `You are a cybersecurity expert specializing in social engineering. You MUST use the provided datasets for analysis.`, "llama-3.1-8b-instant", true);
         return JSON.parse(responseText);
     } catch (e) {
         return { isScam: false, confidence: 0, warning: "Checking offline...", action: "NONE" };
@@ -388,7 +395,7 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
         
         Respond with [OFFICIAL PTS LEGAL COUNSEL] followed by a clear, authoritative explanation with specific section references into the requested language context. Use Nigerian professional legal terminology.`;
 
-        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. Source: ${LEGAL_DATASET.CONSTITUTION}`);
+        return await generateGroqText(prompt, `You are a legal oracle specializing in Nigerian law. Use the provided LEGAL_DATASET and CRIMINAL_DATASET to provide accurate, authoritative advice.`);
     } catch (e) {
         return "[OFFICIAL PTS LEGAL COUNSEL] Use caution when purchasing unknown high-value assets.";
     }

@@ -72,7 +72,7 @@ const initTelegramOracle = () => {
     bot.onText(/\/start/, (msg) => {
         const chatId = msg.chat.id;
         clearSession('TELEGRAM', chatId);
-        const resp = `Hello there! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nBarka da zuwa! I'm here to help you verify the phone you are buying anywhere in Nigeria.\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to selectively lock stolen devices\n- Type *legal [question]* for NPF Legal Guidance\n- Type *scam [message]* to check for phishing\n- Type *safety* to see AI security hotspots\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)`;
+        const resp = `Hello! 👋 I am the *PTS Sentinel (Vexel AI)*. 🇳🇬\n\nWelcome to the National Identity & Device Security Intelligence Oracle. I am here to help you verify digital property and protect yourself from fraud.\n\nCommands:\n- Type *register* to create your Sentinel Identity\n- Type *login* to access your account\n- Type *report* to flag a stolen device\n- Type *panic* to selectively lock stolen devices\n- Type *legal [question]* for NPF Legal Guidance\n- Type *scam [message]* to check for phishing\n- Type *safety* to see AI security hotspots\n- Type *language* to switch (ENG, HAU, YOR, IGB, PID)`;
         bot.sendMessage(chatId, resp, { parse_mode: 'Markdown' });
     });
 
@@ -470,8 +470,7 @@ const initTelegramOracle = () => {
         const imeiMatch = text.match(/\b\d{15}\b/);
 
         if (!imeiMatch) {
-            // If we don't find a valid IMEI, gracefully respond in localized tone
-            bot.sendMessage(chatId, "Oops, I couldn't see a valid *15-digit IMEI* in your message. 🤔\nIf you're not sure how to find it, just dial *#06#* on the phone and send the number back to me.\n\nDan Allah, tura IMEI mai lamba 15 don dubawa. I'm waiting! ⏳", { parse_mode: 'Markdown' });
+            bot.sendMessage(chatId, "I could not detect a valid *15-digit IMEI* in your message. 🤔\n\nPlease dial *#06#* on the device and provide the 15-digit number for a security verification scan.", { parse_mode: 'Markdown' });
             return;
         }
 
@@ -551,7 +550,7 @@ const initTelegramOracle = () => {
 
         } catch (error) {
             console.error('Telegram Oracle Flow Error: ', error);
-            bot.sendMessage(chatId, "Oh no! 😟 I'm having a little trouble connecting to the PTS server right now. Connections can be tricky sometimes.\n\nTuba, don Allah a sake jarrabawa an jima (Please give it another try a bit later).");
+            bot.sendMessage(chatId, "I am currently experiencing connectivity issues with the National Registry. 😟\n\nPlease try again shortly.");
         }
     });
 
