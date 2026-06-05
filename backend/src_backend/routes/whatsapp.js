@@ -466,8 +466,7 @@ router.post('/webhook', async (req, res) => {
                     replyText = "⏳ Preparing your registration...";
                     await sendWhatsAppMessage(phoneNumberId, from, replyText);
                     const { pending, otp } = await startRegistration({ ...session.data, facialDataUrl: cloudinaryUrl });
-                    const { sendOtpViaBots } = require('./auth');
-                    await sendOtpViaBots(pending, otp, "verification");
+                    await sendOtp(pending, otp, "verification");
 
                     updateSession('WHATSAPP', from, 'AWAITING_REG_OTP', { email: pending.email });
                     replyText = `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to complete your registration.`;
@@ -536,8 +535,7 @@ router.post('/webhook', async (req, res) => {
                 replyText = "⏳ Preparing your Vendor Application...";
                 await sendWhatsAppMessage(phoneNumberId, from, replyText);
                 const { pending, otp } = await startRegistration({ ...session.data, cacCertificateUrl: cloudinaryUrl });
-                const { sendOtpViaBots } = require('./auth');
-                await sendOtpViaBots(pending, otp, "verification");
+                await sendOtp(pending, otp, "verification");
 
                 updateSession('WHATSAPP', from, 'AWAITING_REG_OTP', { email: pending.email });
                 replyText = `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to verify your identity and submit your business for review.`;

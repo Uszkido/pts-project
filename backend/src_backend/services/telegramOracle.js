@@ -592,8 +592,8 @@ const initTelegramOracle = () => {
                     bot.sendMessage(chatId, "⏳ Preparing your registration...");
                     try {
                         const { pending, otp } = await startRegistration({ ...session.data, facialDataUrl: cloudinaryUrl });
-                        const { sendOtpViaBots } = require('../routes/auth');
-                        await sendOtpViaBots(pending, otp, "verification");
+                        const { sendOtp } = require('./notificationService');
+                        await sendOtp(pending, otp, "verification");
 
                         updateSession('TELEGRAM', chatId, 'AWAITING_REG_OTP', { email: pending.email });
                         bot.sendMessage(chatId, `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to complete your registration.`, { parse_mode: 'Markdown' });
@@ -621,8 +621,8 @@ const initTelegramOracle = () => {
                 bot.sendMessage(chatId, "⏳ Preparing your Vendor Application...");
                 try {
                     const { pending, otp } = await startRegistration({ ...session.data, cacCertificateUrl: cloudinaryUrl });
-                    const { sendOtpViaBots } = require('../routes/auth');
-                    await sendOtpViaBots(pending, otp, "verification");
+                    const { sendOtp } = require('./notificationService');
+                    await sendOtp(pending, otp, "verification");
 
                     updateSession('TELEGRAM', chatId, 'AWAITING_REG_OTP', { email: pending.email });
                     bot.sendMessage(chatId, `📧 *One Last Step!*\n\nI've sent a 6-digit verification code to your email. Please **type it here** to verify your identity and submit your business for review.`, { parse_mode: 'Markdown' });

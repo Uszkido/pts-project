@@ -12,8 +12,8 @@ const registerStart = async (req, res, next) => {
     try {
         const result = await startRegistration(req.body);
 
-        // Background dispatch
-        sendOtp(result.pending, result.otp, "registration");
+        // Await OTP dispatch to ensure it completes before serverless termination
+        await sendOtp(result.pending, result.otp, "registration");
 
         sendSuccess(res, { email: result.pending.email, requiresOtp: true }, 'Registration started. OTP sent.', 200);
     } catch (err) {
@@ -71,8 +71,8 @@ const resetPassword = async (req, res, next) => {
             }
         });
 
-        // Background dispatch
-        sendOtp(user, otp, "reset");
+        // Await OTP dispatch to ensure it completes before serverless termination
+        await sendOtp(user, otp, "reset");
 
         sendSuccess(res, { email, requiresOtp: true }, 'Reset request initialized. OTP sent.', 200);
     } catch (err) {
