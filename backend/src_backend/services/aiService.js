@@ -34,7 +34,7 @@ const generateGroqText = async (prompt, systemPrompt = "You are the PTS AI Senti
         ],
         model: model,
         temperature: 0.3, // Lower temperature for more factual legal/scam analysis
-        max_tokens: 1536,
+        max_tokens: 2048, // Increased for exhaustive detailed responses
     };
 
     if (jsonMode) {
@@ -88,22 +88,22 @@ Legal & Criminal Context (Use this data):
 
 User Interaction: "${userQuery}"
 
-Your response MUST:
+ योर response MUST:
 1. Greet them warmly and professionally in formal English.
 2. IF CLEAN: Be encouraging. Congratulate them on finding a genuine device. Use phrases like "This device has been verified as clean and safe for transaction." 
-3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "illicit property". MANDATORY: Cite Section 427 of the Criminal Code (Receiving Stolen Property) or relevant Penal Code sections.
+3. IF STOLEN/SNATCHED/FLAGGED: Be VERY DISCOURAGING and FIRM. Warn them that this device is "illicit property". MANDATORY: Provide an exhaustive legal breakdown citing Section 427 of the Criminal Code (Receiving Stolen Property) and Section 317 of the Penal Code.
 4. Clearly state if the phone is SAFE to buy or DANGEROUS. 
 5. Maintain a high-fidelity, professional tone at all times.
-6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition.
-7. IF STOLEN/SNATCHED: Warn them that buying this is a CRIME. Mention potential 14-year imprisonment under the Cybercrimes Act 2024.
-8. MANDATORY: Mention that PTS records are admissible as digital evidence under Section 84 of the Evidence Act.
+6. IF CLEAN: Act as the "PTS Bluebook" (National Price Oracle). Provide a realistic estimated market value (in Nigerian Naira ₦) for this model in "A-Grade Used" condition with a brief justification based on current market trends.
+7. IF STOLEN/SNATCHED: Warn them that buying this is a CRIME. Mention potential 14-year imprisonment under the Cybercrimes Act 2024 (Section 15).
+8. MANDATORY: Provide a detailed explanation on how PTS records are admissible as digital evidence under Section 84 of the Evidence Act.
 9. Use the provided LEGAL_DATASET and CRIMINAL_DATASET to ground your response. Avoid any informal language or slang.
-10. Keep it concise, authoritative, and friendly.
+10. Be exhaustive and thorough. Provide as much relevant legal and safety detail as possible.
 
 CRITICAL ANOMALY WARNING: ${anomalyWarning ? "YES - " + anomalyWarning : "NONE"}`;
 
     try {
-        return await generateGroqText(prompt, systemPrompt);
+        return await generateGroqText(prompt, systemPrompt, "llama3-70b-8192");
     } catch (error) {
         console.error("AI Generation Error:", error.message || error);
         return `[Sentinel Shield Active] The ${deviceBrand} ${deviceModel} is currently marked as ${deviceStatus}. Safety Risk Score: ${riskScore}%. ${deviceStatus === 'CLEAN' ? 'Safe to buy.' : 'DANGER: Buying this is a crime.'}`;
@@ -266,9 +266,9 @@ const generateCrimeInsights = async (reports) => {
         - Modus Operandi: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.MODUS_OPERANDI)}
         - Hotspot Metrics: ${JSON.stringify(CRIMINAL_DATASET.HOTSPOT_METRICS)}
         
-        Respond with a localized, brief investigative summary in a professional tone for law enforcement. Mention specific market hubs or border routes from the CRIMINAL_DATASET if the reports suggest a pattern. You MUST use the provided criminal context to ground your insights.
-        Tone: Official Intelligence Briefing. Use Nigerian professional law enforcement terminology.`;
-        return await generateGroqText(prompt, "You are a senior criminal intelligence analyst specializing in Nigerian mobile crime.", "llama-3.1-70b-versatile");
+        Respond with a localized, exhaustive investigative summary in a professional tone for law enforcement. Mention specific market hubs or border routes from the CRIMINAL_DATASET if the reports suggest a pattern. You MUST use the provided criminal context to ground your insights.
+        Tone: Official Intelligence Briefing. Use Nigerian professional law enforcement terminology. Keep the analysis detailed and data-driven.`;
+        return await generateGroqText(prompt, "You are a senior criminal intelligence analyst specializing in Nigerian mobile crime.", "llama3-70b-8192");
     } catch (e) { console.error(e); return "Stay vigilant in high-traffic zones."; }
 };
 
@@ -338,9 +338,9 @@ const analyzeSmugglingRisk = async (lastLocation, currentLocation, status) => {
         - Known Hubs: ${JSON.stringify(CRIMINAL_DATASET.SYNDICATE_OPERATIONS.RESALE_HUBS)}
         
         Does this move suggest professional smuggling, a regional syndicate swap, or rapid interstate transit?
-        Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Localized professional alert message mentioning potential hub or route" }`;
+        Respond with ONLY JSON: { "isSmuggled": boolean, "warning": "Localized professional alert message mentioning potential hub or route with detailed reasoning" }`;
 
-        const responseText = await generateGroqText(prompt, "You are an anti-smuggling detective specializing in West African border tech crime.", "llama-3.1-8b-instant", true);
+        const responseText = await generateGroqText(prompt, "You are a senior anti-smuggling detective specializing in West African border tech crime.", "llama3-70b-8192", true);
         return JSON.parse(responseText);
     } catch (e) { console.error(e); return { isSmuggled: false, warning: null }; }
 };
@@ -395,9 +395,10 @@ const getLegalAdvice = async (userQuery, language = "ENGLISH") => {
             6. Regulatory Mandate: ${LEGAL_DATASET.LEGAL_ADVICE_MANDATE}
 
             INSTRUCTION:
-            Synthesize a response that directly answers the user's inquiry using the source of truth above. 
-            Start immediately with '[OFFICIAL PTS LEGAL COUNSEL]'. 
-            Be authoritative, cite specific sections, and use professional Nigerian legal terminology.
+            Synthesize an EXHAUSTIVE response that directly answers the user's inquiry using the source of truth above. 
+            Start immediately with '[OFFICIAL PTS LEGAL COUNCEL]'. 
+            Be highly detailed, cite specific sections, explain the implications of those sections, and use professional Nigerian legal terminology.
+            Provide a comprehensive breakdown of the legal situation.
         `;
 
         return await generateGroqText(prompt, `You are the Sentinel Legal AI, a senior legal authority for the National Property Tracking System. Your purpose is to provide precise, section-specific legal advice grounded in the Nigerian Criminal and Penal codes. Do not provide vague or generic advice.`, "llama3-70b-8192");
