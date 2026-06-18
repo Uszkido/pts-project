@@ -8,3 +8,27 @@ backend/prisma/*.db
 frontend/.next/
 frontend/out/
 .vercel
+
+# Editor
+.vscode/
+.idea/
+
+# Build artifacts & binaries
+*.apk
+APKs/
+
+# Logs and debug output
+*.log
+backend/logs/
+**/err.txt
+**/out.txt
+**/build_error*.txt
+**/mac_build_error.txt
+**/electron_build_error.txt
+
+# Backup/temp folders
+.vercel_backend_*bak*/
+*_bak/
+
+# Misc
+Discription
