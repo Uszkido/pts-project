@@ -1,4 +1,6 @@
 require('dotenv').config();
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -16,6 +18,16 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const app = express();
+
+app.use(helmet());
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 // ─── Core Middleware ─────────────────────────────────────────────────────────
 // Restrict CORS to known origins in production
@@ -131,3 +143,4 @@ app.get('/', (_req, res) => {
 app.use(errorHandler);
 
 module.exports = app;
+
