@@ -5,21 +5,43 @@ const path = require('path');
 const logger = require('../src_backend/utils/logger');
 const errorHandler = require('../src_backend/middleware/errorHandler');
 
+// ─── Global Error Guards ────────────────────────────────────────────────────
 process.on('uncaughtException', (err) => {
-    logger.error('🔥 UNCAUGHT EXCEPTION:', err.message, err.stack);
+    logger.error('UNCAUGHT EXCEPTION — shutting down:', err.message, err.stack);
+    process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
-    logger.error('🌊 UNHANDLED REJECTION:', reason);
+    logger.error('UNHANDLED REJECTION:', reason);
 });
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// ─── Core Middleware ─────────────────────────────────────────────────────────
+// Restrict CORS to known origins in production
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:3000', 'http://localhost:5173'];
 
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+    credentials: true,
+}));
+
+// Limit payload size to a reasonable amount to prevent DoS
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ─── Database Client ─────────────────────────────────────────────────────────
+let prisma;
+try {
+    prisma = require(path.join(__dirname, '..', 'src_backend', 'db'));
+    logger.info('Database client initialized');
+} catch (e) {
+    logger.error('db.js failed to load:', e.message);
+}
+
+// ─── Safe Route Loader ───────────────────────────────────────────────────────
 const loadedRoutes = [];
 
 function safeUse(apiPath, routeFile) {
@@ -29,140 +51,83 @@ function safeUse(apiPath, routeFile) {
         app.use(apiPath, route);
         loadedRoutes.push({ path: apiPath, status: 'ok' });
     } catch (e) {
-        logger.error(`❌ Route load failed [${routeFile}]:`, e.message);
+        logger.error(`Route load failed [${routeFile}]:`, e.message);
         loadedRoutes.push({ path: apiPath, status: 'failed', error: e.message });
-
-        const r = express.Router();
-        r.all('*', (req, res) => res.status(503).json({
-            error: `Module offline`,
+        const fallback = express.Router();
+        fallback.all('*', (_req, res) => res.status(503).json({
+            error: 'Module offline',
             module: routeFile,
-            details: e.message
         }));
-        app.use(apiPath, r);
+        app.use(apiPath, fallback);
     }
 }
 
-// RESTORE DATABASE
-let prisma;
-try {
-    const dbPath = path.join(__dirname, '..', 'src_backend', 'db');
-    prisma = require(dbPath);
-    logger.info('🐘 Database client initialized');
-} catch (e) {
-    logger.error('❌ db.js failed:', e.message);
-}
-
-// CORE ROUTES
+// ─── Routes ──────────────────────────────────────────────────────────────────
 const routes = [
-    { path: '/api/v1/auth', file: 'auth' },
-    { path: '/api/v1/devices', file: 'devices' },
-    { path: '/api/v1/police', file: 'police' },
-    { path: '/api/v1/consumers', file: 'consumers' },
-    { path: '/api/v1/transfers', file: 'transfers' },
-    { path: '/api/v1/public', file: 'public' },
-    { path: '/api/v1/admin', file: 'admin' },
-    { path: '/api/v1/registry', file: 'registry' },
-    { path: '/api/v1/upload', file: 'upload' },
-    { path: '/api/v1/telecom', file: 'telecom' },
-    { path: '/api/v1/ussd', file: 'ussd' },
-    { path: '/api/v1/ai', file: 'ai' },
-    { path: '/api/v1/analytics', file: 'analytics' },
-    { path: '/api/v1/api-keys', file: 'apiKeys' },
-    { path: '/api/v1/guardian', file: 'guardian' },
-    { path: '/api/v1/incidents', file: 'incidents' },
+    { path: '/api/v1/auth',        file: 'auth' },
+    { path: '/api/v1/devices',     file: 'devices' },
+    { path: '/api/v1/police',      file: 'police' },
+    { path: '/api/v1/consumers',   file: 'consumers' },
+    { path: '/api/v1/transfers',   file: 'transfers' },
+    { path: '/api/v1/public',      file: 'public' },
+    { path: '/api/v1/admin',       file: 'admin' },
+    { path: '/api/v1/registry',    file: 'registry' },
+    { path: '/api/v1/upload',      file: 'upload' },
+    { path: '/api/v1/telecom',     file: 'telecom' },
+    { path: '/api/v1/ussd',        file: 'ussd' },
+    { path: '/api/v1/ai',          file: 'ai' },
+    { path: '/api/v1/analytics',   file: 'analytics' },
+    { path: '/api/v1/api-keys',    file: 'apiKeys' },
+    { path: '/api/v1/guardian',    file: 'guardian' },
+    { path: '/api/v1/incidents',   file: 'incidents' },
     { path: '/api/v1/maintenance', file: 'maintenance' },
-    { path: '/api/v1/passports', file: 'passports' },
-    { path: '/api/v1/payments', file: 'payments' },
-    { path: '/api/v1/swap', file: 'swap' },
-    { path: '/api/v1/telegram', file: 'telegram' },
-    { path: '/api/v1/tracking', file: 'tracking' },
-    { path: '/api/v1/vendors', file: 'vendors' },
-    { path: '/api/v1/whatsapp', file: 'whatsapp' }
+    { path: '/api/v1/passports',   file: 'passports' },
+    { path: '/api/v1/payments',    file: 'payments' },
+    { path: '/api/v1/swap',        file: 'swap' },
+    { path: '/api/v1/telegram',    file: 'telegram' },
+    { path: '/api/v1/tracking',    file: 'tracking' },
+    { path: '/api/v1/vendors',     file: 'vendors' },
+    { path: '/api/v1/whatsapp',    file: 'whatsapp' },
 ];
 
-routes.forEach(route => safeUse(route.path, route.file));
+routes.forEach(({ path: apiPath, file }) => safeUse(apiPath, file));
 
-const bcrypt = require('bcryptjs');
-
-// HEALTH & ADMIN RESTORE
-app.get('/health', async (req, res) => {
+// ─── Health Check ─────────────────────────────────────────────────────────────
+// NOTE: This endpoint is public. Do NOT include admin credentials or secrets here.
+// Use a separate secure admin CLI or migration script for account provisioning.
+app.get('/health', async (_req, res) => {
     let dbStatus = 'disconnected';
     let dbMsg = 'Database not initialized';
-    let adminFix = 'Not attempted';
 
     try {
         if (prisma) {
             await prisma.$queryRaw`SELECT 1`;
             dbStatus = 'connected';
-            dbMsg = 'PTS Sentinel is fully operational';
-
-            // SOVEREIGN ADMIN OVERRIDE & CREDENTIAL SYNC
-            try {
-                const adminEmail = 'admin@pts.ng';
-                const adminPass = 'admin_pts_2026';
-                const hashedPass = await bcrypt.hash(adminPass, 10);
-
-                let adminUser = await prisma.user.findUnique({ where: { email: adminEmail } });
-
-                if (!adminUser) {
-                    await prisma.user.create({
-                        data: {
-                            email: adminEmail,
-                            password: hashedPass,
-                            role: 'ADMIN',
-                            fullName: 'Sovereign Administrator'
-                        }
-                    });
-                    adminFix = 'SUCCESS: admin@pts.ng created';
-                } else {
-                    await prisma.user.update({
-                        where: { id: adminUser.id },
-                        data: { role: 'ADMIN', password: hashedPass }
-                    });
-                    adminFix = 'SUCCESS: admin@pts.ng synchronized';
-                }
-
-                // Create secondary strategic backup admin
-                const secEmail = 'sovereign@pts.ng';
-                const secPass = 'pts_sovereign_2026';
-                const secHashed = await bcrypt.hash(secPass, 10);
-                await prisma.user.upsert({
-                    where: { email: secEmail },
-                    update: { role: 'ADMIN', password: secHashed },
-                    create: { email: secEmail, password: secHashed, role: 'ADMIN', fullName: 'Strategic Command' }
-                });
-
-                adminFix += ' | Secondary admin sovereign@pts.ng ready.';
-
-            } catch (authErr) {
-                adminFix = `ERROR: Admin restore failed - ${authErr.message}`;
-            }
+            dbMsg = 'PTS API is operational';
         }
     } catch (err) {
         dbStatus = 'offline';
         dbMsg = err.message;
     }
+
     res.json({
         status: dbStatus === 'connected' ? 'ok' : 'degraded',
-        version: '1.9.0',
+        version: process.env.npm_package_version || '1.9.0',
         database: dbStatus,
         message: dbMsg,
-        admin_fix: adminFix,
-        routes: loadedRoutes
+        routes: loadedRoutes,
     });
 });
 
-app.get('/api/v1', (req, res) => {
-    res.json({ status: 'ok', msg: 'PTS Sentinel API v1.9.0 Operational' });
+app.get('/api/v1', (_req, res) => {
+    res.json({ status: 'ok', message: 'PTS API v1 Operational' });
 });
 
-// Root path
-app.get('/', (req, res) => {
-    res.send('PTS Sentinel API Gateway. See /health for status.');
+app.get('/', (_req, res) => {
+    res.send('PTS API Gateway. See /health for status.');
 });
 
-// Final Error Handling
+// ─── Error Handler (must be last) ────────────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;
-

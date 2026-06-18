@@ -1,25 +1,51 @@
-/* ─── SETUP SCREEN — Device Registration ─────────────────────────────────*/
+/* ─── SETUP SCREEN — Device Registration ─────────────────────────────────── */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 interface Props {
     onActivate: (imei: string, token: string, intervalMs: number) => void;
 }
 
+/** Luhn algorithm check — standard IMEI validity test */
+function isValidImei(imei: string): boolean {
+    if (!/^\d{15}$/.test(imei)) return false;
+    let sum = 0;
+    for (let i = 0; i < 15; i++) {
+        let digit = parseInt(imei[i], 10);
+        if (i % 2 === 1) {
+            digit *= 2;
+            if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+    }
+    return sum % 10 === 0;
+}
+
 export default function SetupScreen({ onActivate }: Props) {
-    const [imei, setImei] = useState(localStorage.getItem('pts_imei') || '');
-    const [token, setToken] = useState(localStorage.getItem('pts_sentinel_token') || '');
-    const [interval, setInterval] = useState(30);
-    const [error, setError] = useState('');
+    const [imei, setImei]         = useState(localStorage.getItem('pts_imei') || '');
+    const [token, setToken]       = useState(localStorage.getItem('pts_sentinel_token') || '');
+    const [intervalSec, setIntervalSec] = useState(30);
+    const [error, setError]       = useState('');
+
+    const handleImeiChange = (value: string) => {
+        // Strip non-digits as the user types
+        setImei(value.replace(/\D/g, '').slice(0, 15));
+        setError('');
+    };
 
     const handleActivate = () => {
-        if (!imei.trim() || imei.trim().length < 14) {
-            setError('Enter a valid 15-digit IMEI number');
+        const trimmed = imei.trim();
+        if (trimmed.length !== 15) {
+            setError('IMEI must be exactly 15 digits. Dial *#06# to find yours.');
             return;
         }
-        localStorage.setItem('pts_imei', imei.trim());
+        if (!isValidImei(trimmed)) {
+            setError('Invalid IMEI — checksum failed. Please double-check the number.');
+            return;
+        }
+        localStorage.setItem('pts_imei', trimmed);
         localStorage.setItem('pts_sentinel_token', token.trim());
-        onActivate(imei.trim(), token.trim(), interval * 1000);
+        onActivate(trimmed, token.trim(), intervalSec * 1000);
     };
 
     return (
@@ -32,18 +58,15 @@ export default function SetupScreen({ onActivate }: Props) {
             padding: '24px 20px',
             gap: 0,
         }}>
-            {/* Logo */}
+            {/* Brand */}
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
                 <div style={{
-                    width: 72,
-                    height: 72,
+                    width: 72, height: 72,
                     margin: '0 auto 16px',
                     borderRadius: 18,
                     background: 'rgba(0, 240, 255, 0.06)',
                     border: '1px solid rgba(0, 240, 255, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 32,
                 }}>🛰️</div>
                 <h1 style={{
@@ -63,66 +86,73 @@ export default function SetupScreen({ onActivate }: Props) {
                 }}>NATIONAL DEVICE TRACKING SYSTEM</p>
             </div>
 
-            {/* Form */}
+            {/* Form Card */}
             <div style={{
-                width: '100%',
-                maxWidth: 360,
+                width: '100%', maxWidth: 360,
                 background: 'var(--col-card)',
                 border: '1px solid var(--col-border)',
                 borderRadius: 20,
                 padding: 20,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
+                display: 'flex', flexDirection: 'column', gap: 16,
             }}>
+                {/* IMEI Field */}
                 <div>
                     <label style={labelStyle}>Device IMEI *</label>
                     <input
-                        type="number"
+                        type="tel"
+                        inputMode="numeric"
                         placeholder="Enter 15-digit IMEI"
                         value={imei}
-                        onChange={e => setImei(e.target.value)}
-                        style={inputStyle}
+                        onChange={e => handleImeiChange(e.target.value)}
+                        style={{
+                            ...inputStyle,
+                            borderColor: error ? 'rgba(255, 59, 48, 0.5)' : undefined,
+                        }}
                         maxLength={15}
+                        aria-label="Device IMEI number"
                     />
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--col-muted)', marginTop: 4 }}>
-                        Dial *#06# to find your IMEI
+                    <p style={hintStyle}>
+                        Dial <strong>*#06#</strong> on your phone to find your IMEI
                     </p>
                 </div>
 
+                {/* Token Field */}
                 <div>
-                    <label style={labelStyle}>PTS Auth Token (optional)</label>
+                    <label style={labelStyle}>PTS Auth Token <span style={{ opacity: 0.5 }}>(optional)</span></label>
                     <input
                         type="password"
                         placeholder="••••••••••••"
                         value={token}
                         onChange={e => setToken(e.target.value)}
                         style={inputStyle}
+                        aria-label="PTS authentication token"
+                        autoComplete="current-password"
                     />
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--col-muted)', marginTop: 4 }}>
-                        Log in at pts-vexel.vercel.app to get your token
+                    <p style={hintStyle}>
+                        Get your token at <span style={{ color: 'var(--col-primary)' }}>pts-vexel.vercel.app</span>
                     </p>
                 </div>
 
+                {/* Interval Slider */}
                 <div>
-                    <label style={labelStyle}>Beacon Interval: {interval}s</label>
+                    <label style={labelStyle}>Beacon Interval: {intervalSec}s</label>
                     <input
                         type="range"
-                        min={10}
-                        max={120}
-                        step={10}
-                        value={interval}
-                        onChange={e => setInterval(Number(e.target.value))}
+                        min={10} max={120} step={10}
+                        value={intervalSec}
+                        onChange={e => setIntervalSec(Number(e.target.value))}
                         style={{ width: '100%', accentColor: 'var(--col-primary)', marginTop: 6 }}
+                        aria-label={`Beacon interval: ${intervalSec} seconds`}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--col-muted)', marginTop: 2 }}>
-                        <span>10s (HIGH FREQ)</span>
-                        <span>120s (BATTERY SAVE)</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', ...hintStyle, marginTop: 4 }}>
+                        <span>10s — High frequency</span>
+                        <span>120s — Battery saver</span>
                     </div>
                 </div>
 
+                {/* Error Message */}
                 {error && (
-                    <div style={{
+                    <div role="alert" style={{
                         padding: '10px 12px',
                         background: 'rgba(255, 59, 48, 0.1)',
                         border: '1px solid rgba(255, 59, 48, 0.3)',
@@ -130,11 +160,13 @@ export default function SetupScreen({ onActivate }: Props) {
                         fontFamily: 'var(--font-mono)',
                         fontSize: 11,
                         color: 'var(--col-danger)',
+                        lineHeight: 1.5,
                     }}>
                         {error}
                     </div>
                 )}
 
+                {/* Submit */}
                 <button
                     onClick={handleActivate}
                     style={{
@@ -166,7 +198,8 @@ export default function SetupScreen({ onActivate }: Props) {
                 lineHeight: 1.6,
                 maxWidth: 300,
             }}>
-                This device will continuously broadcast its GPS location to the PTS National Registry. Location data is encrypted and only accessible to law enforcement.
+                This device will broadcast its GPS location to the PTS National Registry.
+                Location data is only accessible to authorised law enforcement.
             </p>
         </div>
     );
@@ -178,7 +211,7 @@ const labelStyle: React.CSSProperties = {
     fontSize: 10,
     color: 'var(--col-muted)',
     letterSpacing: '0.15em',
-    textTransform: 'uppercase' as const,
+    textTransform: 'uppercase',
     marginBottom: 8,
 };
 
@@ -192,4 +225,12 @@ const inputStyle: React.CSSProperties = {
     fontFamily: 'var(--font-mono)',
     fontSize: 13,
     outline: 'none',
+    boxSizing: 'border-box',
+};
+
+const hintStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    color: 'var(--col-muted)',
+    marginTop: 4,
 };

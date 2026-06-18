@@ -1,4 +1,4 @@
-/* ─── PTS SENTINEL — BEACON SERVICE (MOBILE OPTIMIZED) ───────────────── */
+/* ─── PTS SENTINEL — Beacon Service ─────────────────────────────────────── */
 
 import { Geolocation } from '@capacitor/geolocation';
 import { Device } from '@capacitor/device';
@@ -6,6 +6,8 @@ import { Network } from '@capacitor/network';
 import { Capacitor } from '@capacitor/core';
 
 const PTS_API = import.meta.env.VITE_PTS_API_URL || 'https://pts-backend-main-project.onrender.com/api/v1';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BeaconPayload {
     imei: string;
@@ -20,12 +22,11 @@ export interface BeaconPayload {
     status: 'ONLINE' | 'OFFLINE';
     timestamp: number;
     sessionId: string;
-    simCountry?: string; // REACT-NATIVE-DEVICE-COUNTRY Integration
-    // HARDWARE DNA — Forensic Identity
-    screen_serial?: string;
-    battery_serial?: string;
-    logic_board_serial?: string;
-    camera_serial?: string;
+    simCountry: string;
+    screen_serial: string;
+    battery_serial: string;
+    logic_board_serial: string;
+    camera_serial: string;
 }
 
 export interface BeaconLog {
@@ -40,8 +41,10 @@ export interface BeaconLog {
     trackingMode?: 'STANDARD' | 'LOST_MODE';
 }
 
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 class BeaconService {
-    private intervalId: any = null;
+    private intervalId: ReturnType<typeof setInterval> | null = null;
     private watchId: string | null = null;
     private sessionId: string;
     private onUpdate: ((log: BeaconLog) => void) | null = null;
@@ -54,27 +57,28 @@ class BeaconService {
 
     async start(
         imei: string,
-        intervalMs: number = 30000,
+        intervalMs: number = 30_000,
         onUpdate: (log: BeaconLog) => void,
         onStatusChange: (active: boolean) => void,
-        isLostMode: boolean = false // TRACEME-APP Integration
+        isLostMode = false,
     ) {
         if (this.isActive) return;
 
-        // TraceMe App Mode: Aggressive tracking for lost device
-        const activeInterval = isLostMode ? 5000 : intervalMs;
+        // Lost mode uses faster interval for aggressive tracking
+        const activeInterval = isLostMode ? 5_000 : intervalMs;
 
-        // Only explicitly check native permissions if running on mobile Android/iOS
-        // The web browser handles permissions automatically via prompts
+        // On native platforms, request location permission explicitly
         if (Capacitor.isNativePlatform()) {
             try {
                 const perm = await Geolocation.checkPermissions();
                 if (perm.location !== 'granted') {
                     const req = await Geolocation.requestPermissions();
-                    if (req.location !== 'granted') throw new Error('Location Permission Required');
+                    if (req.location !== 'granted') {
+                        throw new Error('Location permission is required for beacon service');
+                    }
                 }
             } catch (e) {
-                console.warn('Native permission check skipped or failed:', e);
+                console.warn('[BEACON] Permission check failed:', e);
             }
         }
 
@@ -83,32 +87,33 @@ class BeaconService {
         this.isActive = true;
         onStatusChange(true);
 
-        // Initial GPS Fix
+        // Fire immediately, then on interval
         this.fire(imei, isLostMode);
-
-        // Foreground service-style interval (Aggressive if lost)
         this.intervalId = setInterval(() => this.fire(imei, isLostMode), activeInterval);
 
-        // Dynamic GPS Watch
+        // GPS watch for high-movement scenarios (future: dynamic reporting)
         this.watchId = await Geolocation.watchPosition(
-            { enableHighAccuracy: true, timeout: 10000 },
-            (pos) => {
-                if (pos) {
-                    // You could optionally report on every change, but for battery we stick to the interval
-                    // Unless the speed is high — you could add logic here.
-                }
-            }
+            { enableHighAccuracy: true, timeout: 10_000 },
+            (_pos) => {
+                // Reserved for future adaptive-interval logic
+            },
         );
     }
 
     stop() {
-        if (this.intervalId) clearInterval(this.intervalId);
-        if (this.watchId) Geolocation.clearWatch({ id: this.watchId });
+        if (this.intervalId !== null) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+        if (this.watchId !== null) {
+            Geolocation.clearWatch({ id: this.watchId });
+            this.watchId = null;
+        }
         this.isActive = false;
         this.onStatusChange?.(false);
     }
 
-    private async fire(imei: string, isLostMode: boolean = false) {
+    private async fire(imei: string, isLostMode = false) {
         const logId = `LOG-${Date.now()}`;
         const pending: BeaconLog = {
             id: logId,
@@ -116,26 +121,21 @@ class BeaconService {
             latitude: 0,
             longitude: 0,
             accuracy: 999,
-            address: 'Resolving Fix...',
+            address: 'Resolving GPS fix...',
             status: 'pending',
-            trackingMode: isLostMode ? 'LOST_MODE' : 'STANDARD'
+            trackingMode: isLostMode ? 'LOST_MODE' : 'STANDARD',
         };
         this.onUpdate?.(pending);
 
         try {
-            // 1. Get High-Accuracy Native Fix
             const pos = await Geolocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 10000
+                timeout: 10_000,
             });
 
             const { latitude, longitude, accuracy, altitude, speed, heading } = pos.coords;
-
-            // 2. Get Device Meta
             const battery = await Device.getBatteryInfo();
             const network = await Network.getStatus();
-
-            // 3. Resolve Address
             const address = await this.reverseGeocode(latitude, longitude);
 
             const payload: BeaconPayload = {
@@ -146,53 +146,54 @@ class BeaconService {
                 altitude,
                 speed,
                 heading,
-                batteryLevel: Math.round((battery.batteryLevel || 0) * 100),
-                isPlugged: battery.isCharging || false,
-                status: isLostMode ? 'OFFLINE' : (network.connected ? 'ONLINE' : 'OFFLINE'), // or 'LOST' if API supports
+                batteryLevel: battery.batteryLevel != null ? Math.round(battery.batteryLevel * 100) : null,
+                isPlugged: battery.isCharging ?? false,
+                status: network.connected ? 'ONLINE' : 'OFFLINE',
                 timestamp: pos.timestamp,
                 sessionId: this.sessionId,
-                simCountry: Capacitor.isNativePlatform() ? "NG" : "UNKNOWN",
-                // Hardware DNA: Pulled from internal secure storage or native bridges
-                screen_serial: localStorage.getItem('pts_hw_screen') || 'NOT_PROVISIONED',
-                battery_serial: localStorage.getItem('pts_hw_battery') || 'NOT_PROVISIONED',
-                logic_board_serial: localStorage.getItem('pts_hw_board') || 'NOT_PROVISIONED',
-                camera_serial: localStorage.getItem('pts_hw_camera') || 'NOT_PROVISIONED'
+                simCountry: Capacitor.isNativePlatform() ? 'NG' : 'UNKNOWN',
+                // Hardware DNA — provisioned via secure native bridge or on-device setup
+                screen_serial:    localStorage.getItem('pts_hw_screen')   ?? 'NOT_PROVISIONED',
+                battery_serial:   localStorage.getItem('pts_hw_battery')  ?? 'NOT_PROVISIONED',
+                logic_board_serial: localStorage.getItem('pts_hw_board')  ?? 'NOT_PROVISIONED',
+                camera_serial:    localStorage.getItem('pts_hw_camera')   ?? 'NOT_PROVISIONED',
             };
 
-            // 4. Dispatch Pulse
             const token = localStorage.getItem('pts_sentinel_token');
             const res = await fetch(`${PTS_API}/guardian/beacon`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token && { 'Authorization': `Bearer ${token}` })
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
             });
 
-            const status = res.ok ? 'sent' : 'failed';
             this.onUpdate?.({
                 ...pending,
                 latitude,
                 longitude,
                 accuracy,
                 address,
-                status,
+                status: res.ok ? 'sent' : 'failed',
                 simCountry: payload.simCountry,
-                trackingMode: isLostMode ? 'LOST_MODE' : 'STANDARD'
             });
 
         } catch (err) {
-            console.error('[SENTINEL BEACON FAILED]', err);
-            this.onUpdate?.({ ...pending, address: 'Fix Failed: No GPS', status: 'failed' });
+            console.error('[BEACON FIRE FAILED]', err);
+            this.onUpdate?.({ ...pending, address: 'GPS fix failed', status: 'failed' });
         }
     }
 
     private async reverseGeocode(lat: number, lon: number): Promise<string> {
         try {
-            const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-            const d = await r.json();
-            return d.display_name?.split(', ').slice(0, 3).join(', ') || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+                { headers: { 'Accept-Language': 'en' } },
+            );
+            const data = await res.json();
+            return data.display_name?.split(', ').slice(0, 3).join(', ')
+                ?? `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
         } catch {
             return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
         }
