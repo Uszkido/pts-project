@@ -1,6 +1,9 @@
-node_modules/
+﻿node_modules/
 .env
 .env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 .DS_Store
 *.db
 *.sqlite
@@ -32,3 +35,4 @@ backend/logs/
 
 # Misc
 Discription
+
