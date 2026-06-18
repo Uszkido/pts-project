@@ -1,6 +1,6 @@
 # 📱 PTS — Phone Theft Tracking System
 
-> A decentralized digital authority for verifiable device ownership — preventing the resale of stolen phones through immutable, IMEI-bound digital certificates.
+> A decentralized digital authority for verifiable device ownership, tracking stolen devices and preventing the resale of stolen phones through immutable, IMEI-bound digital certificates.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://pts-frontend-ten.vercel.app)
