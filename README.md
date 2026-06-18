@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933)](backend)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748)](backend/prisma)
 
-**🔗 [Live Demo](https://pts-frontend-ten.vercel.app)** &nbsp;•&nbsp; **Built by [Usama Ado Shehu](https://github.com/Uszkido) — Vexel Innovations**
+**🔗 [Live Demo](https://pts-vexel.vercel.app)** &nbsp;•&nbsp; **Built by [Usama Ado Shehu](https://github.com/Uszkido) — Vexel Innovations**
 
 ---
 
