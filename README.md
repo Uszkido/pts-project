@@ -1,151 +1,261 @@
-﻿# ðŸ“± PTS â€” Phone Theft Tracking System
+# 📱 PTS — Phone Tracking System
 
-> A decentralized digital authority for verifiable device ownership, tracking stolen devices and preventing the resale of stolen phones through immutable, IMEI-bound digital certificates.
+> A decentralized national registry for verifiable device ownership, stolen phone tracking, and IMEI-bound digital certificates of ownership.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://pts-frontend-ten.vercel.app)
-[![Next.js](https://img.shields.io/badge/Frontend-Next.js-black)](frontend)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://pts-vexel.vercel.app)
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933)](backend)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748)](backend/prisma)
 
-**ðŸ”— [Live Demo](https://pts-vexel.vercel.app)** &nbsp;â€¢&nbsp; **Built by [Usama Ado Shehu](https://github.com/Uszkido) â€” Vexel Innovations**
+**🔗 [Live Demo](https://pts-vexel.vercel.app)** &nbsp;•&nbsp; Built by [Usama Ado Shehu](https://github.com/Uszkido) — Vexel Innovations
 
 ---
 
-## ðŸ“‹ Table of Contents
+## 📋 Table of Contents
 
-- [Overview](#-overview)
-- [System Architecture](#%EF%B8%8F-system-architecture)
-- [Core User Roles](#-core-user-roles)
-- [Database Schema](#%EF%B8%8F-database-schema)
-- [Key Workflows](#-key-workflows)
-- [Getting Started](#-getting-started)
-- [Security](#%EF%B8%8F-security-mechanisms)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [User Roles](#user-roles)
+- [Database Schema](#database-schema)
+- [Key Workflows](#key-workflows)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Reference](#api-reference)
+- [Security](#security)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## ðŸ§­ Overview
+## Overview
 
-PTS gives every mobile device a verifiable digital identity. Vendors register devices at point of sale, ownership transfers are logged on an immutable chain of custody, and anyone â€” a buyer, a pawn shop, a police officer â€” can check an IMEI in seconds to see if it's clean or stolen.
+PTS gives every mobile device a verifiable digital identity. Vendors register devices at point of sale, ownership transfers are logged on an immutable chain of custody, and anyone — a buyer, a pawn shop, a police officer — can verify an IMEI in seconds to see if it's clean or stolen.
 
-| | |
+| Layer | Technology |
 |---|---|
-| **Frontend** | Next.js (React) + TailwindCSS |
-| **Backend** | Node.js + Express |
+| **Backend API** | Node.js + Express |
 | **Database** | PostgreSQL + Prisma ORM (Neon serverless) |
-| **Mobile** | Capacitor / native Android & iOS agents |
+| **Mobile Agent** | React + TypeScript + Capacitor (Android/iOS) |
+| **Auth** | JWT + bcrypt + OTP email verification |
+| **Storage** | Cloudinary (images/documents) |
+| **AI** | Groq SDK (AI command center) |
 
 ---
 
-## ðŸ—ï¸ System Architecture
+## Architecture
 
-- **Frontend** â€” Public-facing IMEI verification, Law Enforcement login, Vendor Portal, and Device Owner dashboard.
-- **Backend/API** â€” Handles authentication, dashboard logic, device registration, and ownership transfers.
-- **Database** â€” PostgreSQL paired with Prisma ORM, hosted on Neon serverless.
-
-## ðŸ‘¥ Core User Roles
-
-### 1. Device Owner (`CONSUMER`)
-Views digital certificates for owned devices and can flag a device as stolen directly from their dashboard.
-
-### 2. Verified Vendor (`VENDOR`)
-The point of registration. When a phone is sold, the vendor registers the IMEI and issues the first certificate of ownership to the buyer. Vendors carry a **Vendor Tier** trust score.
-
-### 3. Law Enforcement (`POLICE`)
-Administrative oversight to investigate flagged devices, review transaction histories, and confirm or clear stolen status across the registry.
+```
+pts-project/
+├── backend/                  # Express API server
+│   ├── api/index.js          # Entry point & route loader
+│   ├── src_backend/
+│   │   ├── controllers/      # Business logic
+│   │   ├── middleware/       # Auth, error handling
+│   │   ├── routes/           # API route definitions
+│   │   ├── services/         # Reusable service layer
+│   │   └── utils/            # Logger, response helpers
+│   └── prisma/
+│       └── schema.prisma     # Database models
+└── pts-sentinel-app/         # Mobile tracking agent
+    └── src/
+        ├── screens/          # Setup & Dashboard UI
+        ├── components/       # Radar, BeaconFeed
+        └── services/         # beaconService, notificationInterceptService
+```
 
 ---
 
-## ðŸ—„ï¸ Database Schema
+## User Roles
+
+| Role | Capabilities |
+|---|---|
+| **CONSUMER** | View certificates for owned devices, flag device as stolen |
+| **VENDOR** | Register devices at point of sale, issue certificates, initiate transfers |
+| **POLICE** | Investigate flagged devices, review transaction histories, manage incident reports |
+| **ADMIN** | Full system access, user management, analytics |
+| **TELECOM** | Sync blacklisted IMEIs with network-level blocking |
+| **INSURANCE** | Access risk scores and incident reports for insured devices |
+
+---
+
+## Database Schema
 
 | Model | Purpose |
 |---|---|
-| **User** | All operators â€” `id`, `email`, `role` (ADMIN / VENDOR / CONSUMER / POLICE / INSURANCE / TELECOM), `vendorTier` |
-| **Device** | Core tracked asset â€” `imei` (unique, 15-digit), `serialNumber`, `brand`, `model`, `status` (CLEAN / STOLEN / LOST / INVESTIGATING / VENDOR_HELD), `riskScore` (0â€“100) |
-| **Certificate** | Proof of ownership â€” `deviceId`, `ownerId`, `qrHash` (unique, for physical scanning), `isActive` |
-| **OwnershipTransfer / ProofOfSale** | Ledger of ownership changes â€” `sellerId`, `buyerId`, `status` (PENDING / COMPLETED / CANCELLED) |
-| **IncidentReport** | Lost/stolen reports â€” `deviceId`, `reporterId`, `type` (LOST / STOLEN / SNATCHED / FRAUD), `policeReportNo`, `status` (OPEN / REVIEWING / RESOLVED) |
-| **TransactionHistory** | Immutable audit log of every action taken on a device |
+| **User** | All operators — `email`, `role`, `vendorTier`, facial/business verification data |
+| **Device** | Core tracked asset — `imei` (unique 15-digit), `status` (CLEAN/STOLEN/LOST/INVESTIGATING), `riskScore` |
+| **Certificate** | Proof of ownership — `qrHash` (unique, for physical scanning), `isActive` |
+| **OwnershipTransfer** | Chain of custody — `sellerId`, `buyerId`, `escrowStatus` |
+| **IncidentReport** | Theft/loss reports — type (LOST/STOLEN/SNATCHED/FRAUD), `policeReportNo`, `status` |
+| **TransactionHistory** | Immutable audit log — SHA-256 sealed entries for every action |
+| **DeveloperApiKey** | Third-party API access with quota and billing tracking |
+| **ObservationReport** | Guardian Mesh sightings via BT/WiFi from sentinel agents |
 
 ---
 
-## ðŸ”‘ Key Workflows
+## Key Workflows
 
-### Safe Purchasing â€” Public Verification API
-Anyone can enter a 15-digit IMEI on the PTS homepage. The system checks the `Device` and `IncidentReport` tables and returns a **Public Trust Index** score. Devices marked `STOLEN` trigger a clear warning before purchase.
+### Public IMEI Verification
+Anyone can look up a 15-digit IMEI. The system returns a **Public Trust Index** score. Devices marked `STOLEN` display a clear warning.
 
 ### Chain of Custody
-1. A **Vendor** registers a new device.
-2. The Vendor transfers ownership to a **Consumer's** email address.
-3. PTS issues a `Certificate` binding that Consumer to the device IMEI.
-4. The transfer is permanently logged in `TransactionHistory`.
+1. A **Vendor** registers a new device (IMEI + photos + receipt).
+2. Vendor initiates an ownership transfer to the buyer's email.
+3. PTS issues a `Certificate` binding that buyer to the device IMEI.
+4. Transfer is permanently logged in `TransactionHistory` with a SHA-256 seal.
+
+### Stolen Device Reporting
+1. Owner flags device via dashboard or USSD (`*123#`).
+2. `IncidentReport` created; device status set to `STOLEN`.
+3. Law enforcement notified; device added to telecom blacklist feed.
+4. **PTS Sentinel** mobile agent continuously broadcasts GPS location to registry.
 
 ---
 
-## ðŸš€ Getting Started
+## Getting Started
 
 ### Prerequisites
-- Node.js â‰¥ 18
+
+- Node.js ≥ 18
 - PostgreSQL database (or a [Neon](https://neon.tech) serverless instance)
 
-### Backend setup
+### Backend
+
 ```bash
 cd backend
 npm install
-cp .env.example .env      # add your DATABASE_URL and JWT secret
+cp .env.example .env        # Fill in your secrets
 npx prisma generate
 npx prisma migrate dev
-npm run dev
+npm run dev                 # Starts on port 5000
 ```
 
-### Frontend setup
+### Mobile App (pts-sentinel-app)
+
 ```bash
-cd frontend
+cd pts-sentinel-app
 npm install
-cp .env.example .env.local   # point this at your backend URL
-npm run dev
+cp .env.example .env        # Set VITE_PTS_API_URL
+npm run dev                 # Web preview
+# For Android:
+npm run build
+npx cap sync android
+npx cap open android
 ```
 
-The app will be available at `http://localhost:3000`.
-
-> **Note:** Replace the `.env.example` references above with your actual environment template filenames if they differ.
+The API will be available at `http://localhost:5000`.
 
 ---
 
-## ðŸ›¡ï¸ Security Mechanisms
+## Environment Variables
 
-- Devices cannot be deleted directly â€” all changes flow through an auditable Transfer or Reporting workflow.
-- Passwords are hashed with `bcrypt`.
-- Backend routes are protected by JWT-based authentication.
+Copy `backend/.env.example` to `backend/.env` and fill in all values.
 
----
+| Variable | Description | Required |
+|---|---|---|
+| `DATABASE_URL` | Neon/PostgreSQL connection string | ✅ |
+| `DIRECT_URL` | Direct DB URL (for Prisma migrations) | ✅ |
+| `JWT_SECRET` | Long random string for signing tokens | ✅ |
+| `EMAIL_USER` | SMTP email for OTP delivery | ✅ |
+| `EMAIL_PASS` | SMTP app password | ✅ |
+| `CLOUDINARY_*` | Cloud storage for images/documents | Recommended |
+| `GROQ_API_KEY` | AI Command Center features | Optional |
+| `PAYSTACK_SECRET_KEY` | NGN payment processing | Optional |
+| `TELEGRAM_BOT_TOKEN` | Telegram alert bot | Optional |
+| `WHATSAPP_*` | WhatsApp Business API alerts | Optional |
 
-## ðŸ—ºï¸ Roadmap
+For the mobile app, create `pts-sentinel-app/.env`:
 
-PTS is evolving from a registry into a full hardware-intelligence infrastructure â€” see [`ROADMAP.md`](ROADMAP.md) for the full plan, including the Device DNA Registry, Guardian Mesh Network, and Anti-Theft Kill-Switch API.
-
-**Currently live:** Device DNA Registry Â· Naira (â‚¦) currency integration Â· AI Command Center Â· Blockchain chain-of-custody.
-
----
-
-## ðŸ¤ Contributing
-
-Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before opening a PR.
-
-## ðŸ”’ Security Policy
-
-Found a vulnerability? Please see [`SECURITY.md`](SECURITY.md) for responsible disclosure steps.
-
-## ðŸ“„ License
-
-This project is licensed under the [MIT License](LICENSE).
+```
+VITE_PTS_API_URL=https://your-backend-url.com/api/v1
+```
 
 ---
 
-<p align="center">
-  Made with â¤ï¸ in Nigeria by <a href="https://github.com/Uszkido">Usama Ado Shehu</a> â€” Vexel Innovations
-</p>
+## API Reference
 
+Base URL: `/api/v1`
+
+### Auth
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/register/start` | Start registration, sends OTP |
+| POST | `/auth/register/verify` | Verify OTP, create account |
+| POST | `/auth/login` | Login, returns JWT |
+| POST | `/auth/reset-password` | Request password reset OTP |
+| POST | `/auth/verify-reset-otp` | Confirm OTP, apply new password |
+
+### Devices
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/devices` | Register a new device (Vendor) |
+| GET | `/devices/:imei` | Get device details |
+| PATCH | `/devices/:imei/status` | Update device status |
+
+### Public
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/public/verify/:imei` | Public IMEI trust check |
+
+### Guardian (Mobile Agent)
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/guardian/beacon` | Submit GPS location beacon |
+
+Full API documentation available via `/health` endpoint which lists all loaded routes.
+
+---
+
+## Security
+
+- Passwords hashed with **bcrypt** (10 rounds).
+- All protected routes require a valid **JWT** (`Authorization: Bearer <token>`).
+- Role-based access control via the `authorize(...roles)` middleware.
+- OTP-verified registration and password reset flow.
+- Devices cannot be deleted — all changes flow through auditable Transfer or Reporting workflows.
+- `TransactionHistory` entries are SHA-256 sealed after creation (`isSealed: true`).
+- Rate limiting recommended for production (add `express-rate-limit` to auth routes).
+
+> ⚠️ **Before deploying to production**, see the [Security Hardening](#security-hardening) section below.
+
+### Security Hardening Checklist
+
+- [ ] Set a strong, unique `JWT_SECRET` (min 32 chars, generated randomly)
+- [ ] Remove the admin credential auto-creation from the `/health` endpoint
+- [ ] Add `helmet` middleware: `npm install helmet` → `app.use(helmet())`
+- [ ] Add rate limiting to `/api/v1/auth/*` routes
+- [ ] Restrict CORS to your actual frontend origin(s)
+- [ ] Set `NODE_ENV=production` in your hosting environment
+- [ ] Enable HTTPS (handled by Vercel/Render/Railway automatically)
+- [ ] Run `npm audit` and resolve any high/critical findings
+
+---
+
+## Roadmap
+
+See [`ROADMAP.md`](ROADMAP.md) for the full plan, including:
+
+- **Device DNA Registry** — hardware serial binding for forensic identity
+- **Guardian Mesh Network** — crowd-sourced BT/WiFi sighting reports
+- **Anti-Theft Kill-Switch API** — remote brick/recovery via telecom integration
+- **Blockchain Chain of Custody** — immutable on-chain ownership proofs
+- **Escrow Payments** — Paystack-backed escrow for second-hand device purchases
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before opening a PR.
+
+## Security Policy
+
+Found a vulnerability? See [`SECURITY.md`](SECURITY.md) for responsible disclosure steps.
+
+## License
+
+[MIT License](LICENSE) — © Usama Ado Shehu / Vexel Innovations
+
+---
+
+<p align="center">Made with ❤️ in Nigeria by <a href="https://github.com/Uszkido">Usama Ado Shehu</a> — Vexel Innovations</p>
