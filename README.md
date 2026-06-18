@@ -1,4 +1,4 @@
-# 📱 PTS — Phone Theft Tracking System
+﻿# ðŸ“± PTS â€” Phone Theft Tracking System
 
 > A decentralized digital authority for verifiable device ownership, tracking stolen devices and preventing the resale of stolen phones through immutable, IMEI-bound digital certificates.
 
@@ -8,11 +8,11 @@
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933)](backend)
 [![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748)](backend/prisma)
 
-**🔗 [Live Demo](https://pts-vexel.vercel.app)** &nbsp;•&nbsp; **Built by [Usama Ado Shehu](https://github.com/Uszkido) — Vexel Innovations**
+**ðŸ”— [Live Demo](https://pts-vexel.vercel.app)** &nbsp;â€¢&nbsp; **Built by [Usama Ado Shehu](https://github.com/Uszkido) â€” Vexel Innovations**
 
 ---
 
-## 📋 Table of Contents
+## ðŸ“‹ Table of Contents
 
 - [Overview](#-overview)
 - [System Architecture](#%EF%B8%8F-system-architecture)
@@ -27,9 +27,9 @@
 
 ---
 
-## 🧭 Overview
+## ðŸ§­ Overview
 
-PTS gives every mobile device a verifiable digital identity. Vendors register devices at point of sale, ownership transfers are logged on an immutable chain of custody, and anyone — a buyer, a pawn shop, a police officer — can check an IMEI in seconds to see if it's clean or stolen.
+PTS gives every mobile device a verifiable digital identity. Vendors register devices at point of sale, ownership transfers are logged on an immutable chain of custody, and anyone â€” a buyer, a pawn shop, a police officer â€” can check an IMEI in seconds to see if it's clean or stolen.
 
 | | |
 |---|---|
@@ -40,13 +40,13 @@ PTS gives every mobile device a verifiable digital identity. Vendors register de
 
 ---
 
-## 🏗️ System Architecture
+## ðŸ—ï¸ System Architecture
 
-- **Frontend** — Public-facing IMEI verification, Law Enforcement login, Vendor Portal, and Device Owner dashboard.
-- **Backend/API** — Handles authentication, dashboard logic, device registration, and ownership transfers.
-- **Database** — PostgreSQL paired with Prisma ORM, hosted on Neon serverless.
+- **Frontend** â€” Public-facing IMEI verification, Law Enforcement login, Vendor Portal, and Device Owner dashboard.
+- **Backend/API** â€” Handles authentication, dashboard logic, device registration, and ownership transfers.
+- **Database** â€” PostgreSQL paired with Prisma ORM, hosted on Neon serverless.
 
-## 👥 Core User Roles
+## ðŸ‘¥ Core User Roles
 
 ### 1. Device Owner (`CONSUMER`)
 Views digital certificates for owned devices and can flag a device as stolen directly from their dashboard.
@@ -59,22 +59,22 @@ Administrative oversight to investigate flagged devices, review transaction hist
 
 ---
 
-## 🗄️ Database Schema
+## ðŸ—„ï¸ Database Schema
 
 | Model | Purpose |
 |---|---|
-| **User** | All operators — `id`, `email`, `role` (ADMIN / VENDOR / CONSUMER / POLICE / INSURANCE / TELECOM), `vendorTier` |
-| **Device** | Core tracked asset — `imei` (unique, 15-digit), `serialNumber`, `brand`, `model`, `status` (CLEAN / STOLEN / LOST / INVESTIGATING / VENDOR_HELD), `riskScore` (0–100) |
-| **Certificate** | Proof of ownership — `deviceId`, `ownerId`, `qrHash` (unique, for physical scanning), `isActive` |
-| **OwnershipTransfer / ProofOfSale** | Ledger of ownership changes — `sellerId`, `buyerId`, `status` (PENDING / COMPLETED / CANCELLED) |
-| **IncidentReport** | Lost/stolen reports — `deviceId`, `reporterId`, `type` (LOST / STOLEN / SNATCHED / FRAUD), `policeReportNo`, `status` (OPEN / REVIEWING / RESOLVED) |
+| **User** | All operators â€” `id`, `email`, `role` (ADMIN / VENDOR / CONSUMER / POLICE / INSURANCE / TELECOM), `vendorTier` |
+| **Device** | Core tracked asset â€” `imei` (unique, 15-digit), `serialNumber`, `brand`, `model`, `status` (CLEAN / STOLEN / LOST / INVESTIGATING / VENDOR_HELD), `riskScore` (0â€“100) |
+| **Certificate** | Proof of ownership â€” `deviceId`, `ownerId`, `qrHash` (unique, for physical scanning), `isActive` |
+| **OwnershipTransfer / ProofOfSale** | Ledger of ownership changes â€” `sellerId`, `buyerId`, `status` (PENDING / COMPLETED / CANCELLED) |
+| **IncidentReport** | Lost/stolen reports â€” `deviceId`, `reporterId`, `type` (LOST / STOLEN / SNATCHED / FRAUD), `policeReportNo`, `status` (OPEN / REVIEWING / RESOLVED) |
 | **TransactionHistory** | Immutable audit log of every action taken on a device |
 
 ---
 
-## 🔑 Key Workflows
+## ðŸ”‘ Key Workflows
 
-### Safe Purchasing — Public Verification API
+### Safe Purchasing â€” Public Verification API
 Anyone can enter a 15-digit IMEI on the PTS homepage. The system checks the `Device` and `IncidentReport` tables and returns a **Public Trust Index** score. Devices marked `STOLEN` trigger a clear warning before purchase.
 
 ### Chain of Custody
@@ -85,10 +85,10 @@ Anyone can enter a 15-digit IMEI on the PTS homepage. The system checks the `Dev
 
 ---
 
-## 🚀 Getting Started
+## ðŸš€ Getting Started
 
 ### Prerequisites
-- Node.js ≥ 18
+- Node.js â‰¥ 18
 - PostgreSQL database (or a [Neon](https://neon.tech) serverless instance)
 
 ### Backend setup
@@ -115,36 +115,37 @@ The app will be available at `http://localhost:3000`.
 
 ---
 
-## 🛡️ Security Mechanisms
+## ðŸ›¡ï¸ Security Mechanisms
 
-- Devices cannot be deleted directly — all changes flow through an auditable Transfer or Reporting workflow.
+- Devices cannot be deleted directly â€” all changes flow through an auditable Transfer or Reporting workflow.
 - Passwords are hashed with `bcrypt`.
 - Backend routes are protected by JWT-based authentication.
 
 ---
 
-## 🗺️ Roadmap
+## ðŸ—ºï¸ Roadmap
 
-PTS is evolving from a registry into a full hardware-intelligence infrastructure — see [`ROADMAP.md`](ROADMAP.md) for the full plan, including the Device DNA Registry, Guardian Mesh Network, and Anti-Theft Kill-Switch API.
+PTS is evolving from a registry into a full hardware-intelligence infrastructure â€” see [`ROADMAP.md`](ROADMAP.md) for the full plan, including the Device DNA Registry, Guardian Mesh Network, and Anti-Theft Kill-Switch API.
 
-**Currently live:** Device DNA Registry · Naira (₦) currency integration · AI Command Center · Blockchain chain-of-custody.
+**Currently live:** Device DNA Registry Â· Naira (â‚¦) currency integration Â· AI Command Center Â· Blockchain chain-of-custody.
 
 ---
 
-## 🤝 Contributing
+## ðŸ¤ Contributing
 
 Contributions are welcome! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before opening a PR.
 
-## 🔒 Security Policy
+## ðŸ”’ Security Policy
 
 Found a vulnerability? Please see [`SECURITY.md`](SECURITY.md) for responsible disclosure steps.
 
-## 📄 License
+## ðŸ“„ License
 
 This project is licensed under the [MIT License](LICENSE).
 
 ---
 
 <p align="center">
-  Made with ❤️ in Nigeria by <a href="https://github.com/Uszkido">Usama Ado Shehu</a> — Vexel Innovations
+  Made with â¤ï¸ in Nigeria by <a href="https://github.com/Uszkido">Usama Ado Shehu</a> â€” Vexel Innovations
 </p>
+
