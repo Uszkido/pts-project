@@ -1,4 +1,4 @@
-# 🚀 PTS (Property Tracking System) — The "Evolutionary Echelons"
+#  PTS (Phone Tracking System) — The "Evolutionary Echelons"
 
 The PTS project is evolving from a simple registry into a National Hardware Intelligence Infrastructure. This roadmap outlines the strategic phases (Echelons) to upscale the system to its maximum potential.
 
