@@ -1,13 +1,28 @@
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0D1117,35:1E293B,70:00F5FF,100:6E40C9&height=180&section=header&text=PTS%20%E2%80%94%20PHONE%20TRACKING%20SYSTEM&fontSize=34&fontColor=ffffff&animation=fadeIn&fontAlignY=36"/>
+
+### 📱 DECENTRALIZED PHONE TRACKING & IMEI VERIFICATION PLATFORM ⚡
+
+*Built by **[Usama Ado Shehu](https://github.com/Uszkido)** — **Vexel Innovations***
+
+<p align="center">
+  <a href="https://pts-vexel.vercel.app">
+    <img src="https://img.shields.io/badge/Live%20Demo-pts--vexel.vercel.app-00C853?style=for-the-badge&logo=vercel"/>
+  </a>
+  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white"/>
+</p>
+
+</div>
+
+---
+
 # 📱 PTS — Phone Tracking System
 
 > A decentralized national registry for verifiable device ownership, stolen phone tracking, and IMEI-bound digital certificates of ownership.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://pts-vexel.vercel.app)
-[![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933)](backend)
-[![Prisma](https://img.shields.io/badge/ORM-Prisma-2D3748)](backend/prisma)
-
-**🔗 [Live Demo](https://pts-vexel.vercel.app)** &nbsp;•&nbsp; Built by [Usama Ado Shehu](https://github.com/Uszkido) — Vexel Innovations
 
 ---
 
